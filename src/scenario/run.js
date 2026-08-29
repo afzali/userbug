@@ -202,6 +202,35 @@ async function execute({ page, ub, ctx, step }) {
       return;
     }
 
+    /**
+     * درخواست مستقیم به API هدف.
+     *
+     * ── چرا این هم لازم است ──
+     *
+     * userbug مرورگر را می‌راند، ولی بخشی از قرارداد سرور را هیچ کاربری از راه
+     * UI نمی‌زند: مسیرهای خطای اعتبارسنجی. همان‌هایی که وقتی خراب‌اند، هیچ‌کس
+     * تا روزِ بد نمی‌فهمد.
+     *
+     * از `page.request` می‌رود تا هم‌بستر با نشستِ صفحه باشد — و لاگ سرور هم
+     * در همان بازهٔ زمانیِ قدم جمع می‌شود، پس درخواست و خطِ لاگش کنار هم
+     * می‌نشینند.
+     */
+    case 'request': {
+      const base = ub.target.apiURL;
+      if (!base) throw new Error('هدف `apiURL` ندارد؛ فعل request بدون آن معنا ندارد');
+
+      const res = await page.request.fetch(base + body.path, {
+        method: body.method || 'GET',
+        data: body.json !== undefined ? body.json : undefined,
+        headers: { 'content-type': 'application/json', ...(body.headers || {}) },
+        failOnStatusCode: false,
+      });
+
+      const text = await res.text();
+      ctx.vars[body.saveAs || 'res'] = { status: String(res.status()), text };
+      return;
+    }
+
     case 'note':
       await ub.note({ message: body, detail: interpolate(raw.detail || null, ctx) });
       return;
@@ -257,6 +286,11 @@ async function checkCondition(page, cond) {
 
   if (cond.equals !== undefined) {
     return String(cond.equals[0]) === String(cond.equals[1]);
+  }
+
+  if (cond.matches !== undefined) {
+    const [value, pattern] = cond.matches;
+    return new RegExp(pattern).test(String(value));
   }
 
   throw new Error(`شرط نامفهوم: ${JSON.stringify(cond)}`);

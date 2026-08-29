@@ -8,6 +8,10 @@ export default {
   name: 'nepi',
   baseURL: 'http://localhost:5173',
 
+  // سرور واقعی نپی، لوکال روی SQLite. راه‌اندازی: پیکربندی `nepi-api-local`
+  // در `.claude/launch.json` نپی.
+  apiURL: 'http://127.0.0.1:8081',
+
   // دروازهٔ ایمنی. قلاب مخرب فقط روی local و staging اجرا می‌شود.
   environment: 'local',
 
@@ -20,12 +24,12 @@ export default {
   /**
    * لاگ سرور.
    *
-   * ثبت‌نام و بازیابی رمزِ نپی کاملاً سمت کلاینت است و به این سرور کاری ندارد؛
-   * این جمع‌کننده برای سناریوهای همگام‌سازی است که بعداً می‌آیند. تا آن وقت
-   * روشن می‌ماند و ساکت است — همین که ساکت است، خودش یک اطلاعات درست است.
+   * ثبت‌نام و بازیابی رمزِ نپی کاملاً سمت کلاینت است و به این سرور کاری ندارد.
+   * ولی سناریوهایی که مستقیم API را می‌زنند (فعل `request`) هم هستند، و
+   * همان‌ها بودند که نخستین باگ سمت سرور را بیرون کشیدند.
    */
   logs: [
-    { type: 'file', name: 'apache', path: 'C:/xampp/apache/logs/error.log' },
+    { type: 'file', name: 'php', path: 'D:/Projects/nepi/nepi-data/php-error.log' },
   ],
 
   /**
@@ -57,6 +61,11 @@ export default {
     seed: {
       localStorage: {
         nepi_storage_permission_dismissed: 'true',
+
+      // اپ را به سرور لوکال وصل کن، نه به nepi.ir. بدون این، سناریوهای
+      // همگام‌سازی به محیط تولیدی می‌خوردند — چیزی که قانون ۸ اجازه‌اش را
+      // نمی‌دهد.
+      'nepi:sync-base-url:v1': 'http://127.0.0.1:8081',
       },
     },
   },
