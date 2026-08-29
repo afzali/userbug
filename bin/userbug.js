@@ -35,6 +35,8 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
                                   اجرای دوبارهٔ همان سناریوها روی همان دستگاه
 
   userbug models [--free]         فهرست زندهٔ مدل‌های OpenRouter
+  userbug repro <runId> [اثرانگشت]
+                                  بازتولید یک یافته از اجرای گذشته
   userbug list [--limit n]        فهرست اجراها
   userbug report <runId|latest>   بازسازی گزارش از مخزن، بدون اجرای دوباره
   userbug diff <runA> <runB>      چه یافته‌ای تازه است و چه یافته‌ای رفته
@@ -117,7 +119,12 @@ function cmdRun({ flags, positional }) {
     // نتیجه‌اش «صفر تست اجرا شد» بدون هیچ خطایی بود — یعنی همان شکستِ خاموشی
     // که این ابزار قرار است پیدایش کند، در خودش.
     const args = [PLAYWRIGHT_CLI, 'test'];
-    if (flags.scenario) args.push(String(flags.scenario));
+
+    // با --file فقط همان یک سناریو باید اجرا شود. بدون این خط، راه‌اندازِ
+    // YAML فایل را برمی‌داشت ولی specهای جاوااسکریپتی هم کنارش می‌رفتند و
+    // «بازتولیدِ یک یافته» عملاً کل مجموعه را اجرا می‌کرد.
+    if (flags.file) args.push('scenarios/yaml.spec.js');
+    else if (flags.scenario) args.push(String(flags.scenario));
     // --scenario مسیر فایل را فیلتر می‌کند و --grep عنوان تست را. جدا نگه
     // داشته شدند چون یک بار «--scenario <عنوان>» بی‌صدا صفر تست اجرا کرد.
     if (flags.grep) args.push('--grep', String(flags.grep));
@@ -128,6 +135,7 @@ function cmdRun({ flags, positional }) {
     if (device) env.UB_DEVICE = device;
     if (flags.persona) env.UB_PERSONA = String(flags.persona);
     if (flags.author) env.UB_AUTHOR = '1';
+    if (flags.file) env.UB_SCENARIO_FILE = String(flags.file);
 
     if (device) console.log(`\n──── دستگاه: ${device} ────`);
     const r = spawnSync(process.execPath, args, { cwd: ROOT, stdio: 'inherit', env });
@@ -171,10 +179,8 @@ function cmdReplay({ flags, positional }) {
   const escape = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const grep = wanted.map((s) => escape(s.name)).join('|');
 
-  console.log(`
-  اجرای دوبارهٔ ${runId}`);
-  console.log(`  دستگاه: ${run.device}  ·  سناریو: ${wanted.length} از ${scenarios.length}
-`);
+  console.log(`\n  اجرای دوبارهٔ ${runId}`);
+  console.log(`  دستگاه: ${run.device}  ·  سناریو: ${wanted.length} از ${scenarios.length}\n`);
 
   cmdRun({
     flags: { ...flags, grep, device: run.device === 'desktop' ? undefined : run.device },
@@ -208,9 +214,45 @@ async function cmdModels({ flags }) {
     .slice(0, Number(flags.limit || 30))
     .forEach((m) => console.log('  ' + m.id.padEnd(52) + String(m.ctx).padStart(9)));
 
-  console.log(`
-  ${rows.length} مدل${flags.free ? ' رایگان' : ''}
-`);
+    console.log(`\n  ${rows.length} مدل${flags.free ? ' رایگان' : ''}\n`);
+}
+
+/**
+ * بازتولید یک یافته.
+ *
+ * قانون سوم: یافته بدون بازتولید، یافته نیست. این زیرفرمان همان فایلی را
+ * اجرا می‌کند که هنگام دیده‌شدنِ یافته ساخته شد — نه بیشتر، نه کمتر.
+ */
+function cmdRepro({ flags, positional }) {
+  const runId = resolveRunId(positional[0]);
+  const dir = path.join(runDir(runId), 'repro');
+
+  if (!fs.existsSync(dir)) throw new Error(`اجرای ${runId} فایل بازتولید ندارد`);
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.yml'));
+  if (!files.length) throw new Error(`اجرای ${runId} یافته‌ای نداشت`);
+
+  const wanted = positional[1];
+  if (!wanted) {
+    console.log(`\n  ${files.length} یافتهٔ قابل بازتولید در ${runId}:\n`);
+    for (const f of files) {
+      const head = fs.readFileSync(path.join(dir, f), 'utf8').split(/\r?\n/);
+      const line = head.find((l) => l.startsWith('# یافته:')) || '';
+      console.log(`   ${f.replace('.yml', '')}  ${line.replace('# یافته:', '').trim().slice(0, 90)}`);
+    }
+    console.log('\n  اجرا: userbug repro ' + runId + ' <اثرانگشت>\n');
+    return;
+  }
+
+  const match = files.find((f) => f.startsWith(wanted));
+  if (!match) throw new Error(`یافته‌ای با اثرانگشت «${wanted}» در آن اجرا نیست`);
+
+  const run = readRun(runId);
+    console.log(`\n  بازتولید ${match.replace('.yml', '')} از ${runId}\n`);
+
+  cmdRun({
+    flags: { ...flags, file: path.join(dir, match), device: run.device === 'desktop' ? undefined : run.device },
+    positional: [run.target],
+  });
 }
 
 function cmdList({ flags }) {
@@ -280,6 +322,9 @@ try {
       break;
     case 'models':
       await cmdModels(parsed);
+      break;
+    case 'repro':
+      cmdRepro(parsed);
       break;
     case 'list':
       cmdList(parsed);

@@ -16,6 +16,10 @@ export function scenarioDir(targetName) {
 }
 
 export function loadScenarios(targetName) {
+  // اجرای یک فایل مشخص از هر جای دیسک — برای بازتولیدِ یک یافته، بدون
+  // اینکه لازم باشد فایل را دستی در پوشهٔ سناریوها کپی کنید.
+  if (process.env.UB_SCENARIO_FILE) return [loadScenario(process.env.UB_SCENARIO_FILE)];
+
   const dir = scenarioDir(targetName);
   if (!fs.existsSync(dir)) return [];
 

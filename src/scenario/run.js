@@ -28,6 +28,7 @@ import { loadCache, saveCache, getEntry, putEntry, shouldReverify } from '../ste
 import { resolveDo, performAction } from '../steps/do.js';
 import { explore } from '../steps/explore.js';
 import { getCurrentRun } from '../store/run-store.js';
+import { writeRepros } from '../repro.js';
 
 const NEEDS_AI = new Set(['goal']);
 
@@ -53,12 +54,15 @@ export async function runScenario({ page, ub, identity, scenario }) {
     reverify: shouldReverify(getCurrentRun(), models.reverifyEvery),
     aiStats: { cache: 0, model: 0, healed: 0, verified: 0 },
     executed: [],
+    groups: [],
   };
 
   for (const group of groupSteps(scenario.steps)) {
+    ctx.groups.push({ title: group.title, raw: [] });
     await ub.step(group.title, async () => {
       for (const step of group.steps) {
         await execute({ page, ub, ctx, step });
+        if (step.verb !== 'explore') ctx.groups.at(-1).raw.push(step.raw);
         // قدم‌های پیش از کاوش، مقدمهٔ پیش‌نویس می‌شوند: پیش‌نویس باید خودش
         // قابل اجرا باشد، نه اینکه کسی دستی «چطور به اینجا برسیم» را بنویسد.
         if (step.verb !== 'explore') ctx.executed.push(step.raw);
@@ -67,6 +71,10 @@ export async function runScenario({ page, ub, identity, scenario }) {
   }
 
   if (ctx.cacheDirty) saveCache(ub.target.key, scenario.id, ctx.cache);
+
+  // «یافته بدون بازتولید، یافته نیست» — قانون سوم پروژه. تا امروز فقط شعار
+  // بود؛ حالا برای هر یافته یک فایل اجراپذیر ساخته می‌شود.
+  await writeRepros({ ub, scenario, ctx });
 
   // آمار در گزارش می‌نشیند: اگر نسبت «مدل» به «کش» بالا بماند، یعنی یا کش
   // کار نمی‌کند یا رابط مدام عوض می‌شود — هر دو ارزش دانستن دارند.

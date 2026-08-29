@@ -76,6 +76,20 @@ export function renderReport({ run, steps, findings, synthetic = [], events }) {
   <div class="kpi"><div class="n">${serverEvents.length}</div><div class="l">خط لاگ سرور</div></div>
 </div>
 
+${
+  run.ai
+    ? `<h2>مدل</h2>
+<div class="kpis">
+  <div class="kpi"><div class="n">${run.ai.cache}</div><div class="l">از کش (رایگان)</div></div>
+  <div class="kpi"><div class="n">${run.ai.model}</div><div class="l">حل تازه</div></div>
+  <div class="kpi"><div class="n" style="color:${run.ai.healed ? SEV.warn : 'inherit'}">${run.ai.healed}</div><div class="l">heal</div></div>
+  <div class="kpi"><div class="n">${run.ai.verified}</div><div class="l">بازبینی نمونه‌ای</div></div>
+  <div class="kpi"><div class="n">$${run.ai.costUsd}</div><div class="l">هزینه · ${run.ai.calls} فراخوانی</div></div>
+</div>
+<p class="empty">نسبت «از کش» به «حل تازه» مهم‌ترین عدد اینجاست: اگر بالا نماند، یا کش کار نمی‌کند یا رابط مدام عوض می‌شود. عددِ heal بالا یعنی آن گوشهٔ رابط ناپایدار است.</p>`
+    : ''
+}
+
 <h2>یافته‌ها</h2>
 ${
   grouped.length === 0
