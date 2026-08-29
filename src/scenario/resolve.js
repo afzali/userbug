@@ -21,7 +21,7 @@ export function resolveTarget(page, target) {
 
   if (typeof target === 'string') return { locator: byLadder(page, target), described: target };
 
-  const { testid, role, name, label, text, placeholder, selector, exact = true, nth } = target;
+  const { testid, role, name, label, text, placeholder, selector, exact = true, nth, visible } = target;
   let locator;
 
   if (selector) locator = page.locator(selector);
@@ -32,6 +32,18 @@ export function resolveTarget(page, target) {
   else if (text) locator = page.getByText(text, { exact });
   else throw new Error(`توصیف هدف نامفهوم: ${JSON.stringify(target)}`);
 
+  /**
+   * `visible: true` یعنی «فقط چیزی که کاربر می‌بیند».
+   *
+   * لازم شد چون کامپوننت Tabs محتوای همهٔ تب‌ها را در DOM نگه می‌دارد: دو
+   * ورودی با برچسب «نام کتاب» هم‌زمان وجود دارند و یکی‌شان پنهان است.
+   * صفحه‌خوان و کاربر فقط یکی را می‌بینند، ولی `getByLabel` هر دو را می‌گیرد و
+   * strict-mode می‌خورد.
+   *
+   * توصیف‌هایی که از snapshot ساخته می‌شوند همیشه این را دارند، چون snapshot
+   * خودش فقط عناصرِ دیده‌شدنی را می‌بیند.
+   */
+  if (visible) locator = locator.filter({ visible: true });
   if (nth !== undefined) locator = locator.nth(nth);
   return { locator, described: JSON.stringify(target) };
 }

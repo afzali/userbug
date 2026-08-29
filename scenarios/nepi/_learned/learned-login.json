@@ -1,43 +1,4 @@
 {
   "version": 1,
-  "steps": {
-    "ایمیل حساب را وارد کن": {
-      "intent": "ایمیل حساب را وارد کن",
-      "action": "fill",
-      "target": {
-        "label": "ایمیل"
-      },
-      "resolvedBy": "openrouter:inclusionai/ling-3.0-flash-fin:free",
-      "domSignature": "6f84f7a3",
-      "healCount": 1,
-      "firstLearned": "2026-08-29T11:20:42.312Z",
-      "lastVerified": "2026-08-29T11:23:03.233Z"
-    },
-    "رمز عبور را وارد کن": {
-      "intent": "رمز عبور را وارد کن",
-      "action": "fill",
-      "target": {
-        "label": "رمز عبور"
-      },
-      "resolvedBy": "openrouter:inclusionai/ling-3.0-flash-fin:free",
-      "domSignature": "ff3c1563",
-      "healCount": 1,
-      "firstLearned": "2026-08-29T11:20:44.820Z",
-      "lastVerified": "2026-08-29T11:23:05.622Z"
-    },
-    "دکمهٔ ورود یا ثبت‌نام را بزن": {
-      "intent": "دکمهٔ ورود یا ثبت‌نام را بزن",
-      "action": "click",
-      "target": {
-        "role": "button",
-        "name": "ورود / ثبت‌نام",
-        "exact": true
-      },
-      "resolvedBy": "openrouter:inclusionai/ling-3.0-flash-fin:free",
-      "domSignature": "8a6a423a",
-      "healCount": 1,
-      "firstLearned": "2026-08-29T11:20:46.350Z",
-      "lastVerified": "2026-08-29T11:24:04.004Z"
-    }
-  }
+  "steps": {}
 }

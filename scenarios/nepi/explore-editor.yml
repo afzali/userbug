@@ -1,0 +1,28 @@
+name: کاوش editor
+persona: pro
+status: approved
+timeout: 900000
+
+steps:
+  - as: ثبت‌نام و ورود به فهرست
+    clearState: true
+  - go: /
+  - expect: { url: "/login" }
+  - wait: 2000
+  - dismissBlockers: true
+  - fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - expect: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 30000 }
+  - dismissBlockers: true
+  - check: { role: checkbox }
+  - click: { role: button, name: "ادامه" }
+  - expect: { url: "/contents", timeout: 30000 }
+  - wait: 1500
+  - dismissBlockers: true
+
+  - explore:
+      goal: >-
+        یک سند بساز و بازش کن، بعد در ویرایشگر متن فارسی بنویس، قالب‌بندی کن، ذخیره کن و ببین کجا چیزی خراب می‌شود
+      maxSteps: 12

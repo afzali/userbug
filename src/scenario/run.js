@@ -255,6 +255,20 @@ async function execute({ page, ub, ctx, step }) {
       return;
     }
 
+    /**
+     * بردن نشانگر روی عنصر، بدون کلیک.
+     *
+     * لازم شد چون بخش‌هایی از رابط فقط با hover ظاهر می‌شوند — در نپی دکمهٔ
+     * «+» افزودن پاراگراف چنین است. بدون این فعل، کل آن ناحیه برای ابزار
+     * وجود نداشت.
+     */
+    case 'hover': {
+      const { locator } = resolveTarget(page, body);
+      await locator.hover();
+      await page.waitForTimeout(300);
+      return;
+    }
+
     case 'clickIfPresent': {
       const { locator } = resolveTarget(page, body);
       if (await locator.isVisible().catch(() => false)) await locator.click();
@@ -281,6 +295,23 @@ async function execute({ page, ub, ctx, step }) {
 
     case 'press':
       return void (await page.keyboard.press(body));
+
+    /**
+     * تایپ با رخدادهای واقعی کیبورد.
+     *
+     * `fill` مقدار را یکجا می‌گذارد و روی contenteditable (ویرایشگر tiptap)
+     * اصلاً کار نمی‌کند؛ `press` هم فقط کلیدهای نام‌دار را می‌گیرد و «پ» را
+     * نمی‌شناسد. برای سنجیدنِ چیزی که به تایپِ واقعی وابسته است — مثل ساخت
+     * پاراگراف با Enter — این فعل لازم است.
+     */
+    case 'type': {
+      const { locator } = resolveTarget(page, body.into);
+      await locator.click();
+      await page.keyboard.type(String(interpolate(body.value, ctx)), {
+        delay: raw.delay ?? persona.typeDelay ?? 0,
+      });
+      return;
+    }
 
     case 'answerDialog':
       ub.answerDialog(body);

@@ -24,6 +24,12 @@
  * می‌دهد و چیزی هم اثبات نمی‌کند. پس ثبت می‌شود و حلقه ادامه می‌دهد — و
  * مدل در تاریخچه می‌بیند که آنجا بن‌بست بود.
  *
+ * ── چرا محافظِ تکرار لازم است ──
+ *
+ * گفتنِ «کارِ تکراری نکن» در prompt کافی نیست. کاوش در تنظیمات شش بار پشت سر
+ * هم همان فیلد را پر کرد و بودجه سوخت بدون اینکه جای تازه‌ای دیده شود. پس
+ * عنصری که دو بار استفاده شده، از فهرستِ بعدی حذف می‌شود — قاعده، نه توصیه.
+ *
  * ── چرا فهرست «ممنوع» لازم است ──
  *
  * عاملی که آزاد بگردد، دیر یا زود «خروج» یا «ریست کامل دیتابیس» را می‌زند و
@@ -44,11 +50,13 @@ const SYSTEM = `تو یک تسترِ انسانی را شبیه‌سازی می�
 خروجی: فقط JSON، بدون توضیح و بدون حصار markdown.
 
 قالب:
-{"action":"click"|"fill"|"check"|"press"|"done","ref":<شماره>,"value":"...","why":"..."}
+{"action":"click"|"fill"|"check"|"press"|"hover"|"done","ref":<شماره>,"value":"...","why":"..."}
 
 قواعد:
 - «ref» باید یکی از شماره‌های همان فهرست باشد.
+- به وضعیت نگاه کن: عنصری که selected یا checked دارد، از قبل انتخاب شده.
 - کارِ تکراری نکن؛ به جای تازه برو.
+- بعضی دکمه‌ها فقط با hover ظاهر می‌شوند. اگر کلیک نشد، اول روی ناحیه‌اش hover کن.
 - «value» فقط برای fill و press.
 - وقتی هدف برآورده شد یا جای تازه‌ای نمانده: {"action":"done","why":"..."}`;
 
@@ -59,14 +67,18 @@ const SYSTEM = `تو یک تسترِ انسانی را شبیه‌سازی می�
 export async function explore({ page, ub, ctx, goal, maxSteps = 12, author = false, preamble = [] }) {
   const avoid = (ub.target.explore?.avoid || []).map((r) => new RegExp(r, 'i'));
   const history = [];
+  /** چند بار روی هر عنصر کار شده — کلید: توصیفِ همان عنصر */
+  const used = new Map();
 
   for (let i = 0; i < maxSteps; i++) {
     const snapshot = await snapshotPage(page);
 
     // عناصرِ ممنوع اصلاً به مدل نمی‌رسند — نه اینکه بعداً ردشان کنیم
-    const items = snapshot.items.filter(
-      (it) => !avoid.some((rx) => rx.test(`${it.name || ''} ${it.label || ''}`))
-    );
+    const items = snapshot.items.filter((it) => {
+      if (avoid.some((rx) => rx.test(`${it.name || ''} ${it.label || ''}`))) return false;
+      const key = JSON.stringify(descriptorFor(it, snapshot.items));
+      return (used.get(key) || 0) < 3;
+    });
 
     if (!items.length) {
       history.push({ step: i, action: 'done', why: 'عنصر قابل کاوشی نماند' });
@@ -124,6 +136,10 @@ export async function explore({ page, ub, ctx, goal, maxSteps = 12, author = fal
           case 'press':
             await page.keyboard.press(String(json.value ?? 'Enter'));
             break;
+          case 'hover':
+            await locator.hover({ timeout: 8000 });
+            await page.waitForTimeout(400);
+            break;
           default:
             throw new Error(`کنشِ ناشناخته در کاوش: ${json.action}`);
         }
@@ -133,6 +149,8 @@ export async function explore({ page, ub, ctx, goal, maxSteps = 12, author = fal
 
       await page.waitForTimeout(600);
     });
+
+    used.set(JSON.stringify(target), (used.get(JSON.stringify(target)) || 0) + 1);
 
     const record = {
       step: i,

@@ -44,6 +44,8 @@ function toStep(record) {
       return { fill: record.target, value: record.value ?? '' };
     case 'press':
       return { press: record.value ?? 'Enter' };
+    case 'hover':
+      return { hover: record.target };
     default:
       return null;
   }

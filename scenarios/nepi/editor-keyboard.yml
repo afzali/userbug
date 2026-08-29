@@ -1,0 +1,102 @@
+name: افزودن پاراگراف با کیبورد
+persona: novice
+status: approved
+timeout: 300000
+
+# ── سؤالی که این سناریو می‌پرسد ──
+#
+# کاوش آزاد به دکمهٔ «+» افزودن پاراگراف رسید و نتوانست بزندش. سورس نشان داد
+# چرا: در `TiptapEditor.svelte` آن دکمه فقط با hover ظاهر می‌شود، `tabindex="-1"`
+# دارد، و داخل یک `aria-hidden="true"` نشسته.
+#
+# یعنی نه با کیبورد می‌شود به آن رسید و نه صفحه‌خوان می‌بیندش.
+#
+# ولی این تنها وقتی باگ است که **راه دیگری هم نباشد**. در هر ویرایشگر متنی،
+# Enter پاراگراف تازه می‌سازد. پس پیش از هر ادعایی، همان را می‌سنجیم.
+#
+# ── تصحیح نسخهٔ اول ──
+#
+# نسخهٔ اول همین‌جا دیتابیس را می‌خواند و «یافته» گرفت. ولی عکسِ همان قدم نشان
+# داد هر دو پاراگراف روی صفحه هستند و بالای صفحه نوشته «ذخیره‌نشده». یعنی
+# Enter کار کرده بود و من قبل از ذخیره پرسیده بودم.
+#
+# سنجش درست این است: صریح ذخیره کن، بعد بپرس.
+
+steps:
+  - as: ثبت‌نام و ورود به فهرست
+    clearState: true
+  - go: /
+  - expect: { url: "/login" }
+  - wait: 2000
+  - dismissBlockers: true
+  - fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - expect: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 30000 }
+  - dismissBlockers: true
+  - check: { role: checkbox }
+  - click: { role: button, name: "ادامه" }
+  - expect: { url: "/contents", timeout: 30000 }
+  - wait: 1500
+  - dismissBlockers: true
+
+  - as: ساخت سند و رفتن به ویرایشگر
+    when: { hidden: { role: button, name: "فایل جدید" }, timeout: 1500 }
+    then:
+      - click: { role: button, name: "Toggle Sidebar" }
+      - wait: 600
+  - click: { role: button, name: "فایل جدید", nth: 0 }
+  - click: { role: tab, name: "فایل خالی جدید" }
+  - fill: { selector: "#blank-title" }
+    value: سند کیبوردی
+  - wait: 1000
+  - click: { role: button, name: "ساخت و باز کردن" }
+  - expect: { url: "/content/", timeout: 30000 }
+  - wait: 2500
+  - dismissBlockers: true
+
+  - as: نوشتن پاراگراف اول
+    type:
+      into: { selector: ".ProseMirror", nth: 0 }
+      value: پاراگراف اول برای آزمایش
+  - wait: 800
+
+  - as: زدن Enter برای پاراگراف دوم
+    press: "Enter"
+  - wait: 800
+  - type:
+      into: { selector: ".ProseMirror", nth: 0 }
+      value: پاراگراف دوم
+  - wait: 1500
+
+  - as: هر دو پاراگراف باید روی صفحه باشند
+    expect: { visible: { text: "پاراگراف دوم" }, timeout: 5000 }
+
+  - as: ذخیره
+    click: { role: button, name: "ذخیره" }
+  - wait: 3000
+  - dismissBlockers: true
+
+  - as: آیا هر دو پاراگراف ذخیره شدند؟
+    query:
+      sql: "SELECT COUNT(*) AS n FROM paragraphs"
+      saveAs: paras
+
+  - assert: { matches: ["{{vars.paras.0.n}}", "^[2-9]"] }
+    finding: >-
+      پس از ذخیرهٔ صریح، فقط {{vars.paras.0.n}} پاراگراف در دیتابیس نشست در
+      حالی که دو تا روی صفحه بود
+    detail: >-
+      کاربر «ذخیره» را زده و نشانِ «ذخیره‌نشده» رفته، ولی محتوا کامل ننشسته.
+      این همان جنس باگی است که فقط با خواندنِ دیتابیس دیده می‌شود — صفحه
+      درست نشان می‌دهد.
+
+  - as: و متنشان هم باید همان باشد
+    query:
+      sql: "SELECT content FROM paragraphs ORDER BY sort_order"
+      saveAs: rows
+  - assert: { matches: ["{{vars.rows.1.content}}", "پاراگراف دوم"] }
+    finding: >-
+      پاراگراف دوم ذخیره شد ولی متنش آن چیزی نیست که تایپ شد
+    detail: "آنچه ذخیره شده: {{vars.rows.1.content}}"

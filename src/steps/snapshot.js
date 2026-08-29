@@ -48,12 +48,34 @@ export const SNAPSHOT_FN = () => {
 
   const clean = (t) => (t || '').trim().replace(/\s+/g, ' ').slice(0, 80);
 
+  /**
+   * متنِ دیده‌شدنی، نه `textContent` خام.
+   *
+   * نپی برای واکنش‌گرایی دو نسخه از یک برچسب می‌گذارد و یکی را با تیلویند
+   * پنهان می‌کند:
+   *
+   *   <span class="hidden sm:inline">فایل خالی جدید</span>
+   *   <span class="sm:hidden">جدید</span>
+   *
+   * `textContent` هر دو را می‌چسباند و «فایل خالی جدید جدید» می‌دهد — نامی که
+   * هیچ locatorی پیدایش نمی‌کند و کاوشگر دو بار رویش گیر کرد. مرورگر و
+   * صفحه‌خوان فقط نسخهٔ دیده‌شدنی را می‌خوانند؛ ما هم باید همان کار را بکنیم.
+   */
+  const visibleText = (el) => {
+    let out = '';
+    for (const node of el.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) out += node.textContent;
+      else if (node.nodeType === Node.ELEMENT_NODE && visible(node)) out += visibleText(node);
+    }
+    return out;
+  };
+
   const labelOf = (el) => {
-    if (el.labels && el.labels[0]) return clean(el.labels[0].textContent);
+    if (el.labels && el.labels[0]) return clean(visibleText(el.labels[0]));
     const id = el.getAttribute('id');
     if (id) {
       const lbl = document.querySelector(`label[for="${CSS.escape(id)}"]`);
-      if (lbl) return clean(lbl.textContent);
+      if (lbl) return clean(visibleText(lbl));
     }
     return '';
   };
@@ -69,10 +91,25 @@ export const SNAPSHOT_FN = () => {
     const testid = el.getAttribute('data-testid') || undefined;
     const label = labelOf(el) || undefined;
     const placeholder = el.getAttribute('placeholder') || undefined;
-    const name = clean(el.getAttribute('aria-label') || el.textContent) || undefined;
+    const name = clean(el.getAttribute('aria-label') || visibleText(el)) || undefined;
 
     // عنصری که هیچ راهی برای اشاره به آن نداریم، فرستادنش فقط نویز است
     if (!testid && !label && !placeholder && !name) continue;
+
+    /**
+     * وضعیتِ فعلی، نه فقط هویت.
+     *
+     * بدون این، مدل نمی‌داند چه چیزی از قبل انتخاب شده و دوباره همان را
+     * می‌زند. کاوش در ویرایشگر دو بار روی تبِ فعال کلیک کرد و بعد به محافظِ
+     * تکرار خورد — نه چون گیج بود، چون ما وضعیت را نگفته بودیم.
+     */
+    const state = {
+      selected: el.getAttribute('aria-selected') === 'true' || undefined,
+      checked: el.checked || el.getAttribute('aria-checked') === 'true' || undefined,
+      expanded: el.getAttribute('aria-expanded') === 'true' || undefined,
+      // مقدارِ فعلیِ ورودی — ماسک بعداً روی همین اعمال می‌شود
+      value: el.value ? String(el.value).slice(0, 40) : undefined,
+    };
 
     items.push({
       ref: ref++,
@@ -82,25 +119,32 @@ export const SNAPSHOT_FN = () => {
       placeholder,
       testid,
       disabled: el.disabled || el.getAttribute('aria-disabled') === 'true' || undefined,
+      ...Object.fromEntries(Object.entries(state).filter(([, v]) => v !== undefined)),
     });
     if (items.length >= 120) break;
   }
 
   const headings = [...document.querySelectorAll('h1, h2, h3')]
     .filter(visible)
-    .map((h) => clean(h.textContent))
+    .map((h) => clean(visibleText(h)))
     .slice(0, 10);
 
   return { url: location.pathname, headings, items };
 };
 
-/** پایه‌ی توصیف، بدون رفع ابهام. */
+/**
+ * پایه‌ی توصیف، بدون رفع ابهام.
+ *
+ * همه‌شان `visible: true` می‌گیرند: این توصیف‌ها از snapshot می‌آیند و snapshot
+ * فقط عناصرِ دیده‌شدنی را می‌بیند. بدون آن، توصیف به عنصرِ پنهانی هم می‌خورد که
+ * مدل اصلاً ندیده بودش.
+ */
 function baseDescriptor(item) {
-  if (item.testid) return { testid: item.testid };
-  if (item.label) return { label: item.label };
-  if (item.role && item.name) return { role: item.role, name: item.name, exact: true };
-  if (item.placeholder) return { placeholder: item.placeholder };
-  if (item.name) return { text: item.name };
+  if (item.testid) return { testid: item.testid, visible: true };
+  if (item.label) return { label: item.label, visible: true };
+  if (item.role && item.name) return { role: item.role, name: item.name, exact: true, visible: true };
+  if (item.placeholder) return { placeholder: item.placeholder, visible: true };
+  if (item.name) return { text: item.name, visible: true };
   return null;
 }
 
