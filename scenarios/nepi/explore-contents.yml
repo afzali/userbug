@@ -1,0 +1,37 @@
+name: کاوش آزاد در فهرست
+persona: pro
+status: approved
+timeout: 600000
+
+# «تست بدون سناریو».
+#
+# این سناریو هیچ سنجشی ندارد و عمداً هم ندارد: کارِ قضاوت با داورِ خودکار است
+# که در پس‌زمینه هر خطای کلاینت، هر ۵۰۰ و هر خطِ لاگ سرور را می‌گیرد.
+# کاوشگر فقط جایی می‌رود که هیچ سناریویی ننوشته.
+#
+# انتظار نداشته باشید باگ منطقی پیدا کند؛ کرش و خطا پیدا می‌کند.
+
+steps:
+  - as: ثبت‌نام و ورود به فهرست
+    clearState: true
+  - go: /
+  - expect: { url: "/login" }
+  - wait: 2000
+  - dismissBlockers: true
+  - fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - expect: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 30000 }
+  - dismissBlockers: true
+  - check: { role: checkbox }
+  - click: { role: button, name: "ادامه" }
+  - expect: { url: "/contents", timeout: 30000 }
+  - wait: 1500
+  - dismissBlockers: true
+
+  - explore:
+      goal: >-
+        مثل کاربری که تازه وارد شده، صفحهٔ فهرست را بگرد: پوشه و فایل بساز،
+        منوها و پنجره‌ها را باز کن، و ببین کجا چیزی خراب می‌شود.
+      maxSteps: 10

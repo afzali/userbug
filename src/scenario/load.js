@@ -47,6 +47,8 @@ export function loadScenario(file) {
     status: doc.status || 'approved',
     persona: doc.persona || 'novice',
     device: doc.device || null,
+    /** مهلت کل سناریو. کاوش آزاد ذاتاً بلند است و با پیش‌فرض نمی‌سازد. */
+    timeout: doc.timeout || null,
     steps: doc.steps,
   };
 }

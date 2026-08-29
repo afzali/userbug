@@ -17,6 +17,8 @@ for (const scenario of loadScenarios(targetName)) {
   const title = scenario.status === 'draft' ? `${scenario.name} [پیش‌نویس]` : scenario.name;
 
   test(title, async ({ page, ub, identity }) => {
+    // سناریوی کاوش ذاتاً بلند است؛ با مهلت پیش‌فرض وسط کار قطع می‌شود
+    if (scenario.timeout) test.setTimeout(scenario.timeout);
     await runScenario({ page, ub, identity, scenario });
   });
 }

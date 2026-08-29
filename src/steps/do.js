@@ -120,7 +120,7 @@ async function askModel({ page, intent, models, budget, identity }) {
   }
 
   // ساختنِ توصیفِ پایدار کارِ ماست، نه مدل. مدل فقط انتخاب می‌کند.
-  const target = descriptorFor(item);
+  const target = descriptorFor(item, snapshot.items);
   if (!target) throw new Error(`عنصر ref=${json.ref} توصیفِ پایداری ندارد`);
 
   return {

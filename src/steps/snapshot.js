@@ -94,18 +94,40 @@ export const SNAPSHOT_FN = () => {
   return { url: location.pathname, headings, items };
 };
 
-/**
- * از یک عنصرِ snapshot، پایدارترین توصیفی که `resolveTarget` می‌فهمد.
- *
- * ترتیب همان نردبانِ همیشگی است: پایدارترین اول.
- */
-export function descriptorFor(item) {
+/** پایه‌ی توصیف، بدون رفع ابهام. */
+function baseDescriptor(item) {
   if (item.testid) return { testid: item.testid };
   if (item.label) return { label: item.label };
   if (item.role && item.name) return { role: item.role, name: item.name, exact: true };
   if (item.placeholder) return { placeholder: item.placeholder };
   if (item.name) return { text: item.name };
   return null;
+}
+
+/**
+ * از یک عنصرِ snapshot، پایدارترین توصیفی که `resolveTarget` می‌فهمد.
+ *
+ * ترتیب همان نردبانِ همیشگی است: پایدارترین اول.
+ *
+ * ── چرا `nth` لازم شد ──
+ *
+ * نخستین کاوش آزاد روی «پوشه جدید» گیر کرد: دو دکمه با همان نام در صفحه بود و
+ * `getByRole` هر دو را می‌گرفت. توصیفی که به بیش از یک عنصر بخورد، بی‌فایده
+ * است — نه فقط الان، بلکه در کش هم، چون دفعهٔ بعد هم نمی‌شود اجرایش کرد.
+ *
+ * پس اگر چند عنصرِ snapshot توصیفِ یکسان بدهند، جایگاهشان هم در توصیف می‌آید.
+ * ترتیب snapshot همان ترتیب سند است، پس با ترتیب locator می‌خواند.
+ */
+export function descriptorFor(item, allItems = null) {
+  const base = baseDescriptor(item);
+  if (!base || !allItems) return base;
+
+  const key = JSON.stringify(base);
+  const twins = allItems.filter((other) => JSON.stringify(baseDescriptor(other)) === key);
+  if (twins.length < 2) return base;
+
+  const index = twins.findIndex((t) => t.ref === item.ref);
+  return { ...base, nth: index < 0 ? 0 : index };
 }
 
 export async function snapshotPage(page) {

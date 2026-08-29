@@ -26,9 +26,10 @@ import { loadGlobalConfig, resolveModel } from '../models/config.js';
 import { Budget } from '../models/provider.js';
 import { loadCache, saveCache, getEntry, putEntry, shouldReverify } from '../steps/cache.js';
 import { resolveDo, performAction } from '../steps/do.js';
+import { explore } from '../steps/explore.js';
 import { getCurrentRun } from '../store/run-store.js';
 
-const NEEDS_AI = new Set(['explore', 'goal']);
+const NEEDS_AI = new Set(['goal']);
 
 export async function runScenario({ page, ub, identity, scenario }) {
   // ترتیب: پرچم خط فرمان بر سناریو می‌چربد، تا بشود همان سناریو را با پرسونای
@@ -399,6 +400,20 @@ async function execute({ page, ub, ctx, step }) {
         raw.value !== undefined ? { ...result.entry, value: interpolate(raw.value, ctx) } : result.entry;
 
       await performAction(result.locator, withValue, page);
+      return;
+    }
+
+    /**
+     * کاوش آزاد.
+     *
+     * قدم‌هایش خودشان `ub.step` می‌سازند، پس هر کدام عکس و بازهٔ لاگ سرورِ
+     * خودش را دارد و داور روی همه‌شان کار می‌کند — همان چیزی که این حلقه را
+     * از سرگرمی جدا می‌کند.
+     */
+    case 'explore': {
+      const goal = typeof body === 'string' ? body : body.goal;
+      const maxSteps = typeof body === 'object' ? body.maxSteps : undefined;
+      await explore({ page, ub, ctx, goal, maxSteps });
       return;
     }
 
