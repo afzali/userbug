@@ -12,7 +12,7 @@
  * دهد و دیتابیس چیز دیگری داشته باشد. پس هر دو را می‌بینیم.
  */
 import { test, expect } from '../../src/fixtures.js';
-import { signUp, sql, createBlankDoc, acknowledgeRecoveryCode } from './_helpers.js';
+import { signUp, sql, createBlankDoc, openBlankDocForm, acknowledgeRecoveryCode } from './_helpers.js';
 import { NASTY } from '../../src/data/persian.js';
 
 const TITLE = 'یادداشت‌های ۱۴۰۴';
@@ -123,34 +123,49 @@ test('کلیک سریع روی «ساخت و باز کردن» با عنوان �
     await ub.dismissBlockers();
   });
 
-  await ub.step('سند دوم با همان عنوان، بدون صبر', async () => {
-    await createBlankDoc(page, ub, { title, waitForSlug: false });
+  await ub.step('دکمهٔ ساخت در بازهٔ بررسی یکتایی قفل نیست', async () => {
+    /**
+     * سنجش قطعی به‌جای بردنِ مسابقه.
+     *
+     * نسخهٔ قبلی این سناریو فقط وقتی یافته ثبت می‌کرد که کلیکش زودتر از
+     * بررسیِ ۵۰۰ میلی‌ثانیه‌ای بنشیند — و در دو اجرا از سه اجرا نمی‌نشست. یافتهٔ
+     * تصادفی، طبق قانون سوم پروژه، یافته نیست.
+     *
+     * پس به‌جای «بیا ببینیم می‌توانم رد شوم؟» می‌پرسیم «آیا اصلاً پنجرهٔ رد
+     * شدن وجود دارد؟» — یعنی دکمه پیش از پایان بررسی باز است و بعدش قفل
+     * می‌شود. این را بدون هیچ مسابقه‌ای می‌شود دید.
+     */
+    await openBlankDocForm(page, ub, { title });
+    const submit = page.getByRole('button', { name: 'ساخت و باز کردن' });
 
-    // پیام لحظه‌ای است؛ اگر چهار ثانیه صبر کنیم رفته و نمی‌فهمیم کاربر چه دید
+    const openDuringCheck = await submit.isEnabled();
+    await page.waitForTimeout(1200);
+    const openAfterCheck = await submit.isEnabled();
+
+    console.log(`    دکمه — حین بررسی: ${openDuringCheck} · پس از بررسی: ${openAfterCheck}`);
+
+    if (openDuringCheck && !openAfterCheck) {
+      await ub.note({
+        message:
+          'دکمهٔ ساخت در بازهٔ بررسی یکتاییِ عنوان باز است و تنها پس از آن قفل می‌شود',
+        detail:
+          'یکتاییِ slug با ۵۰۰ میلی‌ثانیه تأخیر بررسی می‌شود، ولی دکمه فقط با نشستن slugError ' +
+          'قفل می‌گردد. یعنی پنجره‌ای هست که کاربر می‌تواند از اعتبارسنجی رد شود و مستقیم به ' +
+          'INSERT برسد — و آنچه می‌گیرد پیام خامِ UNIQUE constraint failed است.',
+      });
+    }
+  });
+
+  await ub.step('و کاربری که در همان پنجره کلیک کند چه می‌بیند', async () => {
+    // این قدم مکملِ سنجشِ بالاست: نتیجه‌اش به زمان‌بندی بستگی دارد، پس هرچه
+    // ببیند فقط ثبت می‌شود و یافته‌ای از آن ساخته نمی‌شود.
+    await page.getByRole('button', { name: 'ساخت و باز کردن' }).click().catch(() => {});
     const toastText = await page
       .locator('[data-sonner-toast]')
       .first()
       .innerText({ timeout: 8000 })
       .catch(() => '');
-
-    // دیالوگِ «افزودن کتاب جدید» را خودمان باز کرده‌ایم — مزاحم نیست
     await ub.dismissBlockers({ expected: [/افزودن کتاب جدید/] });
-
-    const onEditor = /\/content\//.test(page.url());
-    console.log(`    در ویرایشگر: ${onEditor} · پیام به کاربر: ${JSON.stringify(toastText)}`);
-
-    if (!onEditor && /constraint|SQLITE|UNIQUE/i.test(toastText)) {
-      await ub.note({
-        message: 'کلیک سریع با عنوان تکراری، متنِ خطای خامِ SQLite را به کاربر نشان می‌دهد',
-        detail:
-          'بررسی یکتاییِ slug با ۵۰۰ میلی‌ثانیه تأخیر انجام می‌شود ولی دکمهٔ ساخت فقط با نشستن ' +
-          `slugError قفل می‌شود. کلیک پیش از آن مستقیم به INSERT می‌رسد. آنچه کاربر می‌بیند: «${toastText}»`,
-      });
-    } else if (!onEditor) {
-      await ub.note({
-        message: 'کلیک سریع با عنوان تکراری، سند را نمی‌سازد و پیام روشنی هم نمی‌دهد',
-        detail: `پیام دیده‌شده: «${toastText}»`,
-      });
-    }
+    console.log(`    در ویرایشگر: ${/\/content\//.test(page.url())} · پیام: ${JSON.stringify(toastText)}`);
   });
 });

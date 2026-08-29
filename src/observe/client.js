@@ -26,8 +26,10 @@ export const INIT_SCRIPT = () => {
 /**
  * @param {import('@playwright/test').Page} page
  * @param {(event: object) => void} sink مقصد رخدادها
+ * @param {{onDialog?: (d: import('@playwright/test').Dialog) => Promise<boolean>}} [opts]
+ *   `onDialog` اگر `true` برگرداند یعنی خودش پنجره را بست؛ وگرنه dismiss می‌شود.
  */
-export function attachClientObservers(page, sink) {
+export function attachClientObservers(page, sink, { onDialog } = {}) {
   page.on('console', (m) => {
     const type = m.type();
     if (type !== 'error' && type !== 'warning') return;
@@ -72,13 +74,29 @@ export function attachClientObservers(page, sink) {
     });
   });
 
-  // پنجرهٔ alert/confirm که کسی نبندد، تست را تا timeout معلق می‌گذارد
+  /**
+   * پنجرهٔ alert/confirm/prompt.
+   *
+   * ── چرا این قابل تنظیم است ──
+   *
+   * بستن خودکارِ همهٔ dialogها لازم است، چون پنجره‌ای که کسی نبنددش تست را تا
+   * timeout معلق می‌گذارد. ولی بی‌صدا رفتار اپ را هم عوض می‌کند: صفحهٔ `/sqlite`
+   * نپی رمزش را با `prompt()` می‌گیرد، و چون ما همیشه dismiss می‌کردیم، آن صفحه
+   * زیر userbug همیشه خالی می‌ماند. یک بار همین باعث شد نتیجه بگیریم نپی باگ
+   * دارد، در حالی که ابزار خودش جواب را بلعیده بود.
+   *
+   * پس سناریو می‌تواند برای dialog بعدی جواب بگذارد؛ پیش‌فرض همان dismiss است.
+   */
   page.on('dialog', async (d) => {
     sink({
       source: 'dialog',
       severity: 'warn',
       message: `${d.type()}: ${d.message()}`,
     });
+    if (onDialog) {
+      const handled = await onDialog(d).catch(() => false);
+      if (handled) return;
+    }
     await d.dismiss().catch(() => {});
   });
 }

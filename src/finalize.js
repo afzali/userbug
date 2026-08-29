@@ -1,0 +1,71 @@
+/**
+ * بستنِ یک اجرا: نهایی کردن `run.json` و ساختن گزارش.
+ *
+ * ── چرا جدا از گزارشگر ──
+ *
+ * این کار اول داخل `UserbugReporter.onEnd` بود. ولی گزارشگرِ کانفیگ با یک
+ * `--reporter=line` در خط فرمان کنار می‌رود، و آن‌وقت اجرا کامل انجام می‌شود،
+ * عکس‌ها و رخدادها روی دیسک می‌نشینند، و `run.json` تا ابد `status: running`
+ * می‌ماند بدون هیچ گزارشی. دو اجرای نهایی فاز ۰ دقیقاً همین‌طور از دست رفتند.
+ *
+ * پس نهایی‌سازی از گزارشگر بیرون آمد: `globalTeardown` همیشه اجرا می‌شود، هر
+ * رپورتری که در خط فرمان بدهید. گزارشگر — اگر فعال باشد — همین را دوباره صدا
+ * می‌زند تا وضعیت واقعی تست‌ها را هم بنویسد. تابع idempotent است، پس ترتیبِ
+ * این دو اهمیتی ندارد.
+ */
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { RunStore, getCurrentRun } from './store/run-store.js';
+import { renderReport } from './report/html.js';
+import { dedupe } from './observe/oracle.js';
+
+/**
+ * @param {string} [runId]
+ * @param {{status?: string}} [opts] وضعیت واقعی، اگر فراخوان می‌داندش
+ */
+export async function finalizeRun(runId = getCurrentRun(), { status } = {}) {
+  const store = new RunStore(runId);
+
+  const events = await store.readNdjson('events.ndjson');
+  const findings = await store.readNdjson('findings.ndjson');
+  const real = findings.filter((f) => !f.synthetic);
+  const synthetic = findings.filter((f) => f.synthetic);
+  const steps = events.filter((e) => e.kind === 'step');
+  const unique = dedupe(real);
+
+  const before = (await store.readJson('run.json')) || {};
+
+  await store.finish({
+    // بدون وضعیتِ داده‌شده، وضعیت قبلی می‌ماند — مگر اینکه هنوز «running» باشد
+    status: status ?? (before.status === 'running' ? 'finished' : before.status),
+    steps: steps.length,
+    findings: unique.length,
+    findingEvents: real.length,
+    syntheticEvents: synthetic.length,
+    serverLines: events.filter((e) => e.source === 'server').length,
+    serverCollectors: [...new Set(events.filter((e) => e.source === 'server').map((e) => e.collector))],
+  });
+
+  const run = await store.readJson('run.json');
+  const file = path.join(store.dir, 'report.html');
+  await fs.writeFile(file, renderReport({ run, steps, findings: real, synthetic, events }), 'utf8');
+
+  return { run, store, steps, unique, synthetic, file };
+}
+
+/** خلاصهٔ کنسولی — همان چیزی که آدم بعد از اجرا می‌خواهد ببیند. */
+export function printSummary({ run, steps, unique, file }) {
+  console.log(`\n  گزارش: ${file}`);
+  console.log(
+    `  قدم: ${steps.length}  ·  یافتهٔ یکتا: ${unique.length}  ·  خط لاگ سرور: ${run.serverLines ?? 0}\n`
+  );
+
+  if (unique.length) {
+    console.log('  یافته‌ها:');
+    for (const f of unique) {
+      const where = (f.steps || [f.step]).join(' · ');
+      console.log(`   • [${f.source}] ${where} — ${f.normalized.slice(0, 120)} (${f.count}×)`);
+    }
+    console.log('');
+  }
+}

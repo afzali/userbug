@@ -20,6 +20,9 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 10_000 },
   globalSetup: './src/global-setup.js',
+  // نهایی‌سازی و ساخت گزارش در teardown است، نه در گزارشگر — تا با
+  // `--reporter=…` در خط فرمان از دست نرود. نگاه به `src/finalize.js`.
+  globalTeardown: './src/global-teardown.js',
   reporter: [['list'], ['./src/reporter.js']],
   use: {
     baseURL: target.baseURL,

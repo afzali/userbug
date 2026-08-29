@@ -9,11 +9,20 @@ import { expect } from '../../src/fixtures.js';
  *
  * ── چرا از کنسول SQL خودِ نپی استفاده نمی‌کنیم ──
  *
- * `/sqlite` هست، ولی سه مانع دارد: پشت `devMode` در localStorage است، یک
- * `prompt` با رمز ثابتِ درون سورس می‌پرسد، و مهم‌تر از همه `showContent` در آن
- * صفحه با `let` سادهٔ Svelte 5 نوشته شده — یعنی بدون `$state` هرگز واکنشی
- * نیست و محتوا حتی با رمز درست هم رندر نمی‌شود. علاوه بر این، رفتن به آن صفحه
- * کاربر را از مسیرش بیرون می‌برد.
+ * `/sqlite` هست، ولی رفتن به آن صفحه کاربر را از مسیرش بیرون می‌برد، پشت
+ * `devMode` در localStorage است، و رمزش را با `prompt()` می‌گیرد.
+ *
+ * ── تصحیح یک برداشت غلط ──
+ *
+ * پیش‌تر اینجا نوشته بودیم که `showContent` در آن صفحه با `let` سادهٔ Svelte 5
+ * نوشته شده و «بدون `$state` واکنشی نیست». این درست نبود: آن فایل هیچ runeی
+ * ندارد و `svelte.config.js` هم `runes: true` نگذاشته، پس در حالت legacy
+ * کامپایل می‌شود و همان `let` واکنشی است.
+ *
+ * علتِ واقعیِ خالی ماندنِ صفحه، خودِ ابزار ما بود: رصدگر هر dialog را
+ * می‌بست، پس `prompt()` همیشه `null` برمی‌گرداند. حالا سناریو می‌تواند با
+ * `ub.answerDialog('…')` جواب بگذارد. این را می‌نویسیم چون یافتهٔ اشتباه
+ * گران‌تر از نبودِ یافته است.
  *
  * پس مستقیم همان ماژولی را صدا می‌زنیم که خودِ اپ استفاده می‌کند. این کار در
  * حالت توسعه ممکن است چون Vite سورس را به‌شکل ESM سرو می‌کند — و همان محیطی
@@ -32,6 +41,24 @@ export async function sql(page, query, params = []) {
 }
 
 /**
+ * باز کردن نوار کناری، اگر جمع باشد.
+ *
+ * روی موبایل نوار پشت «Toggle Sidebar» جمع می‌شود و هر سلکتوری که سراغ محتوای
+ * آن برود بی‌صدا timeout می‌خورد. این را دو بار جداگانه یاد گرفتیم — یک بار در
+ * `logout` و یک بار در `createBlankDoc` — پس شد یک تابع.
+ *
+ * @param {import('@playwright/test').Locator} target چیزی که باید دیده شود
+ */
+export async function ensureVisible(page, target) {
+  if (await target.isVisible().catch(() => false)) return;
+  const toggle = page.getByRole('button', { name: 'Toggle Sidebar' });
+  if (await toggle.count()) {
+    await toggle.first().click();
+    await page.waitForTimeout(600);
+  }
+}
+
+/**
  * خروج از حساب — مستقل از دستگاه.
  *
  * روی دسکتاپ منوی کاربر در نوار کناریِ باز است؛ روی موبایل نوار جمع شده و
@@ -43,14 +70,7 @@ export async function logout(page, ub, email) {
 
   const userMenu = page.getByRole('button', { name: new RegExp(email.split('@')[0]) }).first();
 
-  if (!(await userMenu.isVisible().catch(() => false))) {
-    const toggle = page.getByRole('button', { name: 'Toggle Sidebar' });
-    if (await toggle.count()) {
-      await toggle.first().click();
-      await page.waitForTimeout(600);
-    }
-  }
-
+  await ensureVisible(page, userMenu);
   await userMenu.click();
   await page.getByRole('menuitem', { name: 'خروج', exact: true }).click();
   await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
@@ -69,12 +89,24 @@ export async function logout(page, ub, email) {
  *   slug تمام شود. `false` یعنی همان کاری که کاربر عجول می‌کند.
  */
 export async function createBlankDoc(page, ub, { title, waitForSlug = true }) {
-  await ub.dismissBlockers();
-  await page.getByRole('button', { name: 'فایل جدید' }).first().click();
-  await page.getByRole('tab', { name: 'فایل خالی جدید' }).click();
-  await page.locator('#blank-title').fill(title);
+  await openBlankDocForm(page, ub, { title });
   if (waitForSlug) await page.waitForTimeout(900);
   await page.getByRole('button', { name: 'ساخت و باز کردن' }).click();
+}
+
+/**
+ * همان فرم، ولی بدون زدن دکمهٔ ساخت.
+ *
+ * جدا شد تا بشود وضعیتِ فرم را در بازهٔ بررسی یکتایی سنجید، بدون اینکه لازم
+ * باشد مسابقه با آن بررسی را ببریم.
+ */
+export async function openBlankDocForm(page, ub, { title }) {
+  await ub.dismissBlockers();
+  const newFile = page.getByRole('button', { name: 'فایل جدید' }).first();
+  await ensureVisible(page, newFile);
+  await newFile.click();
+  await page.getByRole('tab', { name: 'فایل خالی جدید' }).click();
+  await page.locator('#blank-title').fill(title);
 }
 
 /** عبور از صفحهٔ کد بازیابی به فهرست. */

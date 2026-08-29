@@ -18,6 +18,10 @@ export function normalizeMessage(message) {
   return String(message)
     .replace(/\b[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}\b/gi, '<uuid>')
     .replace(/\b[0-9a-f]{32,}\b/gi, '<hash>')
+    // ایمیل و هویتِ هر اجرا. بدون این، یک باگ در هر اجرا اثرانگشت تازه‌ای
+    // می‌گیرد و `diff` همان یافته را هم‌زمان «تازه» و «رفته» نشان می‌دهد —
+    // که دقیقاً همان چیزی است که اثرانگشت قرار بود جلویش را بگیرد.
+    .replace(/[\w.+-]+@[\w.-]+\.\w+/g, '<email>')
     .replace(/https?:\/\/[^\s"')]+/g, '<url>')
     .replace(/:\d+:\d+/g, ':<pos>')
     .replace(/\b\d{4}-\d{2}-\d{2}[T ][\d:.]+/g, '<time>')
@@ -82,7 +86,11 @@ export function judge(events, { allowlist = [], step, route } = {}) {
  */
 export function dedupe(findings) {
   const byPrint = new Map();
-  for (const f of findings) {
+  for (const raw of findings) {
+    // اثرانگشت اینجا دوباره حساب می‌شود، نه از رکورد خوانده. چون اگر ذخیره‌شده
+    // بماند، هر بهبودی در نرمال‌سازی فقط شامل اجراهای بعدی می‌شود و اجراهای
+    // قدیمی برای همیشه با اثرانگشتِ غلط می‌مانند — و `diff` بین آن‌ها بی‌معنا.
+    const f = { ...raw, fingerprint: fingerprint({ source: raw.source, message: raw.message }) };
     const seen = byPrint.get(f.fingerprint);
     if (seen) {
       seen.count++;

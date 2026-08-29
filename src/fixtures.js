@@ -53,8 +53,19 @@ export const test = base.extend({
       store.appendEvent(event).catch(() => {});
     };
 
+    // جواب‌های یک‌بارمصرف برای dialogهای بعدی. صف است نه یک مقدار، چون یک قدم
+    // ممکن است چند پنجره پشت سر هم بیاورد.
+    const dialogAnswers = [];
+
     await page.addInitScript(INIT_SCRIPT);
-    attachClientObservers(page, sink);
+    attachClientObservers(page, sink, {
+      onDialog: async (d) => {
+        const answer = dialogAnswers.shift();
+        if (!answer) return false;
+        await answer(d);
+        return true;
+      },
+    });
 
     const collectors = await startAll(createServerCollectors(target.logs));
 
@@ -103,6 +114,24 @@ export const test = base.extend({
             errorCount: found.length,
           });
         }
+      },
+
+      /**
+       * جواب برای پنجرهٔ بعدی — پیش از کنشی که آن را باز می‌کند صدا بزنید.
+       *
+       *   ub.answerDialog('رمز');   // prompt
+       *   ub.answerDialog(true);    // confirm → تأیید
+       */
+      answerDialog(value) {
+        dialogAnswers.push(async (d) => {
+          if (value === false) return d.dismiss();
+          return d.accept(typeof value === 'string' ? value : undefined);
+        });
+      },
+
+      /** کنترل کامل روی پنجرهٔ بعدی، وقتی `answerDialog` کافی نیست. */
+      onNextDialog(handler) {
+        dialogAnswers.push(handler);
       },
 
       /** یافته‌ای که خودِ سناریو تشخیص می‌دهد، نه داورِ خطاها. */
@@ -207,6 +236,26 @@ export const test = base.extend({
             }
           } catch {}
         });
+
+        /**
+         * دانه‌های وضعیت پس از پاکسازی.
+         *
+         * برای خاموش کردنِ مزاحم‌هایی است که یافته‌شان **قبلاً ثبت شده**. بدون
+         * این، یک مودالِ ناخوانده که دیرهنگام می‌آید، هر سناریوی دیگری را هم
+         * ناپایدار می‌کند و یافته‌های تازه زیر نویزِ یافتهٔ قدیمی گم می‌شوند.
+         *
+         * این «پنهان کردن باگ» نیست: یافته در `findings/` نوشته شده و کلیدِ
+         * خاموش‌کردنش اینجا با ارجاع به همان یافته می‌آید.
+         */
+        const seed = target.isolation?.seed?.localStorage;
+        if (seed) {
+          await page.evaluate((entries) => {
+            for (const [k, v] of Object.entries(entries)) {
+              try { localStorage.setItem(k, v); } catch {}
+            }
+          }, seed);
+        }
+
         await page.context().clearCookies();
       },
     };
