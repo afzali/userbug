@@ -29,6 +29,9 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --headed                    مرورگر دیده شود
       --repeat <n>                هر سناریو n بار
 
+  userbug replay <runId> [--only-findings]
+                                  اجرای دوبارهٔ همان سناریوها روی همان دستگاه
+
   userbug list [--limit n]        فهرست اجراها
   userbug report <runId|latest>   بازسازی گزارش از مخزن، بدون اجرای دوباره
   userbug diff <runA> <runB>      چه یافته‌ای تازه است و چه یافته‌ای رفته
@@ -138,6 +141,42 @@ function cmdRun({ flags, positional }) {
   process.exit(results.some((r) => r.code !== 0) ? 1 : 0);
 }
 
+/**
+ * اجرای دوبارهٔ یک اجرای قبلی: همان هدف، همان دستگاه، همان سناریوها.
+ *
+ * ── چرا «resume» نداریم ──
+ *
+ * ادامه دادن از قدمی که ماند، یعنی بازگرداندن وضعیت مرورگر و اپ به همان نقطه.
+ * آن وضعیت — نشست، دیتابیس محلی، کش — با پایان اجرا رفته و مرورگر راهی برای
+ * برگرداندنش نمی‌دهد. پس به‌جای وعدهٔ نادرست، `replay` را داریم که از اول
+ * اجرا می‌کند و `--only-findings` که فقط سناریوهای مشکل‌دار را برمی‌دارد.
+ */
+function cmdReplay({ flags, positional }) {
+  const runId = resolveRunId(positional[0]);
+  const run = readRun(runId);
+  const scenarios = run.scenarios || [];
+
+  if (!scenarios.length) {
+    throw new Error(`اجرای ${runId} سناریویی ثبت نکرده است؛ شاید پیش از افزوده‌شدن این قابلیت بوده`);
+  }
+
+  const wanted = flags['only-findings'] ? scenarios.filter((s) => s.findings > 0) : scenarios;
+  if (!wanted.length) throw new Error('آن اجرا یافته‌ای نداشت؛ چیزی برای اجرای دوباره نیست');
+
+  const escape = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const grep = wanted.map((s) => escape(s.name)).join('|');
+
+  console.log(`
+  اجرای دوبارهٔ ${runId}`);
+  console.log(`  دستگاه: ${run.device}  ·  سناریو: ${wanted.length} از ${scenarios.length}
+`);
+
+  cmdRun({
+    flags: { ...flags, grep, device: run.device === 'desktop' ? undefined : run.device },
+    positional: [run.target],
+  });
+}
+
 function cmdList({ flags }) {
   const limit = Number(flags.limit || 20);
   const ids = listRunIds().slice(-limit).reverse();
@@ -199,6 +238,9 @@ try {
   switch (cmd) {
     case 'run':
       cmdRun(parsed);
+      break;
+    case 'replay':
+      cmdReplay(parsed);
       break;
     case 'list':
       cmdList(parsed);

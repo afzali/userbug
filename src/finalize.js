@@ -35,6 +35,19 @@ export async function finalizeRun(runId = getCurrentRun(), { status } = {}) {
 
   const before = (await store.readJson('run.json')) || {};
 
+  /**
+   * چه سناریوهایی اجرا شدند و کدامشان یافته داشتند.
+   *
+   * بدون این، `replay` نمی‌داند چه چیزی را دوباره اجرا کند و مجبور است کل
+   * مجموعه را ببرد — که با پنج سناریو هنوز قابل تحمل است و با پنجاه تا نه.
+   */
+  const scenarios = [...new Set(steps.map((s) => s.scenario).filter(Boolean))].map((name) => ({
+    name,
+    steps: steps.filter((s) => s.scenario === name).length,
+    findings: real.filter((f) => f.scenario === name || steps.some((s) => s.scenario === name && s.step === f.step))
+      .length,
+  }));
+
   await store.finish({
     // بدون وضعیتِ داده‌شده، وضعیت قبلی می‌ماند — مگر اینکه هنوز «running» باشد
     status: status ?? (before.status === 'running' ? 'finished' : before.status),
@@ -44,6 +57,7 @@ export async function finalizeRun(runId = getCurrentRun(), { status } = {}) {
     syntheticEvents: synthetic.length,
     serverLines: events.filter((e) => e.source === 'server').length,
     serverCollectors: [...new Set(events.filter((e) => e.source === 'server').map((e) => e.collector))],
+    scenarios,
   });
 
   const run = await store.readJson('run.json');

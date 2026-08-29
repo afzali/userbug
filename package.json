@@ -19,5 +19,8 @@
   },
   "bin": {
     "userbug": "./bin/userbug.js"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0"
   }
 }

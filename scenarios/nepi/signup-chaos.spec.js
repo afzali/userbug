@@ -62,43 +62,13 @@ test('رفرش روی صفحهٔ کد بازیابی', async ({ page, ub, identi
   });
 });
 
-test('ایمیل با حرف بزرگ، حساب دوم می‌سازد', async ({ page, ub, identity }) => {
-  const lower = identity.email;
-  const upper = lower[0].toUpperCase() + lower.slice(1);
-
-  await ub.step('ثبت‌نام با ایمیل کوچک', async () => {
-    await signUp(page, ub, lower, identity.password);
-    await page.getByRole('checkbox').check();
-    await page.getByRole('button', { name: 'ادامه' }).click();
-    await expect(page).toHaveURL(/\/contents/, { timeout: 30_000 });
-  });
-
-  await ub.step('خروج', async () => {
-    await logout(page, ub, lower);
-  });
-
-  await ub.step('ورود با همان ایمیل، فقط حرف اول بزرگ', async () => {
-    await page.getByLabel('ایمیل').fill(upper);
-    await page.getByLabel('رمز عبور').fill(identity.password);
-    await page.getByRole('button', { name: 'ورود / ثبت‌نام' }).click();
-    await page.waitForTimeout(2500);
-    await ub.dismissBlockers();
-
-    // اگر صفحهٔ کد بازیابی دوباره آمد، یعنی حسابِ دومی ساخته شده
-    const secondAccount = await page
-      .getByRole('heading', { name: 'کد بازیابی شما' })
-      .isVisible()
-      .catch(() => false);
-
-    if (secondAccount) {
-      await ub.note({
-        message: `ایمیل «${upper}» حساب جداگانه‌ای از «${lower}» ساخت — ایمیل پیش از ذخیره نرمال نمی‌شود`,
-        detail:
-          'کاربری که ایمیلش را با حرف بزرگ بنویسد، حساب تازه و خالی می‌گیرد و فکر می‌کند داده‌هایش پریده است.',
-      });
-    }
-  });
-});
+/*
+ * «ایمیل با حرف بزرگ» به `email-case.yml` منتقل شد.
+ *
+ * نخستین سناریویی که از اسکریپت به داده رفت. نگه داشتن هر دو نسخه یعنی یک
+ * باگ دو بار گزارش می‌شود و `replay` هر دو را برمی‌دارد — همان چیزی که در
+ * اولین اجرای replay دیدیم.
+ */
 
 test('ایمیل با فاصلهٔ اضافه', async ({ page, ub, identity }) => {
   await ub.step('ثبت‌نام با ایمیل تمیز', async () => {

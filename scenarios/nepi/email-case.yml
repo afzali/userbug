@@ -1,0 +1,64 @@
+name: ایمیل با حرف بزرگ، حساب دوم می‌سازد
+persona: novice
+status: approved
+
+# نخستین سناریوی داده‌ای. همان چیزی که در signup-chaos.spec.js اسکریپت بود،
+# اینجا داده است — تا بشود از رابط ویرایشش کرد و در فاز ۲ به مدل دادش.
+
+steps:
+  - as: پاکسازی و باز کردن اپ
+    clearState: true
+
+  - go: /
+  - expect: { url: "/login" }
+
+  # پنجره‌ها با تأخیر می‌آیند؛ کاربر هم همین‌قدر صبر می‌کند و بعد می‌بنددشان
+  - wait: 2000
+  - dismissBlockers: true
+
+  - as: ثبت‌نام با ایمیل کوچک
+    fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - expect: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 30000 }
+  - dismissBlockers: true
+
+  - as: تأیید کد بازیابی و عبور به فهرست
+    check: { role: checkbox }
+  - click: { role: button, name: "ادامه" }
+  - expect: { url: "/contents", timeout: 30000 }
+  - wait: 1500
+  - dismissBlockers: true
+
+  # ── خروج، مستقل از دستگاه ──
+  # روی موبایل نوار کناری جمع است و منوی کاربر دیده نمی‌شود؛ اول بازش می‌کنیم.
+  - as: خروج از حساب
+    when: { hidden: { role: button, name: "{{identity.local}}", exact: false }, timeout: 1500 }
+    then:
+      - click: { role: button, name: "Toggle Sidebar" }
+      - wait: 600
+
+  - click: { role: button, name: "{{identity.local}}", exact: false, nth: 0 }
+  - click: { role: menuitem, name: "خروج", exact: true }
+  - expect: { url: "/login" }
+  - dismissBlockers: true
+
+  - as: ورود با همان ایمیل، فقط حرف اول بزرگ
+    fill:
+      ایمیل: "{{identity.email | upperFirst}}"
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - wait: 2500
+  - dismissBlockers: true
+
+  # سنجشِ نرم: اگر نخورد یافته ثبت می‌شود و سناریو می‌شکند نه، ادامه می‌دهد.
+  - as: نباید حساب تازه‌ای ساخته باشد
+    assert: { hidden: { role: heading, name: "کد بازیابی شما" }, timeout: 3000 }
+    finding: >-
+      ایمیل «{{identity.email | upperFirst}}» حساب جداگانه‌ای از
+      «{{identity.email}}» ساخت — ایمیل پیش از ذخیره نرمال نمی‌شود
+    detail: >-
+      کاربری که ایمیلش را با حرف بزرگ بنویسد، حساب تازه و خالی می‌گیرد و فکر
+      می‌کند داده‌هایش پریده است.
