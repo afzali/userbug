@@ -1,0 +1,99 @@
+name: عنوان‌های فارسیِ بدخیم
+persona: novice
+status: approved
+
+# رشته‌هایی که در اپ‌های فارسی واقعاً می‌شکنند و در هیچ مجموعهٔ تست انگلیسی
+# پیدا نمی‌شوند: نیم‌فاصله، «ی» و «ك» عربی، ارقام فارسی، متن مخلوط RTL/LTR،
+# و ایموجی.
+#
+# سنجش روی صفحه کافی نیست: عنوان ممکن است درست نشان داده شود ولی چیز دیگری در
+# دیتابیس نشسته باشد — نرمال‌سازی‌شده، بریده، یا با نویسهٔ عوض‌شده. پس هر بار
+# خودِ دیتابیس را می‌خوانیم.
+#
+# پرسونا عمداً novice است: عنوان حرف‌به‌حرف تایپ می‌شود تا اعتبارسنجیِ زنده و
+# ساختِ slug واقعاً اجرا شوند. با `fill` یکجا، هیچ‌کدام اجرا نمی‌شدند.
+
+steps:
+  - as: ثبت‌نام و ورود به فهرست
+    clearState: true
+  - go: /
+  - expect: { url: "/login" }
+  - wait: 2000
+  - dismissBlockers: true
+  - fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - expect: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 30000 }
+  - dismissBlockers: true
+  - check: { role: checkbox }
+  - click: { role: button, name: "ادامه" }
+  - expect: { url: "/contents", timeout: 30000 }
+  - wait: 1500
+  - dismissBlockers: true
+
+  - as: ساخت سند با هر عنوان بدخیم
+    forEach:
+      var: title
+      in:
+        - "{{nasty.zwnj}}"
+        - "{{nasty.arabicYaKaf}}"
+        - "{{nasty.persianDigits}}"
+        - "{{nasty.mixed}}"
+        - "{{nasty.emoji}}"
+    then:
+      - go: /contents
+      - wait: 1200
+      - dismissBlockers: true
+
+      - when: { hidden: { role: button, name: "فایل جدید" }, timeout: 1500 }
+        then:
+          - click: { role: button, name: "Toggle Sidebar" }
+          - wait: 600
+
+      - click: { role: button, name: "فایل جدید", nth: 0 }
+      - click: { role: tab, name: "فایل خالی جدید" }
+
+      # `#blank-title` نه برچسب: کامپوننت Tabs محتوای همهٔ تب‌ها را در DOM نگه
+      # می‌دارد، پس دو ورودیِ «نام کتاب» هم‌زمان وجود دارد.
+      - fill: { selector: "#blank-title" }
+        value: "{{vars.title}}"
+
+      # مهلت برای بررسی یکتاییِ slug — همان ۵۰۰ میلی‌ثانیه‌ای که یافتهٔ ۵ از آن آمد
+      - wait: 1000
+      - click: { role: button, name: "ساخت و باز کردن" }
+      - expect: { url: "/content/", timeout: 30000 }
+      - wait: 1200
+
+      # ── چرا «دقیقاً همان که تایپ شد» سنجشِ درستی نبود ──
+      #
+      # نسخهٔ اول همین سناریو مقایسهٔ دقیقِ رشتهٔ تایپ‌شده با رشتهٔ ذخیره‌شده بود
+      # و سه یافته داد. ولی `TabBlank.svelte` عنوان را عمداً با
+      # `normalizePersian` نرمال می‌کند: «ك»/«ي» عربی به فارسی، ارقام فارسی
+      # یکسان‌سازی، اعراب حذف. یعنی آن سه «یافته» رفتارِ خواسته‌شدهٔ اپ بودند.
+      #
+      # یافتهٔ اشتباه از نبودِ یافته بدتر است. پس سنجش عوض شد به دو چیزی که
+      # واقعاً می‌توانند خراب باشند: چیزی گم نشود، و آنچه ذخیره شده همان باشد
+      # که کاربر در فهرست می‌بیند.
+      - as: چه چیزی واقعاً ذخیره شد؟
+        query:
+          sql: "SELECT title FROM books ORDER BY rowid DESC LIMIT 1"
+          saveAs: last
+
+      - assert: { matches: ["{{vars.last.0.title}}", "\\S"] }
+        finding: >-
+          عنوان «{{vars.title}}» پس از نرمال‌سازی خالی شد
+        detail: >-
+          نرمال‌سازی نباید عنوان را نابود کند. کاربر سندی می‌سازد که در فهرست
+          بی‌نام است و دیگر پیدایش نمی‌کند.
+
+      - go: /contents
+      - wait: 1500
+      - dismissBlockers: true
+      - assert: { visible: { text: "{{vars.last.0.title}}" }, timeout: 4000 }
+        finding: >-
+          عنوان ذخیره‌شده «{{vars.last.0.title}}» در فهرست دیده نمی‌شود
+        detail: >-
+          آنچه در دیتابیس نشسته با آنچه فهرست نشان می‌دهد یکی نیست. یعنی مسیر
+          نمایش و مسیر ذخیره دو نرمال‌سازی متفاوت دارند — و کاربر عنوانی
+          می‌بیند که با جست‌وجو پیدا نمی‌شود.

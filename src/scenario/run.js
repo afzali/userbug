@@ -21,14 +21,20 @@ import { interpolate } from './interpolate.js';
 import { resolveTarget } from './resolve.js';
 import { NASTY } from '../data/persian.js';
 import { assertMayRequest } from '../guard.js';
+import { resolvePersona } from '../personas.js';
 
 const NEEDS_AI = new Set(['do', 'explore', 'goal']);
 
 export async function runScenario({ page, ub, identity, scenario }) {
+  // ترتیب: پرچم خط فرمان بر سناریو می‌چربد، تا بشود همان سناریو را با پرسونای
+  // دیگری اجرا کرد و تفاوت رفتار اپ را دید.
+  const persona = resolvePersona(process.env.UB_PERSONA || scenario.persona || 'novice');
+
   const ctx = {
     identity: { ...identity, local: identity.email.split('@')[0] },
     nasty: NASTY,
     vars: {},
+    persona,
   };
 
   for (const group of groupSteps(scenario.steps)) {
@@ -69,7 +75,7 @@ function groupSteps(rawSteps) {
 function normalizeStep(raw) {
   if (typeof raw === 'string') throw new Error(`قدم باید شیء باشد، نه رشته: «${raw}»`);
   const keys = Object.keys(raw).filter((k) => k !== 'as');
-  const verb = keys.find((k) => !['detail', 'finding', 'else', 'then', 'value', 'timeout'].includes(k));
+  const verb = keys.find((k) => !['detail', 'finding', 'else', 'then', 'value', 'timeout', 'delay'].includes(k));
   if (!verb) throw new Error(`قدم بدون فعل: ${JSON.stringify(raw)}`);
   if (NEEDS_AI.has(verb)) {
     throw new Error(`فعل «${verb}» به فاز ۲ (AI) نیاز دارد و در این نسخه پشتیبانی نمی‌شود`);
@@ -85,11 +91,30 @@ function defaultTitle(verb, body) {
 async function execute({ page, ub, ctx, step }) {
   const { verb, raw } = step;
   const body = interpolate(step.body, ctx);
+  const persona = ctx.persona;
 
   switch (verb) {
     case 'go':
       await page.goto(body);
+      if (persona.settle) await page.waitForTimeout(persona.settle);
       return;
+
+    /**
+     * حلقه روی مجموعه‌ای از مقدارها.
+     *
+     * برای سنجیدن دادهٔ بدخیم لازم است: همان چند قدم با ده رشتهٔ متفاوت. بدون
+     * آن یا سناریو ده برابر می‌شد یا فقط یک نمونه را می‌آزمودیم.
+     */
+    case 'forEach': {
+      const { var: name, in: values } = body;
+      for (const value of values) {
+        ctx.vars[name] = value;
+        for (const sub of raw.then || []) {
+          await execute({ page, ub, ctx, step: normalizeStep(sub) });
+        }
+      }
+      return;
+    }
 
     case 'clearState':
       await ub.clearBrowserState();
@@ -105,6 +130,7 @@ async function execute({ page, ub, ctx, step }) {
 
     case 'click': {
       const { locator } = resolveTarget(page, body);
+      if (persona.actionDelay) await page.waitForTimeout(persona.actionDelay);
       return void (await locator.click());
     }
 
@@ -157,11 +183,11 @@ async function execute({ page, ub, ctx, step }) {
       // دو شکل: {fill: {label: …}, value: …}  یا  {fill: {«برچسب»: «مقدار»}}
       if (raw.value !== undefined) {
         const { locator } = resolveTarget(page, body);
-        return void (await locator.fill(String(interpolate(raw.value, ctx))));
+        return void (await typeInto(page, locator, String(interpolate(raw.value, ctx)), persona));
       }
       for (const [label, value] of Object.entries(body)) {
         const { locator } = resolveTarget(page, { label });
-        await locator.fill(String(value));
+        await typeInto(page, locator, String(value), persona);
       }
       return;
     }
@@ -277,6 +303,20 @@ async function execute({ page, ub, ctx, step }) {
     default:
       throw new Error(`فعل ناشناخته: «${verb}»`);
   }
+}
+
+/**
+ * تایپ با سرعتِ پرسونا.
+ *
+ * `fill` مقدار را یکجا می‌گذارد و هیچ رخداد کیبوردی تولید نمی‌کند — پس هر
+ * منطقی که به تایپِ تدریجی وابسته است (debounce، اعتبارسنجی زنده، شمارندهٔ
+ * حروف) اصلاً اجرا نمی‌شود. `pro` همان `fill` را می‌خواهد چون هدفش بردنِ
+ * مسابقه است؛ `novice` باید واقعاً تایپ کند.
+ */
+async function typeInto(page, locator, value, persona) {
+  if (!persona.typeDelay) return locator.fill(value);
+  await locator.fill('');
+  await locator.pressSequentially(value, { delay: persona.typeDelay });
 }
 
 /**
