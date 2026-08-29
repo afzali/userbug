@@ -6,6 +6,7 @@
 | `signup-chaos.spec.js` › ایمیل با حرف بزرگ | `email-case.yml` |
 | `signup-chaos.spec.js` › ایمیل با فاصلهٔ اضافه | `email-whitespace.yml` |
 | `signup-double-submit.spec.js` | `double-submit.yml` |
+| `signup-recovery.spec.js` | `signup-recovery.yml` |
 
 نگه داشتن هر دو نسخه یعنی یک باگ دو بار گزارش می‌شود و `replay` هر دو را
 برمی‌دارد — همان چیزی که در اولین اجرای replay دیدیم. پس نسخهٔ اسکریپتی هر
@@ -17,5 +18,4 @@
 دیتابیس نشست. قدم‌های تایپ در ویرایشگرِ contenteditable هنوز فعلِ متناظری در
 YAML ندارند. تا وقتی دارد، اسکریپت می‌ماند.
 
-`signup-recovery.spec.js` — دانلود فایل کد بازیابی و بازنشانی رمز با آن.
-فعل‌های `download` و `set` هستند، پس مهاجرتش ممکن است؛ فقط هنوز انجام نشده.
+تنها فایل اسکریپتیِ باقی‌مانده همان یکی است.

@@ -1,0 +1,97 @@
+name: ثبت‌نام تا بازیابی رمز
+persona: novice
+status: approved
+
+# مسیری که یک کاربر واقعی طی می‌کند و بیشترین چیز برایش در خطر است:
+# ثبت‌نام، گرفتن کد بازیابی، دانلودش، خروج، فراموشی رمز، و بازگشت با همان فایل.
+#
+# سنجش‌های صریحِ اینجا فقط نیمی از کارند. نیمهٔ دیگر داورِ خودکار است که در
+# پس‌زمینه هر خطای کلاینت و سرور را می‌گیرد، حتی اگر هیچ سنجشی ننوشته باشیم.
+
+steps:
+  - as: پاکسازی و باز کردن اپ
+    clearState: true
+  - go: /
+  - expect: { url: "/login" }
+  - wait: 2000
+  - dismissBlockers: true
+
+  - as: ثبت‌نام با هویت تازه
+    fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - expect: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 30000 }
+  - dismissBlockers: true
+
+  - as: کد بازیابی روی صفحه
+    set: { name: shown, from: { text: { selector: "code.select-all" } } }
+
+  # این تنها چیزی است که کاربر را از رد شدنِ بی‌کد بازیابی نگه می‌دارد
+  - as: دکمهٔ ادامه پیش از تأیید قفل است
+    expect: { disabled: { role: button, name: "ادامه" } }
+
+  - as: دانلود فایل کد بازیابی
+    download:
+      click: { role: button, name: "دانلود به‌شکل فایل" }
+      saveAs: fromFile
+      line: 2          # عنوان، خط خالی، کد
+
+  - expect: { equals: ["{{vars.fromFileFilename}}", "nepi-recovery-code.txt"] }
+  - as: کد داخل فایل باید همان کد روی صفحه باشد
+    expect: { equals: ["{{vars.fromFile}}", "{{vars.shown}}"] }
+
+  - as: تأیید و عبور به فهرست
+    check: { role: checkbox }
+  - click: { role: button, name: "ادامه" }
+  - expect: { url: "/contents", timeout: 30000 }
+  - wait: 1500
+  - dismissBlockers: true
+
+  - as: خروج از حساب
+    when: { hidden: { role: button, name: "{{identity.local}}", exact: false }, timeout: 1500 }
+    then:
+      - click: { role: button, name: "Toggle Sidebar" }
+      - wait: 600
+  - click: { role: button, name: "{{identity.local}}", exact: false, nth: 0 }
+  - click: { role: menuitem, name: "خروج", exact: true }
+  - expect: { url: "/login" }
+  - dismissBlockers: true
+
+  - as: باز کردن پنجرهٔ فراموشی رمز
+    click: { role: button, name: "فراموشی رمز عبور؟" }
+  - expect: { visible: { role: heading, name: "بازنشانی رمز با کد بازیابی" } }
+
+  - as: بازنشانی رمز با کد دانلودشده
+    fill:
+      ایمیل حساب: "{{identity.email}}"
+      کد بازیابی: "{{vars.fromFile}}"
+      رمز عبور جدید: "{{identity.password}}X2!"
+      تکرار رمز جدید: "{{identity.password}}X2!"
+  - click: { role: button, name: "بازنشانی رمز و ورود" }
+  - expect: { url: "/contents", timeout: 30000 }
+  - wait: 1500
+  - dismissBlockers: true
+
+  - as: رمز قدیمی پس از بازنشانی نباید کار کند
+    when: { hidden: { role: button, name: "{{identity.local}}", exact: false }, timeout: 1500 }
+    then:
+      - click: { role: button, name: "Toggle Sidebar" }
+      - wait: 600
+  - click: { role: button, name: "{{identity.local}}", exact: false, nth: 0 }
+  - click: { role: menuitem, name: "خروج", exact: true }
+  - expect: { url: "/login" }
+  - dismissBlockers: true
+  - fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"     # رمز قدیمی
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - wait: 2500
+  - dismissBlockers: true
+
+  # اگر هنوز روی صفحهٔ ورود هستیم، رمز قدیمی رد شده — یعنی درست.
+  - assert: { visible: { label: "ایمیل" }, timeout: 3000 }
+    finding: "رمز قدیمی پس از بازنشانی هنوز کار می‌کند"
+    detail: >-
+      بازنشانی باید بستهٔ کلید را با رمز تازه دوباره ببندد؛ اگر رمز قبلی هم
+      بازش می‌کند، بازنشانی کامل نشده.

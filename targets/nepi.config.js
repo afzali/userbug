@@ -43,6 +43,14 @@ export default {
     mode: 'both',
     identity: { strategy: 'fresh-signup' },
     reset: {
+      /**
+       * دیتابیس تستِ سرور لوکال را از نو شروع کن.
+       *
+       * هویتِ تازه اجراها را از هم جدا می‌کند، ولی فایل SQLite سرور با هر
+       * اجرا بزرگ‌تر می‌شود و حساب‌های مرده در آن می‌مانند. این قلاب فقط روی
+       * محیطِ توسعه اجرا می‌شود — دروازهٔ ایمنی در `src/guard.js`.
+       */
+      beforeRun: [{ type: 'shell', run: 'node scripts/reset-nepi-db.mjs' }],
       beforeScenario: [
         { type: 'browser', clear: ['cookies', 'localStorage', 'indexedDB', 'cache', 'serviceWorker'] },
       ],

@@ -20,6 +20,7 @@ import { expect } from '@playwright/test';
 import { interpolate } from './interpolate.js';
 import { resolveTarget } from './resolve.js';
 import { NASTY } from '../data/persian.js';
+import { assertMayRequest } from '../guard.js';
 
 const NEEDS_AI = new Set(['do', 'explore', 'goal']);
 
@@ -252,6 +253,10 @@ async function execute({ page, ub, ctx, step }) {
     case 'request': {
       const base = ub.target.apiURL;
       if (!base) throw new Error('هدف `apiURL` ندارد؛ فعل request بدون آن معنا ندارد');
+
+      // خواندن آزاد است، نوشتن فقط روی محیط توسعه. یک اشتباه تایپی در apiURL
+      // نباید بتواند روی دادهٔ واقعی کاربران بنویسد.
+      assertMayRequest(ub.target, body.method || 'GET', body.path);
 
       const res = await page.request.fetch(base + body.path, {
         method: body.method || 'GET',

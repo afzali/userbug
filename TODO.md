@@ -73,17 +73,17 @@
 - [x] `state.sql` در کانفیگ هدف — موتور می‌داند *که* بخواند، هدف می‌داند *چطور*
 - [x] مهاجرت: `email-case` ، `email-whitespace` ، `refresh-recovery` ،
       `double-submit` ، `api-validation`
-- [ ] مهاجرت `signup-recovery` (فعل‌هایش هست، فقط انجام نشده)
+- [x] مهاجرت `signup-recovery` — با `download` و `set` و مقایسهٔ فایل با صفحه
 - [ ] مهاجرت `content-roundtrip` (فعل تایپ در ویرایشگر contenteditable ندارد)
 
 ### قلاب‌های ریست
 
 - [x] فعل `request` — درخواست مستقیم به API هدف، هم‌بستر با نشستِ صفحه
 - [x] سرور لوکال نپی روی SQLite (`.claude/launch.json` → `nepi-api-local`)
-- [ ] `shell` — دستور روی همین ماشین
-- [ ] `http` — اندپوینت تستِ خودِ اپ
+- [x] `shell` — دستور روی همین ماشین
+- [x] `http` — اندپوینت تستِ خودِ اپ
 - [x] `browser` — پاکسازی وضعیت مرورگر
-- [ ] لحظه‌های `beforeRun` ، `beforeScenario` ، `afterRun`
+- [x] لحظهٔ `beforeRun` (در `globalSetup`)؛ `afterRun` هنوز صدا زده نمی‌شود
 - [ ] **به‌کارگیری** دروازهٔ ایمنی: قلاب مخرب روی `production` اجرا نشود
   (تابعش در `target.js` هست ولی هنوز هیچ‌جا صدا زده نمی‌شود)
 
