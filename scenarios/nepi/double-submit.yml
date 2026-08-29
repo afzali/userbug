@@ -1,0 +1,40 @@
+name: دوبار کلیک روی ورود / ثبت‌نام
+persona: novice
+status: approved
+
+# چرا این سناریو ارزش دارد: `handleSubmit` اول `isLoading = true` می‌گذارد و بعد
+# `await` می‌کند. اگر بین آن دو رندر نرسیده باشد، کلیک دوم هم رد می‌شود، هر دو
+# اجرا `SELECT … WHERE email = ?` را خالی می‌بینند و هر دو `INSERT` می‌کنند.
+#
+# سنجش روی صفحه اینجا کافی نیست: صفحه در هر دو حالت یک‌شکل است. تنها راهِ
+# دیدنش، خواندنِ خودِ دیتابیس است.
+
+steps:
+  - as: پاکسازی و باز کردن فرم
+    clearState: true
+  - go: /
+  - expect: { url: "/login" }
+  - wait: 2000
+  - dismissBlockers: true
+
+  - as: پر کردن فرم
+    fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+
+  - as: دوبار کلیک بی‌حوصله روی دکمه
+    dblclick: { role: button, name: "ورود / ثبت‌نام" }
+  - expect: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 30000 }
+
+  - as: چند حساب با این ایمیل ساخته شد؟
+    query:
+      sql: "SELECT COUNT(*) AS n FROM users WHERE email = ?"
+      params: ["{{identity.email}}"]
+      saveAs: users
+
+  - assert: { equals: ["{{vars.users.0.n}}", "1"] }
+    finding: >-
+      دوبار کلیک روی «ورود / ثبت‌نام» {{vars.users.0.n}} حساب با یک ایمیل ساخت
+    detail: >-
+      هنگام ورود `users[0]` انتخاب می‌شود، پس کد بازیابی‌ای که کاربر ذخیره کرده
+      ممکن است به ردیفی بخورد که هیچ‌وقت باز نمی‌شود.

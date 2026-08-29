@@ -1,0 +1,59 @@
+name: ایمیل با فاصلهٔ اضافه
+persona: novice
+status: approved
+
+# کپی کردن ایمیل از جای دیگر معمولاً یک فاصله هم با خودش می‌آورد.
+#
+# نتیجهٔ این سناریو تا امروز «سالم» بوده: مرورگر روی `type=email` خودش فاصله را
+# می‌برد. نگهش داشته‌ایم چون اگر روزی آن ورودی به `type=text` تغییر کند، این
+# سناریو همان روز خبر می‌دهد — و «سالم بود» هم یک نتیجه است، نه هیچ.
+
+steps:
+  - as: ثبت‌نام با ایمیل تمیز
+    clearState: true
+  - go: /
+  - expect: { url: "/login" }
+  - wait: 2000
+  - dismissBlockers: true
+  - fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - expect: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 30000 }
+  - dismissBlockers: true
+  - check: { role: checkbox }
+  - click: { role: button, name: "ادامه" }
+  - expect: { url: "/contents", timeout: 30000 }
+  - wait: 1500
+  - dismissBlockers: true
+
+  - as: خروج از حساب
+    when: { hidden: { role: button, name: "{{identity.local}}", exact: false }, timeout: 1500 }
+    then:
+      - click: { role: button, name: "Toggle Sidebar" }
+      - wait: 600
+  - click: { role: button, name: "{{identity.local}}", exact: false, nth: 0 }
+  - click: { role: menuitem, name: "خروج", exact: true }
+  - expect: { url: "/login" }
+  - dismissBlockers: true
+
+  - as: ورود با فاصله در انتهای ایمیل
+    fill:
+      ایمیل: "{{identity.email}} "
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - wait: 2500
+  - dismissBlockers: true
+
+  - as: نباید حساب تازه‌ای ساخته باشد
+    assert: { hidden: { role: heading, name: "کد بازیابی شما" }, timeout: 3000 }
+    finding: "ایمیل با فاصلهٔ انتهایی حساب جداگانه ساخت — trim نمی‌شود"
+    detail: "کپی کردن ایمیل از جای دیگر معمولاً یک فاصله هم با خودش می‌آورد."
+
+  - as: و در دیتابیس هم باید یک ردیف باشد
+    query:
+      sql: "SELECT COUNT(*) AS n FROM users WHERE TRIM(email) = ?"
+      params: ["{{identity.email}}"]
+      saveAs: users
+  - assert: { equals: ["{{vars.users.0.n}}", "1"] }
+    finding: "پس از ورود با فاصله، {{vars.users.0.n}} ردیف کاربر با همان ایمیل هست"

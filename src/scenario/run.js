@@ -107,6 +107,40 @@ async function execute({ page, ub, ctx, step }) {
       return void (await locator.click());
     }
 
+    case 'dblclick': {
+      // همان توالی رخدادی که مرورگر از انگشتِ عجول تولید می‌کند
+      const { locator } = resolveTarget(page, body);
+      return void (await locator.dblclick({ delay: raw.delay ?? 20 }));
+    }
+
+    case 'reload':
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded');
+      return;
+
+    /**
+     * خواندن وضعیت واقعی از دیتابیسِ خودِ اپ.
+     *
+     * ── چرا این لازم است ──
+     *
+     * تا اینجا هر سنجش از روی چیزی بود که روی صفحه دیده می‌شد. ولی بخش بزرگی
+     * از باگ‌ها همان‌جایی است که صفحه درست نشان می‌دهد و دیتابیس چیز دیگری
+     * دارد — «دو ردیف کاربر با یک ایمیل» از بیرون هیچ نشانه‌ای ندارد.
+     *
+     * ── چرا موتور نمی‌داند چطور بخواند ──
+     *
+     * *چگونه* خواندن مسئلهٔ هدف است نه ابزار. تابعش در کانفیگ هدف می‌نشیند و
+     * موتور فقط صدایش می‌زند. وگرنه کدِ مخصوص نپی وسط موتور می‌ماند و هدف
+     * بعدی مجبور می‌شد دورش بزند.
+     */
+    case 'query': {
+      const probe = ub.target.state?.sql;
+      if (!probe) throw new Error(`هدف «${ub.target.key}» تابع state.sql ندارد`);
+      const rows = await page.evaluate(probe, { query: body.sql, params: body.params || [] });
+      ctx.vars[body.saveAs || 'rows'] = rows;
+      return;
+    }
+
     case 'clickIfPresent': {
       const { locator } = resolveTarget(page, body);
       if (await locator.isVisible().catch(() => false)) await locator.click();

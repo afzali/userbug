@@ -1,0 +1,53 @@
+name: رفرش روی صفحهٔ کد بازیابی
+persona: novice
+status: approved
+
+# صفحهٔ کد بازیابی تنها جایی است که کاربر *باید* کاری بکند و اگر نکند داده‌اش
+# برای همیشه می‌رود. پس رفرشِ ساده روی همان صفحه، سنگین‌ترین چیزی است که
+# می‌شود امتحان کرد.
+
+steps:
+  - as: ثبت‌نام تا صفحهٔ کد بازیابی
+    clearState: true
+  - go: /
+  - expect: { url: "/login" }
+  - wait: 2000
+  - dismissBlockers: true
+  - fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - expect: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 30000 }
+  - dismissBlockers: true
+
+  - as: رفرش صفحه — همان کاری که کاربر بی‌حوصله می‌کند
+    reload: true
+  - wait: 2500
+  - dismissBlockers: true
+
+  # اگر کد هنوز دیده می‌شود، رفتار درست است و کاری نداریم. اگر نه، باید ببینیم
+  # حساب ساخته مانده یا نه — چون «حسابِ بی‌کد» همان حالتِ بد است.
+  - as: اگر کد رفته، آیا حساب مانده؟
+    when: { hidden: { role: heading, name: "کد بازیابی شما" }, timeout: 2000 }
+    then:
+      - go: /
+      - wait: 1500
+      - dismissBlockers: true
+      - when: { visible: { label: "ایمیل" }, timeout: 2000 }
+        then:
+          - fill:
+              ایمیل: "{{identity.email}}"
+              رمز عبور: "{{identity.password}}"
+          - click: { role: button, name: "ورود / ثبت‌نام" }
+          - wait: 2500
+          - dismissBlockers: true
+
+      - assert: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 2000 }
+        finding: >-
+          رفرش روی صفحهٔ کد بازیابی: حساب ساخته می‌ماند ولی کد بازیابی دیگر
+          هرگز نشان داده نمی‌شود
+        detail: >-
+          کاربر با رمز خودش وارد می‌شود، پس حساب هست؛ اما کد بازیابی فقط در
+          حافظهٔ کامپوننت بود و کدِ تازه تنها در مسیر migrated صادر می‌شود.
+          طبق متن خودِ اپ، بدون این کد و با فراموشی رمز، داده برای همیشه
+          غیرقابل بازگشایی است.
