@@ -21,13 +21,14 @@ export function resolveTarget(page, target) {
 
   if (typeof target === 'string') return { locator: byLadder(page, target), described: target };
 
-  const { testid, role, name, label, text, selector, exact = true, nth } = target;
+  const { testid, role, name, label, text, placeholder, selector, exact = true, nth } = target;
   let locator;
 
   if (selector) locator = page.locator(selector);
   else if (testid) locator = page.getByTestId(testid);
   else if (role) locator = page.getByRole(role, name ? { name, exact } : undefined);
   else if (label) locator = page.getByLabel(label, { exact });
+  else if (placeholder) locator = page.getByPlaceholder(placeholder, { exact });
   else if (text) locator = page.getByText(text, { exact });
   else throw new Error(`توصیف هدف نامفهوم: ${JSON.stringify(target)}`);
 

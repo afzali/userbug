@@ -50,7 +50,7 @@ export async function runScenario({ page, ub, identity, scenario }) {
     scenarioId: scenario.id,
     // از هر N اجرا یکی کامل با مدل حل می‌شود، تا انحرافِ خاموشِ کش پیدا شود
     reverify: shouldReverify(getCurrentRun(), models.reverifyEvery),
-    aiStats: { cache: 0, model: 0, healed: 0 },
+    aiStats: { cache: 0, model: 0, healed: 0, verified: 0 },
   };
 
   for (const group of groupSteps(scenario.steps)) {

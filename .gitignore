@@ -4,3 +4,4 @@ test-results/
 .env
 .devin/
 userbug.config.js
+.env

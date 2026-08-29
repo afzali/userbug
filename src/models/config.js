@@ -10,6 +10,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ROOT } from '../target.js';
+import { loadEnv } from '../env.js';
+
+loadEnv();
 
 /**
  * نقش‌ها، نه اسم مدل‌ها.
@@ -21,11 +24,20 @@ import { ROOT } from '../target.js';
 export const DEFAULTS = {
   provider: 'openrouter',
   baseURL: 'https://openrouter.ai/api/v1',
-  default: 'anthropic/claude-haiku-4.5',
+  /**
+   * پیش‌فرض‌ها فعلاً مدل‌های رایگانِ OpenRouter هستند، چون هنوز در مرحلهٔ
+   * ساختِ ابزاریم و هزینه‌دار کردنِ چیزی که روزی ده بار اجرا می‌شود بی‌معناست.
+   *
+   * اسلاگ‌ها از فهرست زندهٔ `/api/v1/models` گرفته شده‌اند، نه از حافظه.
+   * برای دیدن فهرست تازه: `node bin/userbug.js models --free`
+   */
+  default: 'inclusionai/ling-3.0-flash-fin:free',
   roles: {
-    resolve: 'anthropic/claude-haiku-4.5',
-    author: 'anthropic/claude-haiku-4.5',
-    analyze: 'anthropic/claude-sonnet-5',
+    // پرتکرارترین نقش: باید سریع باشد و JSON تمیز بدهد
+    resolve: 'inclusionai/ling-3.0-flash-fin:free',
+    author: 'inclusionai/ling-3.0-flash-fin:free',
+    // کم‌تکرار، پس می‌شود مدل قوی‌تری گذاشت
+    analyze: 'z-ai/glm-5.2:free',
   },
   /** سقف هزینهٔ هر اجرا به دلار. رد شدن از آن اجرا را متوقف می‌کند، نه اینکه بی‌صدا ادامه دهد. */
   budgetPerRun: 0.5,

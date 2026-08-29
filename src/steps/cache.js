@@ -54,12 +54,14 @@ export function getEntry(cache, intent) {
   return cache.steps[stepKey(intent)] || null;
 }
 
-export function putEntry(cache, intent, entry) {
+export function putEntry(cache, intent, entry, { changed = true } = {}) {
   const key = stepKey(intent);
   const previous = cache.steps[key];
   cache.steps[key] = {
     ...entry,
-    healCount: previous ? (previous.healCount || 0) + 1 : 0,
+    // فقط تغییرِ واقعی heal است. بازبینیِ نمونه‌ای که همان نتیجه را بدهد،
+    // شمارنده را بالا نمی‌برد — وگرنه سیگنالِ ناپایداری بی‌معنا می‌شود.
+    healCount: previous ? (previous.healCount || 0) + (changed ? 1 : 0) : 0,
     firstLearned: previous?.firstLearned || new Date().toISOString(),
     lastVerified: new Date().toISOString(),
   };

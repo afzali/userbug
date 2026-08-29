@@ -33,10 +33,11 @@ function summarizeAi(events) {
       cache: acc.cache + (r.cache || 0),
       model: acc.model + (r.model || 0),
       healed: acc.healed + (r.healed || 0),
+      verified: acc.verified + (r.verified || 0),
       calls: acc.calls + (r.budget?.calls || 0),
       costUsd: Number((acc.costUsd + (r.budget?.costUsd || 0)).toFixed(6)),
     }),
-    { cache: 0, model: 0, healed: 0, calls: 0, costUsd: 0 }
+    { cache: 0, model: 0, healed: 0, verified: 0, calls: 0, costUsd: 0 }
   );
 }
 
@@ -99,7 +100,7 @@ export function printSummary({ run, steps, unique, file }) {
   if (run.ai) {
     const a = run.ai;
     console.log(
-      `  مدل: کش ${a.cache} · مدل ${a.model} · heal ${a.healed} · ` +
+      `  مدل: کش ${a.cache} · مدل ${a.model} · heal ${a.healed} · بازبینی ${a.verified} · ` +
         `${a.calls} فراخوانی · $${a.costUsd}
 `
     );

@@ -17,9 +17,35 @@ const PRICES = {
 };
 
 export function estimateCost(model, usage) {
+  // مدل‌های `:free` هزینه ندارند. قاعده بهتر از فهرست است، چون فهرست کهنه
+  // می‌شود و مدل رایگانِ تازه بی‌صدا گران حساب می‌شد.
+  if (String(model).endsWith(':free')) return 0;
   const p = PRICES[model];
   if (!p || !usage) return 0;
   return ((usage.prompt_tokens || 0) * p.in + (usage.completion_tokens || 0) * p.out) / 1e6;
+}
+
+/**
+ * بیرون کشیدن JSON از پاسخ.
+ *
+ * `response_format: json_object` را نمی‌فرستیم، چون بیشتر مدل‌های رایگان
+ * پشتیبانی‌اش نمی‌کنند و درخواست را با ۴۰۰ رد می‌کنند. در عوض جواب را با
+ * مدارا می‌خوانیم: حصار ```json برداشته می‌شود و اولین بلوکِ {…} گرفته.
+ */
+export function extractJson(text) {
+  const cleaned = String(text)
+    .replace(/^\s*```(?:json)?/i, '')
+    .replace(/```\s*$/, '')
+    .trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+    if (start === -1 || end <= start) throw new Error('JSON پیدا نشد');
+    return JSON.parse(cleaned.slice(start, end + 1));
+  }
 }
 
 export class Budget {
@@ -90,7 +116,6 @@ export async function askJson(cfg, prompt, budget) {
     body: JSON.stringify({
       model: cfg.model,
       temperature: 0,
-      response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: prompt.system },
         { role: 'user', content: prompt.user },
@@ -108,7 +133,7 @@ export async function askJson(cfg, prompt, budget) {
 
   const text = data.choices?.[0]?.message?.content ?? '';
   try {
-    return { json: JSON.parse(text), usage: data.usage, model: cfg.model };
+    return { json: extractJson(text), usage: data.usage, model: cfg.model };
   } catch {
     throw new Error(`پاسخ مدل JSON معتبر نبود: ${text.slice(0, 200)}`);
   }

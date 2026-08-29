@@ -13,22 +13,24 @@
  */
 import { resolveTarget } from '../scenario/resolve.js';
 import { signatureOf } from './signature.js';
-import { snapshotPage } from './snapshot.js';
+import { snapshotPage, descriptorFor } from './snapshot.js';
 import { redactDeep, secretsOf } from '../models/redact.js';
 import { askJson } from '../models/provider.js';
 
 const SYSTEM = `تو یک دستیارِ تستِ رابط کاربری هستی.
-ورودی: نمای فشردهٔ صفحه و یک نیت به زبان فارسی.
-خروجی: فقط JSON، بدون توضیح.
+
+ورودی: فهرست عناصرِ صفحه (هر کدام با یک شمارهٔ «ref») و یک نیت به زبان فارسی.
+کارِ تو فقط انتخاب است: کدام عنصر و چه کنشی.
+
+خروجی: فقط JSON، بدون توضیح و بدون حصار markdown.
 
 قالب:
-{"action":"click"|"fill"|"check"|"press","target":{"role":"...","name":"...","exact":true},"value":"..."}
+{"action":"click"|"fill"|"check"|"press","ref":<شماره>}
 
 قواعد:
-- «target» باید دقیقاً به یکی از عناصر فهرست اشاره کند.
-- اگر عنصر «testid» دارد، از {"testid":"..."} استفاده کن؛ پایدارتر است.
-- «value» فقط برای fill و press.
-- اگر هیچ عنصری با نیت نمی‌خواند، برگردان {"action":"none","reason":"..."}.`;
+- «ref» باید یکی از شماره‌های همان فهرست باشد. عنصر تازه نساز.
+- برای پر کردن یک ورودی، action برابر fill.
+- اگر هیچ عنصری با نیت نمی‌خواند: {"action":"none","reason":"..."}`;
 
 /**
  * @returns {{source: 'cache'|'model'|'healed', entry: object}}
@@ -55,8 +57,23 @@ export async function resolveDo({ page, intent, cache, models, budget, identity,
   }
   entry.domSignature = check.signature;
 
-  const stored = putEntry(cache, intent, entry);
-  return { source: cached ? 'healed' : 'model', entry: stored, locator: check.locator };
+  /**
+   * «دوباره حل شد» با «عوض شده بود» یکی نیست.
+   *
+   * بازبینیِ نمونه‌ای (یک از هر N اجرا) همهٔ قدم‌ها را دوباره از مدل می‌پرسد.
+   * اگر همان را heal بشماریم، `healCount` هر بار باد می‌کند و سیگنالِ
+   * «این گوشهٔ رابط ناپایدار است» به نویز تبدیل می‌شود.
+   *
+   * پس فقط وقتی heal است که نتیجه واقعاً فرق کرده باشد.
+   */
+  const unchanged =
+    cached &&
+    cached.domSignature === entry.domSignature &&
+    JSON.stringify(cached.target) === JSON.stringify(entry.target);
+
+  const stored = putEntry(cache, intent, entry, { changed: !unchanged });
+  const source = !cached ? 'model' : unchanged ? 'verified' : 'healed';
+  return { source, entry: stored, locator: check.locator };
 }
 
 /** آیا این ورودیِ کش هنوز به عنصری با همان امضا می‌رسد؟ */
@@ -97,12 +114,19 @@ async function askModel({ page, intent, models, budget, identity }) {
     throw new Error(`مدل نتوانست «${intent}» را به عنصری نگاشت کند: ${json.reason || 'بدون دلیل'}`);
   }
 
+  const item = snapshot.items.find((i) => i.ref === Number(json.ref));
+  if (!item) {
+    throw new Error(`مدل ref نامعتبر داد: ${json.ref} (فهرست ${snapshot.items.length} عنصر داشت)`);
+  }
+
+  // ساختنِ توصیفِ پایدار کارِ ماست، نه مدل. مدل فقط انتخاب می‌کند.
+  const target = descriptorFor(item);
+  if (!target) throw new Error(`عنصر ref=${json.ref} توصیفِ پایداری ندارد`);
+
   return {
     intent,
     action: json.action,
-    target: json.target,
-    // مقدارِ پیشنهادیِ مدل فقط وقتی می‌ماند که سناریو خودش مقداری نداده باشد
-    value: json.value,
+    target,
     resolvedBy: `${models.provider}:${models.model}`,
   };
 }

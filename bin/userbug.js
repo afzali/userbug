@@ -33,6 +33,7 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
   userbug replay <runId> [--only-findings]
                                   اجرای دوبارهٔ همان سناریوها روی همان دستگاه
 
+  userbug models [--free]         فهرست زندهٔ مدل‌های OpenRouter
   userbug list [--limit n]        فهرست اجراها
   userbug report <runId|latest>   بازسازی گزارش از مخزن، بدون اجرای دوباره
   userbug diff <runA> <runB>      چه یافته‌ای تازه است و چه یافته‌ای رفته
@@ -179,6 +180,37 @@ function cmdReplay({ flags, positional }) {
   });
 }
 
+/**
+ * فهرست زندهٔ مدل‌ها.
+ *
+ * اسلاگ‌ها را از حافظه ننویسید: عوض می‌شوند، و مدلی که وجود ندارد با یک ۴۰۰
+ * وسط اجرا خودش را نشان می‌دهد نه پیش از آن.
+ */
+async function cmdModels({ flags }) {
+  const { loadEnv } = await import('../src/env.js');
+  loadEnv();
+
+  const res = await fetch('https://openrouter.ai/api/v1/models', {
+    headers: process.env.OPENROUTER_API_KEY
+      ? { authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` }
+      : {},
+  });
+  if (!res.ok) throw new Error(`فهرست مدل‌ها نیامد: ${res.status}`);
+
+  const all = (await res.json()).data || [];
+  const rows = flags.free ? all.filter((m) => m.id.endsWith(':free')) : all;
+
+  rows
+    .map((m) => ({ id: m.id, ctx: m.context_length || 0 }))
+    .sort((a, b) => b.ctx - a.ctx)
+    .slice(0, Number(flags.limit || 30))
+    .forEach((m) => console.log('  ' + m.id.padEnd(52) + String(m.ctx).padStart(9)));
+
+  console.log(`
+  ${rows.length} مدل${flags.free ? ' رایگان' : ''}
+`);
+}
+
 function cmdList({ flags }) {
   const limit = Number(flags.limit || 20);
   const ids = listRunIds().slice(-limit).reverse();
@@ -243,6 +275,9 @@ try {
       break;
     case 'replay':
       cmdReplay(parsed);
+      break;
+    case 'models':
+      await cmdModels(parsed);
       break;
     case 'list':
       cmdList(parsed);
