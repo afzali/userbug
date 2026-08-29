@@ -52,11 +52,17 @@ export async function runScenario({ page, ub, identity, scenario }) {
     // از هر N اجرا یکی کامل با مدل حل می‌شود، تا انحرافِ خاموشِ کش پیدا شود
     reverify: shouldReverify(getCurrentRun(), models.reverifyEvery),
     aiStats: { cache: 0, model: 0, healed: 0, verified: 0 },
+    executed: [],
   };
 
   for (const group of groupSteps(scenario.steps)) {
     await ub.step(group.title, async () => {
-      for (const step of group.steps) await execute({ page, ub, ctx, step });
+      for (const step of group.steps) {
+        await execute({ page, ub, ctx, step });
+        // قدم‌های پیش از کاوش، مقدمهٔ پیش‌نویس می‌شوند: پیش‌نویس باید خودش
+        // قابل اجرا باشد، نه اینکه کسی دستی «چطور به اینجا برسیم» را بنویسد.
+        if (step.verb !== 'explore') ctx.executed.push(step.raw);
+      }
     });
   }
 
@@ -413,7 +419,9 @@ async function execute({ page, ub, ctx, step }) {
     case 'explore': {
       const goal = typeof body === 'string' ? body : body.goal;
       const maxSteps = typeof body === 'object' ? body.maxSteps : undefined;
-      await explore({ page, ub, ctx, goal, maxSteps });
+      // نوشتنِ پیش‌نویس یا از سناریو می‌آید یا از پرچم خط فرمان
+      const author = (typeof body === 'object' && body.author) || process.env.UB_AUTHOR === '1';
+      await explore({ page, ub, ctx, goal, maxSteps, author, preamble: ctx.executed });
       return;
     }
 

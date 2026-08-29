@@ -34,6 +34,7 @@ import { snapshotPage, descriptorFor } from './snapshot.js';
 import { resolveTarget } from '../scenario/resolve.js';
 import { redactDeep, secretsOf } from '../models/redact.js';
 import { askJson } from '../models/provider.js';
+import { writeDraft } from './author.js';
 
 const SYSTEM = `تو یک تسترِ انسانی را شبیه‌سازی می‌کنی که با یک اپ کار می‌کند.
 
@@ -55,7 +56,7 @@ const SYSTEM = `تو یک تسترِ انسانی را شبیه‌سازی می�
  * @param {object} o
  * @param {number} [o.maxSteps] سقف قدم — بدون آن کاوش تا timeout ادامه می‌دهد
  */
-export async function explore({ page, ub, ctx, goal, maxSteps = 12 }) {
+export async function explore({ page, ub, ctx, goal, maxSteps = 12, author = false, preamble = [] }) {
   const avoid = (ub.target.explore?.avoid || []).map((r) => new RegExp(r, 'i'));
   const history = [];
 
@@ -137,6 +138,8 @@ export async function explore({ page, ub, ctx, goal, maxSteps = 12 }) {
       step: i,
       action: json.action,
       target,
+      // مقدار برای نوشتنِ پیش‌نویس لازم است، وگرنه fillها بی‌مقدار در می‌آیند
+      ...(json.value !== undefined ? { value: String(json.value) } : {}),
       why: json.why,
       ...(failure ? { failed: failure } : {}),
     };
@@ -154,5 +157,15 @@ export async function explore({ page, ub, ctx, goal, maxSteps = 12 }) {
   }
 
   await ub.store.appendEvent({ kind: 'explore', goal, steps: history.length, history });
+
+  if (author) {
+    const slug = `explore-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16)}`;
+    const draft = writeDraft({ targetName: ub.target.key, goal, preamble, history, slug });
+    if (draft) {
+      console.log(`    پیش‌نویس نوشته شد: ${draft.file} (${draft.steps} قدم)`);
+      await ub.store.appendEvent({ kind: 'draft', goal, file: draft.file, steps: draft.steps });
+    }
+  }
+
   return history;
 }

@@ -5,3 +5,4 @@ test-results/
 .devin/
 userbug.config.js
 .env
+scenarios/*/_drafts/

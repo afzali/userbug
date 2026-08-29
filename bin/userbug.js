@@ -27,6 +27,7 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --grep <عنوان>              فیلتر روی عنوان تست
       --persona <novice|pro>      سرعت و رفتار کاربر؛ بر سناریو می‌چربد
       --device <a,b>              یک یا چند دستگاه؛ هر کدام یک اجرای جدا
+      --author                    از کاوش، پیش‌نویس سناریو بنویس
       --headed                    مرورگر دیده شود
       --repeat <n>                هر سناریو n بار
 
@@ -126,6 +127,7 @@ function cmdRun({ flags, positional }) {
     const env = { ...process.env, UB_TARGET: target };
     if (device) env.UB_DEVICE = device;
     if (flags.persona) env.UB_PERSONA = String(flags.persona);
+    if (flags.author) env.UB_AUTHOR = '1';
 
     if (device) console.log(`\n──── دستگاه: ${device} ────`);
     const r = spawnSync(process.execPath, args, { cwd: ROOT, stdio: 'inherit', env });
