@@ -143,7 +143,50 @@ async function execute({ page, ub, ctx, step }) {
     case 'reload':
       await page.reload();
       await page.waitForLoadState('domcontentloaded');
+      if (persona.settle) await page.waitForTimeout(persona.settle);
       return;
+
+    // ── فعل‌های آشوب ──
+    //
+    // اینها همان کارهایی‌اند که کاربر واقعی از سرِ عادت می‌کند و برنامه‌نویس
+    // هیچ‌وقت دستی امتحان نمی‌کند. هیچ‌کدام AI نمی‌خواهند و همه قطعی‌اند.
+
+    /** دکمهٔ back مرورگر — پرتکرارترین کاری که هیچ تستی نمی‌زند. */
+    case 'back':
+      await page.goBack();
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      if (persona.settle) await page.waitForTimeout(persona.settle);
+      return;
+
+    case 'forward':
+      await page.goForward();
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      return;
+
+    /**
+     * قطع و وصل شبکه.
+     *
+     * برای اپی که خودش را آفلاین‌محور می‌داند، این سنجشِ ادعای اصلی‌اش است.
+     */
+    case 'offline':
+      await page.context().setOffline(body !== false);
+      return;
+
+    /**
+     * چسباندن، نه تایپ کردن.
+     *
+     * `insertText` متن را بدون رخدادهای keydown/keyup وارد می‌کند — همان کاری
+     * که چسباندن می‌کند. هر منطقی که فقط به رخداد کیبورد گوش داده باشد،
+     * اینجا اجرا نمی‌شود؛ و همان‌جاست که باگ‌های «فرم می‌گوید خالی است ولی
+     * پر است» زندگی می‌کنند.
+     */
+    case 'paste': {
+      const { locator } = resolveTarget(page, body.into);
+      await locator.click();
+      await locator.fill('');
+      await page.keyboard.insertText(String(interpolate(body.value, ctx)));
+      return;
+    }
 
     /**
      * خواندن وضعیت واقعی از دیتابیسِ خودِ اپ.

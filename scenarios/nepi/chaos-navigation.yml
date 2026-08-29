@@ -1,0 +1,80 @@
+name: آشوب — back و چسباندن
+persona: novice
+status: approved
+
+# مُد آشوب: کارهایی که کاربر واقعی از سرِ عادت می‌کند و هیچ برنامه‌نویسی دستی
+# امتحانشان نمی‌کند. هیچ‌کدام AI نمی‌خواهند و همه قطعی‌اند.
+#
+# سه چیز سنجیده می‌شود:
+#   ۱. دکمهٔ back پس از ورود — آیا کاربر را از حسابش بیرون می‌اندازد؟
+#   ۲. چسباندن به‌جای تایپ — منطقی که فقط به رخداد کیبورد گوش داده، رد می‌شود
+#
+# سنجش آفلاین عمداً اینجا نیست؛ دلیلش پایین‌تر نوشته شده.
+
+steps:
+  - as: ثبت‌نام و ورود به فهرست
+    clearState: true
+  - go: /
+  - expect: { url: "/login" }
+  - wait: 2000
+  - dismissBlockers: true
+  - fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - expect: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 30000 }
+  - dismissBlockers: true
+  - check: { role: checkbox }
+  - click: { role: button, name: "ادامه" }
+  - expect: { url: "/contents", timeout: 30000 }
+  - wait: 1500
+  - dismissBlockers: true
+
+  # ── ۱ ──
+  - as: زدن back بلافاصله پس از ورود
+    back: true
+  - wait: 2000
+  - dismissBlockers: true
+
+  - assert: { hidden: { role: button, name: "ورود / ثبت‌نام" }, timeout: 3000 }
+    finding: >-
+      زدن back پس از ورود، کاربرِ واردشده را دوباره به فرم ورود می‌برد
+    detail: >-
+      نشست هنوز برقرار است ولی صفحهٔ ورود نشان داده می‌شود. کاربر فکر می‌کند
+      از حسابش بیرون افتاده و ممکن است حساب تازه‌ای بسازد — که در نپی یعنی
+      دیتابیس محلیِ خالی و احساسِ از دست رفتن داده‌ها.
+
+  # ── ۲ ── قطع شبکه: اینجا نیست، و دلیلش مهم است ──
+  #
+  # نسخهٔ اول همین سناریو بخش آفلاین داشت و چهار «یافته» داد:
+  # `net::ERR_INTERNET_DISCONNECTED` و «Failed to fetch dynamically imported
+  # module». هیچ‌کدام باگ نپی نبودند — آرتیفکتِ **سرور توسعه** بودند: ویت
+  # ماژول‌ها را در لحظه از شبکه می‌دهد، پس اپِ dev ذاتاً آفلاین کار نمی‌کند.
+  #
+  # سنجش آفلاین باید روی بیلد تولیدی اجرا شود، آنجا که service worker فایل‌ها
+  # را کش کرده. تا وقتی هدفی برای `npm run preview` تعریف نشده، این بخش
+  # عمداً اینجا نیست — چون یافتهٔ اشتباه از نبودِ یافته بدتر است.
+
+  # ── ۳ ──
+  - as: چسباندن متن بسیار بلند به‌جای تایپ
+    go: /contents
+  - wait: 1500
+  - dismissBlockers: true
+  - when: { hidden: { role: button, name: "فایل جدید" }, timeout: 1500 }
+    then:
+      - click: { role: button, name: "Toggle Sidebar" }
+      - wait: 600
+  - click: { role: button, name: "فایل جدید", nth: 0 }
+  - click: { role: tab, name: "فایل خالی جدید" }
+
+  - paste:
+      into: { selector: "#blank-title" }
+      value: "{{nasty.long}}"
+  - wait: 1500
+
+  - as: عنوان چهارهزار کاراکتری نباید اپ را بشکند
+    assert: { visible: { role: button, name: "ساخت و باز کردن" }, timeout: 5000 }
+    finding: "پس از چسباندن عنوان بسیار بلند، فرم ساخت سند از کار افتاد"
+    detail: >-
+      چسباندن رخداد keydown تولید نمی‌کند؛ اگر اعتبارسنجی طول فقط به تایپ
+      گوش داده باشد، از کنارش رد می‌شود.
