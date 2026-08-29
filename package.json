@@ -1,0 +1,19 @@
+{
+  "name": "userbug",
+  "version": "0.0.1",
+  "description": "شبیه‌ساز کاربر برای تست خودکار اپ‌های وب",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@faker-js/faker": "^10.6.0",
+    "@playwright/test": "^1.62.1"
+  }
+}
