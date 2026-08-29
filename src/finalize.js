@@ -20,6 +20,27 @@ import { renderReport } from './report/html.js';
 import { dedupe } from './observe/oracle.js';
 
 /**
+ * جمعِ آمار مدل در کل اجرا.
+ *
+ * نسبت «کش» به «مدل» مهم‌ترین عددِ فاز ۲ است: اگر بالا نماند، یعنی یا کش کار
+ * نمی‌کند یا رابط مدام عوض می‌شود — هر دو ارزش دانستن دارند.
+ */
+function summarizeAi(events) {
+  const rows = events.filter((e) => e.kind === 'ai');
+  if (!rows.length) return null;
+  return rows.reduce(
+    (acc, r) => ({
+      cache: acc.cache + (r.cache || 0),
+      model: acc.model + (r.model || 0),
+      healed: acc.healed + (r.healed || 0),
+      calls: acc.calls + (r.budget?.calls || 0),
+      costUsd: Number((acc.costUsd + (r.budget?.costUsd || 0)).toFixed(6)),
+    }),
+    { cache: 0, model: 0, healed: 0, calls: 0, costUsd: 0 }
+  );
+}
+
+/**
  * @param {string} [runId]
  * @param {{status?: string}} [opts] وضعیت واقعی، اگر فراخوان می‌داندش
  */
@@ -58,6 +79,7 @@ export async function finalizeRun(runId = getCurrentRun(), { status } = {}) {
     serverLines: events.filter((e) => e.source === 'server').length,
     serverCollectors: [...new Set(events.filter((e) => e.source === 'server').map((e) => e.collector))],
     scenarios,
+    ai: summarizeAi(events),
   });
 
   const run = await store.readJson('run.json');
@@ -73,6 +95,15 @@ export function printSummary({ run, steps, unique, file }) {
   console.log(
     `  قدم: ${steps.length}  ·  یافتهٔ یکتا: ${unique.length}  ·  خط لاگ سرور: ${run.serverLines ?? 0}\n`
   );
+
+  if (run.ai) {
+    const a = run.ai;
+    console.log(
+      `  مدل: کش ${a.cache} · مدل ${a.model} · heal ${a.healed} · ` +
+        `${a.calls} فراخوانی · $${a.costUsd}
+`
+    );
+  }
 
   if (unique.length) {
     console.log('  یافته‌ها:');

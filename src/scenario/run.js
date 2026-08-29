@@ -22,24 +22,53 @@ import { resolveTarget } from './resolve.js';
 import { NASTY } from '../data/persian.js';
 import { assertMayRequest } from '../guard.js';
 import { resolvePersona } from '../personas.js';
+import { loadGlobalConfig, resolveModel } from '../models/config.js';
+import { Budget } from '../models/provider.js';
+import { loadCache, saveCache, getEntry, putEntry, shouldReverify } from '../steps/cache.js';
+import { resolveDo, performAction } from '../steps/do.js';
+import { getCurrentRun } from '../store/run-store.js';
 
-const NEEDS_AI = new Set(['do', 'explore', 'goal']);
+const NEEDS_AI = new Set(['explore', 'goal']);
 
 export async function runScenario({ page, ub, identity, scenario }) {
   // ترتیب: پرچم خط فرمان بر سناریو می‌چربد، تا بشود همان سناریو را با پرسونای
   // دیگری اجرا کرد و تفاوت رفتار اپ را دید.
   const persona = resolvePersona(process.env.UB_PERSONA || scenario.persona || 'novice');
 
+  const globalConfig = await loadGlobalConfig();
+  const models = resolveModel({ global: globalConfig, target: ub.target, role: 'resolve' });
+
   const ctx = {
     identity: { ...identity, local: identity.email.split('@')[0] },
     nasty: NASTY,
     vars: {},
     persona,
+    models,
+    budget: new Budget(models.budgetPerRun),
+    cache: loadCache(ub.target.key, scenario.id),
+    cacheDirty: false,
+    scenarioId: scenario.id,
+    // از هر N اجرا یکی کامل با مدل حل می‌شود، تا انحرافِ خاموشِ کش پیدا شود
+    reverify: shouldReverify(getCurrentRun(), models.reverifyEvery),
+    aiStats: { cache: 0, model: 0, healed: 0 },
   };
 
   for (const group of groupSteps(scenario.steps)) {
     await ub.step(group.title, async () => {
       for (const step of group.steps) await execute({ page, ub, ctx, step });
+    });
+  }
+
+  if (ctx.cacheDirty) saveCache(ub.target.key, scenario.id, ctx.cache);
+
+  // آمار در گزارش می‌نشیند: اگر نسبت «مدل» به «کش» بالا بماند، یعنی یا کش
+  // کار نمی‌کند یا رابط مدام عوض می‌شود — هر دو ارزش دانستن دارند.
+  if (ctx.aiStats.cache + ctx.aiStats.model + ctx.aiStats.healed > 0) {
+    await ub.store.appendEvent({
+      kind: 'ai',
+      scenario: scenario.name,
+      ...ctx.aiStats,
+      budget: ctx.budget.snapshot(),
     });
   }
 
@@ -336,6 +365,40 @@ async function execute({ page, ub, ctx, step }) {
 
       const text = await res.text();
       ctx.vars[body.saveAs || 'res'] = { status: String(res.status()), text };
+      return;
+    }
+
+    /**
+     * قدم به زبان طبیعی — تنها فعلی که ممکن است مدل صدا بزند.
+     *
+     * «ممکن است» مهم است: اگر کش دارد و امضای صفحه نخورده، هیچ تماسی برقرار
+     * نمی‌شود و اجرا بدون کلید هم پیش می‌رود.
+     */
+    case 'do': {
+      const intent = String(body);
+      const result = await resolveDo({
+        page,
+        intent,
+        cache: ctx.cache,
+        models: ctx.models,
+        budget: ctx.budget,
+        identity: ctx.identity,
+        getEntry,
+        putEntry,
+        forceModel: ctx.reverify,
+      });
+
+      ctx.aiStats[result.source]++;
+      if (result.source !== 'cache' || result.learnedSignature) ctx.cacheDirty = true;
+
+      if (persona.actionDelay) await page.waitForTimeout(persona.actionDelay);
+
+      // کش می‌گوید «کجا»، سناریو می‌گوید «چه». اگر مقدار هم کش می‌شد، ایمیلِ
+      // اجرای قبلی در فایل می‌ماند و اجرای بعدی با هویت مرده پر می‌شد.
+      const withValue =
+        raw.value !== undefined ? { ...result.entry, value: interpolate(raw.value, ctx) } : result.entry;
+
+      await performAction(result.locator, withValue, page);
       return;
     }
 

@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "note": "مسیرهای یادگرفته‌شده. در گیت می‌ماند چون سرمایه است نه فایل موقت.",
+  "steps": {
+    "ایمیل حساب را وارد کن": {
+      "intent": "ایمیل حساب را وارد کن",
+      "action": "fill",
+      "target": {
+        "label": "ایمیل"
+      },
+      "resolvedBy": "seed:دست‌کاشته",
+      "healCount": 0,
+      "domSignature": "6f84f7a3"
+    },
+    "رمز عبور را وارد کن": {
+      "intent": "رمز عبور را وارد کن",
+      "action": "fill",
+      "target": {
+        "label": "رمز عبور"
+      },
+      "resolvedBy": "seed:دست‌کاشته",
+      "healCount": 0,
+      "domSignature": "ff3c1563"
+    },
+    "دکمهٔ ورود یا ثبت‌نام را بزن": {
+      "intent": "دکمهٔ ورود یا ثبت‌نام را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "ورود / ثبت‌نام",
+        "exact": true
+      },
+      "resolvedBy": "seed:دست‌کاشته",
+      "healCount": 0,
+      "domSignature": "8a6a423a"
+    }
+  }
+}
