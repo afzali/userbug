@@ -488,6 +488,38 @@ async function typeInto(page, locator, value, persona) {
 }
 
 /**
+ * «شرط نخورد» یا «توصیف بد بود»؟
+ *
+ * ── چرا این تفکیک هستهٔ درستیِ ابزار است ──
+ *
+ * هر شرطی که نخورد، در `assert` یافته ثبت می‌کند. پس اگر خطای **ابزار** را هم
+ * «نخورد» بخوانیم، هر توصیفِ مبهم به یک یافتهٔ قلابی تبدیل می‌شود و به‌نام اپ
+ * نوشته می‌شود.
+ *
+ * یک بار همین اتفاق افتاد: `{text: "همه مطالب"}` در `/list` به سه چیز خورد —
+ * آیتم نوار کناری، breadcrumb، و `<title>`. پلی‌رایت strict-mode داد،
+ * `.catch(() => false)` قورتش داد، و گزارش گفت «/list چیزی رندر نکرد» در حالی
+ * که عکسِ همان قدم صفحهٔ کاملاً سالم را نشان می‌داد. سه یافتهٔ قلابی در یک
+ * اجرا.
+ *
+ * قاعده: تنها **timeout** یعنی شرط نخورد. هر خطای دیگری — تطبیق چندگانه،
+ * selector نامعتبر، بسته شدن صفحه — ایرادِ سناریو یا ابزار است و باید بلند
+ * بشکند، نه اینکه به حساب اپ نوشته شود.
+ */
+function conditionFailed(err) {
+  const message = String(err?.message || err);
+  // پلی‌رایت تطبیقِ چندگانه را گاهی تا پایان timeout تکرار می‌کند و بعد
+  // TimeoutError می‌دهد که متنِ strict-mode درونش است. پس فقط به `name` تکیه
+  // نمی‌کنیم.
+  const ambiguous = message.includes('strict mode violation');
+  if (!ambiguous && err?.name === 'TimeoutError') return false;
+  throw new Error(
+    `توصیفِ هدف در شرط قابل استفاده نبود — این ایرادِ سناریو است، نه اپ: ${err?.message || err}`,
+    { cause: err },
+  );
+}
+
+/**
  * شرط‌ها — همان مجموعه برای `expect` ، `assert` و `when`.
  *
  * یکی بودنشان عمدی است: هر شرطی که بشود انتظار داشت، باید بشود شرطِ اجرا هم
@@ -500,8 +532,8 @@ async function checkCondition(page, cond) {
     try {
       await page.waitForURL(new RegExp(cond.url), { timeout });
       return true;
-    } catch {
-      return false;
+    } catch (err) {
+      return conditionFailed(err);
     }
   }
 
@@ -510,7 +542,7 @@ async function checkCondition(page, cond) {
     return await locator
       .waitFor({ state: 'visible', timeout })
       .then(() => true)
-      .catch(() => false);
+      .catch(conditionFailed);
   }
 
   if (cond.hidden !== undefined) {
@@ -518,17 +550,17 @@ async function checkCondition(page, cond) {
     return await locator
       .waitFor({ state: 'hidden', timeout })
       .then(() => true)
-      .catch(() => false);
+      .catch(conditionFailed);
   }
 
   if (cond.enabled !== undefined) {
     const { locator } = resolveTarget(page, cond.enabled);
-    return await locator.isEnabled().catch(() => false);
+    return await locator.isEnabled({ timeout }).then(Boolean).catch(conditionFailed);
   }
 
   if (cond.disabled !== undefined) {
     const { locator } = resolveTarget(page, cond.disabled);
-    return await locator.isDisabled().catch(() => false);
+    return await locator.isDisabled({ timeout }).then(Boolean).catch(conditionFailed);
   }
 
   if (cond.equals !== undefined) {

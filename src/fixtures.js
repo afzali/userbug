@@ -93,11 +93,21 @@ export const test = base.extend({
             // صفحه‌ای که بسته شده عکس نمی‌دهد؛ نبودِ عکس دلیل شکست تست نیست
           }
 
+          // مسیرِ پایانِ قدم. هم داور لازمش دارد و هم خطِ زمانی: بدون آن
+          // «کاربر کجا بود» فقط از عکس درمی‌آمد، و یک بار همین باعث شد سه قدم
+          // را با هم اشتباه بگیریم.
+          let route = null;
+          try {
+            route = new URL(page.url()).pathname;
+          } catch {
+            // صفحه‌ای که هنوز جایی نرفته یا بسته شده، آدرس قابل تجزیه ندارد
+          }
+
           const slice = events.slice(from);
           const { findings: found } = judge(slice, {
             allowlist: target.allowlist,
             step: name,
-            route: new URL(page.url()).pathname,
+            route,
           });
           for (const f of found) {
             const tagged = probe ? { ...f, synthetic: true } : f;
@@ -111,6 +121,7 @@ export const test = base.extend({
             scenario: testInfo.title,
             ms: Date.now() - started,
             shot,
+            route,
             errorCount: found.length,
           });
         }

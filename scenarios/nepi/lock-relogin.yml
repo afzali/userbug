@@ -1,0 +1,80 @@
+name: ورود دوباره از صفحهٔ قفل
+persona: novice
+status: approved
+timeout: 300000
+
+# ── سؤال ──
+#
+# صفحهٔ قفل یک راه فرار دارد: «خروج (ورود با حساب دیگر)». کاربری که رمزش را
+# به‌خاطر نمی‌آورد یا می‌خواهد با حساب دیگری وارد شود، همان را می‌زند.
+#
+# `lock/+page.svelte:handleLogout` این‌طور می‌نویسد:
+#
+#     goto(`${base}/login?redirect_to=${$page.url.pathname}`)
+#
+# و `$page.url.pathname` در آن لحظه `/lock` است. یعنی `redirect_to=/lock`.
+#
+# `login-form.svelte:67` پس از ورودِ موفق دقیقاً همان را به `goto` می‌دهد.
+#
+# پس این سناریو می‌پرسد: کاربری که از صفحهٔ قفل «ورود با حساب دیگر» را زد و
+# رمزش را داد، کجا می‌رسد؟
+
+steps:
+  - as: ثبت‌نام و ورود به فهرست
+    clearState: true
+  - go: /
+  - expect: { url: "/login" }
+  - wait: 2000
+  - dismissBlockers: true
+  - fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - expect: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 30000 }
+  - dismissBlockers: true
+  - check: { role: checkbox }
+  - click: { role: button, name: "ادامه" }
+  - expect: { url: "/contents", timeout: 30000 }
+  - wait: 1500
+  - dismissBlockers: true
+
+  - as: قفل کردن از منوی کاربر
+    when: { hidden: { role: button, name: "کاربر سامانه", exact: false }, timeout: 1500 }
+    then:
+      - click: { role: button, name: "Toggle Sidebar" }
+      - wait: 800
+  - click: { role: button, name: "کاربر سامانه", exact: false, nth: 0 }
+  - wait: 800
+  - click: { role: menuitem, name: "قفل کردن" }
+  - expect: { url: "/lock", timeout: 15000 }
+  - wait: 1500
+
+  - as: زدن «خروج (ورود با حساب دیگر)»
+    click: { role: button, name: "خروج (ورود با حساب دیگر)" }
+  - expect: { url: "/login", timeout: 15000 }
+  - wait: 2000
+  - dismissBlockers: true
+
+  - as: ورود دوباره با همان حساب
+    fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - wait: 5000
+  - dismissBlockers: true
+
+  # هدف، دکمهٔ فرمِ قفل است نه عنوان «قفل شده»: عنوان هم در `<title>` هست و هم
+  # در کارت، و توصیفِ مبهم یافتهٔ قلابی می‌سازد.
+  - as: پس از ورودِ موفق نباید دوباره صفحهٔ قفل بیاید
+    assert: { hidden: { role: button, name: "باز کردن قفل" }, timeout: 8000 }
+    finding: >-
+      خروج از صفحهٔ قفل و ورود دوباره، کاربر را به همان صفحهٔ قفل برمی‌گرداند
+    detail: >-
+      `redirect_to` هنگام خروج از `/lock` برابر `/lock` می‌شود و فرم ورود پس
+      از موفقیت همان را باز می‌کند. کاربر رمزش را همین حالا داده و برنامه
+      دوباره «قفل شده» نشانش می‌دهد و رمز می‌خواهد — با اینکه نشستش باز است.
+
+  - as: و باید به فهرست مطالب رسیده باشیم
+    assert: { url: "/contents", timeout: 8000 }
+    finding: "پس از ورود دوباره، کاربر به /contents نرسید"
+    detail: "مقصدِ پیش‌فرضِ ورود `/contents` است؛ هر جای دیگری بن‌بست است."

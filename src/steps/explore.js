@@ -99,6 +99,17 @@ export async function explore({ page, ub, ctx, goal, maxSteps = 12, author = fal
       ctx.budget
     );
 
+    // ── چرا شمارش اینجا لازم است ──
+    //
+    // کاوش تنها فعلی است که **همیشه** مدل صدا می‌زند، ولی آمار مدل فقط در
+    // مسیر `do:` شمرده می‌شد. نتیجه‌اش این بود: اجرای کاوشِ ۳۷ قدمی در
+    // `run.json` می‌گفت `ai: null` و خلاصهٔ کنسول خط «مدل» را اصلاً چاپ
+    // نمی‌کرد — یعنی گران‌ترین اجرا، بی‌هزینه‌ترین به نظر می‌رسید.
+    //
+    // بودجه از اول درست حساب می‌شد (`ctx.budget` همین بالا رفته)؛ فقط گزارشش
+    // گم بود.
+    ctx.aiStats.model++;
+
     if (json.action === 'done') {
       history.push({ step: i, action: 'done', why: json.why });
       break;

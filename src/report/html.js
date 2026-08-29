@@ -138,7 +138,7 @@ ${
   <div>${s.shot ? `<a href="${esc(s.shot)}"><img src="${esc(s.shot)}" alt=""></a>` : '<span class="sub">بدون عکس</span>'}</div>
   <div>
     <div class="nm">${esc(s.step)}</div>
-    <div class="sub">${s.ms} میلی‌ثانیه${s.errorCount ? ` · <span style="color:${SEV.error}">${s.errorCount} خطا</span>` : ''}</div>
+    <div class="sub">${s.route ? `<code>${esc(s.route)}</code> · ` : ''}${s.ms} میلی‌ثانیه${s.errorCount ? ` · <span style="color:${SEV.error}">${s.errorCount} خطا</span>` : ''}</div>
   </div>
 </div>`
         )

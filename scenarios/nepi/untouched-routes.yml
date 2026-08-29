@@ -1,0 +1,94 @@
+name: مسیرهایی که هیچ سناریویی نرفته
+persona: pro
+status: approved
+timeout: 300000
+
+# ── چرا این سناریو ──
+#
+# همهٔ سناریوهای موجود در سه مسیر می‌گذرند: `/login` ، `/contents` ، `/content`.
+# نپی پنج مسیر دیگر هم دارد که هیچ‌وقت باز نشده‌اند. این سناریو هیچ ادعای
+# منطقی نمی‌کند — فقط درها را باز می‌کند و می‌گذارد داورِ خودکار گوش بدهد:
+# خطای جاوااسکریپت، promise رهاشده، ۴xx و ۵xx.
+#
+# تنها سنجشِ صریحش این است که صفحه **خالی نباشد**، چون محافظِ چیدمان در
+# `+layout.svelte` سمت کلاینت است و صفحهٔ سفید همان چیزی است که کاربر
+# «برنامه خراب شد» می‌خواندش.
+#
+# `/sqlite` عمداً نیست: پشت `devMode` است و رمزش را با `prompt()` می‌گیرد.
+
+steps:
+  - as: ثبت‌نام و ورود به فهرست
+    clearState: true
+  - go: /
+  - expect: { url: "/login" }
+  - wait: 2000
+  - dismissBlockers: true
+  - fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - expect: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 30000 }
+  - dismissBlockers: true
+  - check: { role: checkbox }
+  - click: { role: button, name: "ادامه" }
+  - expect: { url: "/contents", timeout: 30000 }
+  - wait: 1500
+  - dismissBlockers: true
+
+  - as: «همه مطالب» — /list
+    go: /list
+  - wait: 3000
+  - dismissBlockers: true
+  # «همه مطالب» هدفِ بدی است: هم آیتم نوار کناری است، هم breadcrumb، هم
+  # `<title>`. متنِ حالتِ خالی یکی است و همان چیزی است که کاربرِ تازه می‌بیند.
+  - assert: { visible: { text: "شما هنوز هیچ مطلبی ندارید" }, timeout: 15000 }
+    finding: "/list چیزی رندر نکرد"
+    detail: "حساب تازه است، پس حالت خالیِ این صفحه باید بی‌قید دیده شود."
+
+  - as: «قابلیت‌ها و پلاگین‌ها» — /features
+    go: /features
+  - wait: 3000
+  - dismissBlockers: true
+  # عنوان «قابلیت‌ها و پلاگین‌ها» دو بار روی همین صفحه است — یکی در سرصفحه و
+  # یکی در خودِ پنل. زیرعنوانِ سرصفحه یکی است.
+  - assert: { visible: { text: "مدیریت مستقل همه قابلیت‌های اختیاری" }, timeout: 15000 }
+    finding: "/features چیزی رندر نکرد"
+    detail: "این صفحه از منوی کاربر هم باز می‌شود، پس مسیر واقعیِ کاربر است."
+
+  - as: راهنما — /help
+    go: /help
+  - wait: 3000
+  - dismissBlockers: true
+  - assert: { visible: { role: heading, name: "معرفی نپی" }, timeout: 15000 }
+    finding: "/help چیزی رندر نکرد"
+    detail: "پیوندش در منوی کاربر با target=_blank هست، پس با تبِ تازه هم باز می‌شود."
+
+  # ── /ai-chat ──
+  #
+  # نسخهٔ اول اینجا انتظار داشت صفحهٔ چت بیاید و «یافته» گرفت: «/ai-chat چیزی
+  # رندر نکرد». عکسِ همان قدم چیز دیگری نشان داد — کاربر در /contents بود.
+  #
+  # سورس دلیلش را گفت: `ai-chat/+page.svelte:181-185` وقتی کلید API ثبت نشده
+  # باشد توست می‌دهد و به /contents برمی‌گرداند. یعنی رفتارِ **خواسته‌شده**.
+  #
+  # پس سنجش عوض شد به همان چیزی که باید بشود: برگشتنِ کاربر با پیامِ روشن. اگر
+  # روزی بی‌صدا برگرداند یا صفحهٔ خالی بدهد، همین سنجش می‌گیردش.
+  - as: چت هوش مصنوعی بدون کلید — باید با پیام برگردد
+    go: /ai-chat
+  - wait: 1200
+  - assert: { visible: { text: "تنظیمات هوش مصنوعی", exact: false }, timeout: 10000 }
+    finding: "/ai-chat بدون کلید API، بی‌صدا کاربر را جای دیگری برد"
+    detail: >-
+      برگشتن درست است، ولی بی‌پیام برگشتن یعنی کاربر روی «هوش مصنوعی» کلیک
+      می‌کند و هیچ اتفاقی نمی‌بیند.
+  - assert: { url: "/contents", timeout: 10000 }
+    finding: "/ai-chat بدون کلید API، کاربر را به /contents برنگرداند"
+    detail: "مقصدِ اعلام‌شدهٔ همان کد `${base}/contents` است."
+
+  - as: بازگشت به فهرست، سالم
+    go: /contents
+  - wait: 3000
+  - dismissBlockers: true
+  - assert: { visible: { role: button, name: "کاربر سامانه", exact: false }, timeout: 15000 }
+    finding: "پس از گشتن در مسیرهای دیگر، بازگشت به /contents برنامه را بالا نیاورد"
+    detail: "یعنی یکی از آن صفحه‌ها چیزی را در حالت خراب گذاشته."

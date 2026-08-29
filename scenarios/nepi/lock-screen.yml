@@ -1,0 +1,124 @@
+name: قفل کردن و باز کردن قفل
+persona: novice
+status: approved
+timeout: 300000
+
+# ── چرا این سناریو ──
+#
+# مسیر `/lock` تا امروز هیچ سناریویی نداشت. تنها ادعای کل قابلیت این است:
+# «تا رمز را ندهی، به داده نمی‌رسی». پس سه چیز سنجیده می‌شود، به همان ترتیبی
+# که یک کاربر واقعی به آن‌ها می‌رسد:
+#
+#   ۱. قفل شدن از منوی کاربر کار می‌کند
+#   ۲. پیوندِ مستقیم به مسیرِ محافظت‌شده، در حالت قفل، داده را نشان نمی‌دهد
+#      — و رفرش هم قفل را باز نمی‌کند
+#   ۳. رمزِ غلط پیام می‌دهد، رمزِ درست به همان جایی برمی‌گرداند که بودیم
+#
+# سنجشِ «سقفِ تلاش برای رمز غلط» عمداً اینجا نیست: داده محلی رمزنگاری‌شده
+# نیست (`vault.js` فقط بار همگام‌سازی را رمز می‌کند) و `vault_json` از همان
+# IndexedDB خواندنی است. پس محدود کردن تلاش در رابط، چیزی را سخت‌تر نمی‌کند
+# و ادعایش گمراه‌کننده می‌شد.
+
+steps:
+  - as: ثبت‌نام و ورود به فهرست
+    clearState: true
+  - go: /
+  - expect: { url: "/login" }
+  - wait: 2000
+  - dismissBlockers: true
+  - fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - expect: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 30000 }
+  - dismissBlockers: true
+  - check: { role: checkbox }
+  - click: { role: button, name: "ادامه" }
+  - expect: { url: "/contents", timeout: 30000 }
+  - wait: 1500
+  - dismissBlockers: true
+
+  # ── ۱ ── قفل کردن از منوی کاربر ──
+  - as: قفل کردن از منوی کاربر
+    when: { hidden: { role: button, name: "کاربر سامانه", exact: false }, timeout: 1500 }
+    then:
+      - click: { role: button, name: "Toggle Sidebar" }
+      - wait: 800
+  - click: { role: button, name: "کاربر سامانه", exact: false, nth: 0 }
+  - wait: 800
+  - click: { role: menuitem, name: "قفل کردن" }
+  - expect: { url: "/lock", timeout: 15000 }
+  - wait: 1500
+
+  # هدف، دکمهٔ فرم است نه عنوان «قفل شده». عنوان هم در `<title>` صفحه هست و هم
+  # در کارت، پس `text` به دو چیز می‌خورد و strict-mode می‌شود.
+  - as: صفحهٔ قفل باید خودش را نشان دهد
+    expect: { visible: { role: button, name: "باز کردن قفل" }, timeout: 10000 }
+
+  - as: در حالت قفل، فهرست کاربر نباید روی صفحه باشد
+    assert: { hidden: { role: button, name: "کاربر سامانه", exact: false }, timeout: 5000 }
+    finding: "در حالت قفل، نوار کناری و فهرست کاربر همچنان روی صفحه است"
+    detail: >-
+      صفحهٔ قفل باید تنها چیزی باشد که دیده می‌شود. اگر چیدمانِ برنامه زیرش
+      رندر مانده، یعنی داده هم رندر مانده.
+
+  # ── ۲ ── پیوند مستقیم و رفرش، در حالت قفل ──
+  - as: پیوند مستقیم به مسیر محافظت‌شده در حالت قفل
+    go: /contents
+  - wait: 2500
+  - assert: { url: "/lock", timeout: 8000 }
+    finding: "در حالت قفل، پیوند مستقیم به /contents روی همان صفحه می‌ماند"
+    detail: >-
+      محافظِ مسیر سمت کلاینت است (`+layout.svelte`). اگر برنگرداند، کاربرِ
+      قفل‌شده به فهرست مطالب می‌رسد و کل قفل بی‌معنا می‌شود.
+
+  - as: رفرش در حالت قفل نباید قفل را باز کند
+    reload: true
+  - wait: 3000
+  - assert: { url: "/lock", timeout: 8000 }
+    finding: "رفرش در حالت قفل، قفل را باز کرد"
+    detail: >-
+      نشانِ قفل، نبودِ کلید `nepi_activity_token` در localStorage است
+      (`auth.js:97`). اگر رفرش قفل را باز کند یعنی آن کلید جایی دوباره نوشته
+      می‌شود.
+  - assert: { visible: { role: button, name: "باز کردن قفل" }, timeout: 8000 }
+    finding: "پس از رفرش، فرم باز کردن قفل روی صفحه نبود"
+    detail: "کاربر صفحهٔ سفید می‌بیند و نمی‌داند چه شده."
+
+  # ── ۳ ── رمز غلط، بعد رمز درست ──
+  - as: رمز غلط
+    fill: { selector: "#password" }
+    value: "رمزِ-قطعاً-غلط-۱۲۳"
+  - click: { role: button, name: "باز کردن قفل" }
+  - wait: 4000
+
+  - as: رمز غلط باید پیام خطا بدهد
+    assert: { visible: { text: "رمز عبور نامعتبر است." }, timeout: 15000 }
+    finding: "رمز غلط هیچ پیامی نداد"
+    detail: >-
+      کاربر نمی‌فهمد رمز غلط بود یا برنامه گیر کرده، و دوباره همان رمز را
+      می‌زند.
+  - assert: { url: "/lock", timeout: 3000 }
+    finding: "با رمز غلط، قفل باز شد"
+    detail: "جدی‌ترین حالتِ ممکن این صفحه."
+
+  - as: رمز درست
+    fill: { selector: "#password" }
+    value: "{{identity.password}}"
+  - click: { role: button, name: "باز کردن قفل" }
+  - wait: 5000
+  - dismissBlockers: true
+
+  - as: با رمز درست باید به همان جایی برگردیم که بودیم
+    assert: { url: "/contents", timeout: 20000 }
+    finding: "پس از باز کردن قفل، کاربر به /contents برنگشت"
+    detail: >-
+      `handleLock` مسیر فعلی را در `redirect_to` می‌گذارد و صفحهٔ قفل همان را
+      به `goto` می‌دهد. اگر نخورد، کاربر جای دیگری سر درمی‌آورد.
+
+  - as: و داده باید دوباره در دسترس باشد
+    assert: { visible: { role: button, name: "کاربر سامانه", exact: false }, timeout: 15000 }
+    finding: "پس از باز کردن قفل، برنامه بالا نیامد"
+    detail: >-
+      قفل کلید را از حافظه پاک می‌کند و باز کردنش دوباره از رمز می‌سازدش. اگر
+      این زنجیره جایی پاره شود، کاربر «باز» است ولی برنامه کار نمی‌کند.
