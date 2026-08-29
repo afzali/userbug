@@ -292,6 +292,25 @@ function cmdDiff({ positional }) {
   const a = resolveRunId(positional[0]);
   const b = resolveRunId(positional[1]);
 
+  /**
+   * هشدارِ مقایسهٔ ناهم‌جنس.
+   *
+   * یک بار اجرای کاملِ پیش از اصلاح را با اجرای تک‌سناریوییِ پس از آن مقایسه
+   * کردیم و `diff` گفت «۷ یافته رفت». چهارتایشان اصلاً اجرا نشده بودند.
+   * عددی که راست می‌گوید ولی معنایش غلط است، از عددِ غلط خطرناک‌تر است.
+   */
+  const setA = new Set((readRun(a).scenarios || []).map((s) => s.name));
+  const setB = new Set((readRun(b).scenarios || []).map((s) => s.name));
+  const onlyA = [...setA].filter((n) => !setB.has(n));
+  const onlyB = [...setB].filter((n) => !setA.has(n));
+
+  if (onlyA.length || onlyB.length) {
+    console.log('');
+    console.log('  ⚠ دو اجرا سناریوهای یکسانی نداشتند — «رفته» و «تازه» را با احتیاط بخوانید.');
+    if (onlyA.length) console.log(`    فقط در اولی: ${onlyA.join('، ')}`);
+    if (onlyB.length) console.log(`    فقط در دومی: ${onlyB.join('، ')}`);
+  }
+
   const fa = new Map(readFindings(a).map((f) => [f.fingerprint, f]));
   const fb = new Map(readFindings(b).map((f) => [f.fingerprint, f]));
 
