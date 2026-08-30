@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { finalizeRun, printSummary } from '../src/finalize.js';
+import { renderJUnit } from '../src/report/junit.js';
 import { runDir } from '../src/store/run-store.js';
 import { dedupe } from '../src/observe/oracle.js';
 
@@ -30,6 +31,7 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --author                    از کاوش، پیش‌نویس سناریو بنویس
       --headed                    مرورگر دیده شود
       --repeat <n>                هر سناریو n بار
+      --junit <مسیر>              کپی خروجی JUnit برای CI
 
   userbug replay <runId> [--only-findings]
                                   اجرای دوبارهٔ همان سناریوها روی همان دستگاه
@@ -38,10 +40,14 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
   userbug repro <runId> [اثرانگشت]
                                   بازتولید یک یافته از اجرای گذشته
   userbug list [--limit n]        فهرست اجراها
-  userbug report <runId|latest>   بازسازی گزارش از مخزن، بدون اجرای دوباره
+  userbug report <runId|latest> [--junit <مسیر>]
+                                  بازسازی گزارش از مخزن، بدون اجرای دوباره
   userbug diff <runA> <runB>      چه یافته‌ای تازه است و چه یافته‌ای رفته
 
   runId می‌تواند «latest» یا پیشوندِ یکتا باشد.
+
+  کد خروج: ۰ بدون یافته · ۱ یافته دارد · ۲ خطای اجراگر.
+  هر اجرا کنار گزارش، یک junit.xml هم در پوشهٔ خودش می‌گذارد.
 `;
 
 // ── ابزار ──
@@ -61,13 +67,38 @@ function parseArgs(argv) {
   return { flags, positional };
 }
 
+function runStartedAtMs(runId, startedAt) {
+  const metadataTime = Date.parse(String(startedAt || ''));
+  if (Number.isFinite(metadataTime)) return metadataTime;
+
+  const match = String(runId).match(/^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})/);
+  if (!match) return Number.NEGATIVE_INFINITY;
+  const idTime = Date.parse(`${match[1]}:${match[2]}:${match[3]}Z`);
+  return Number.isFinite(idTime) ? idTime : Number.NEGATIVE_INFINITY;
+}
+
+function compareRunEntries(left, right) {
+  const timeDifference = runStartedAtMs(left.runId, left.startedAt) - runStartedAtMs(right.runId, right.startedAt);
+  if (timeDifference) return timeDifference;
+  return left.runId === right.runId ? 0 : left.runId < right.runId ? -1 : 1;
+}
+
 function listRunIds() {
   if (!fs.existsSync(RUNS)) return [];
   return fs
     .readdirSync(RUNS, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name)
-    .sort();
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => {
+      let startedAt = null;
+      try {
+        startedAt = readRun(entry.name).startedAt;
+      } catch {
+        // پوشهٔ تازه یا artifact قدیمی با timestamp خود شناسه مرتب می‌شود.
+      }
+      return { runId: entry.name, startedAt };
+    })
+    .sort(compareRunEntries)
+    .map((entry) => entry.runId);
 }
 
 /** «latest» یا پیشوندِ یکتا را به شناسهٔ کامل تبدیل کن. */
@@ -98,6 +129,77 @@ function readFindings(runId) {
   return dedupe(all.filter((f) => !f.synthetic));
 }
 
+/**
+ * مسیر کپی JUnit برای یک اجرا.
+ *
+ * `--junit` بدون مقدار یعنی «همان فایلِ داخل پوشهٔ اجرا کافی است» و مسیر
+ * دلخواهی ساخته نمی‌شود.
+ */
+function junitPathFor(flag, device, multiDevice) {
+  if (!flag || flag === true) return null;
+  const requested = path.resolve(String(flag));
+
+  /**
+   * پسوند همیشه `.xml` می‌شود، حتی اگر مسیر پسوند دیگری داشته باشد.
+   *
+   * دو دلیل: الگوهای `*.xml` در CI فایلِ بی‌پسوند را نمی‌بینند، و مهم‌تر —
+   * `clearJUnitTarget` این مسیر را پیش از اجرا پاک می‌کند. با تحمیل `.xml`،
+   * یک `--junit src/finalize.js` اشتباهی به `src/finalize.js.xml` می‌خورد،
+   * نه به خود فایل.
+   */
+  const stem = requested.toLowerCase().endsWith('.xml') ? requested.slice(0, -4) : requested;
+  if (!multiDevice) return `${stem}.xml`;
+
+  const slug = String(device || 'default').replace(/[^\p{L}\p{N}_-]+/gu, '-');
+  return `${stem}.${slug}.xml`;
+}
+
+/**
+ * مسیر JUnit را پیش از اجرا خالی کن.
+ *
+ * روی رانرِ self-hosted یا با کشِ ورک‌اسپیس، فایلِ سبزِ بیلد قبلی همان‌جا
+ * نشسته است. اگر پاک نشود، اجرایی که امروز می‌شکند نتیجهٔ دیروز را به ارث
+ * می‌دهد و CI سبز می‌شود. با پاک کردنِ اول، وجودِ فایل بعد از اجرا دقیقاً
+ * یعنی «همین اجرا نوشتش».
+ */
+function clearJUnitTarget(file) {
+  if (!file) return;
+  try {
+    fs.rmSync(file, { force: true });
+  } catch (cause) {
+    console.error(`  پاک کردن JUnit قبلی ناموفق بود: ${cause.message}`);
+  }
+}
+
+/**
+ * JUnit برای اجرایی که هیچ‌وقت شروع نشد.
+ *
+ * دستگاه ناشناخته یا کانفیگ شکسته پیش از `globalTeardown` می‌شکند، پس
+ * نهایی‌سازی اجرا نمی‌شود و فایلی ساخته نمی‌شود. CI که آن مسیر را می‌خواند
+ * «نتیجه‌ای نیست» می‌بیند و بسته به تنظیمش، بی‌صدا سبز می‌شود. کد خروج ۲
+ * درست است ولی کافی نیست؛ فایل هم باید وجود داشته باشد و صریح بگوید چه شد.
+ */
+function writeRunnerFailureJUnit(file, { runId, target, device, detail }) {
+  // اینجا وجودِ فایل یعنی نهایی‌سازیِ همین اجرا نوشتش؛ مسیر پیش از spawn
+  // خالی شده بود.
+  if (!file || fs.existsSync(file)) return;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(
+      file,
+      renderJUnit({
+        run: { runId, target, device: device || 'desktop', status: 'error', error: detail },
+        steps: [],
+        findings: [],
+      }),
+      'utf8'
+    );
+    console.error(`  JUnit خطای اجراگر: ${file}`);
+  } catch (cause) {
+    console.error(`  نوشتن JUnit خطای اجراگر ناموفق بود: ${cause.message}`);
+  }
+}
+
 // ── زیرفرمان‌ها ──
 
 function cmdRun({ flags, positional }) {
@@ -111,6 +213,18 @@ function cmdRun({ flags, positional }) {
   // چون یک اجرا باید یک روایت باشد و مخلوط کردن دستگاه‌ها گزارش را بی‌معنا می‌کند.
   const runs = devices.length ? devices : [null];
   const results = [];
+
+  const classifyExit = (result, runId) => {
+    if (result.error || !Number.isInteger(result.status)) return 2;
+    if (result.status === 0) return 0;
+    try {
+      const run = readRun(runId);
+      if (result.status === 1 && run.status !== 'running' && Number(run.findings || 0) > 0) return 1;
+    } catch {
+      // config/globalSetup ممکن است پیش از ساخت artifact شکسته باشد.
+    }
+    return 2;
+  };
 
   for (const device of runs) {
     // مستقیم CLI پلی‌رایت با node، نه از راه npx و پوسته.
@@ -131,27 +245,45 @@ function cmdRun({ flags, positional }) {
     if (flags.headed) args.push('--headed');
     if (flags.repeat) args.push(`--repeat-each=${flags.repeat}`);
 
-    const env = { ...process.env, UB_TARGET: target };
+    // هر invocation پلی‌رایت هویت مستقل دارد؛ workerها و reporter این مقدار را
+    // به ارث می‌برند و دیگر برای مالکیت artifact به runs/.current نگاه نمی‌کنند.
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const runId = `${stamp}_${target}_${process.pid.toString(16)}${Math.random().toString(16).slice(2, 10)}`;
+    const env = { ...process.env, UB_TARGET: target, UB_RUN_ID: runId };
     if (device) env.UB_DEVICE = device;
     if (flags.persona) env.UB_PERSONA = String(flags.persona);
     if (flags.author) env.UB_AUTHOR = '1';
     if (flags.file) env.UB_SCENARIO_FILE = String(flags.file);
 
+    // اجرای چنددستگاهی چند اجرای مستقل است؛ یک مسیر ثابت JUnit یعنی آخرین
+    // دستگاه بقیه را پاک می‌کند و CI فقط یکی را می‌بیند.
+    const junit = junitPathFor(flags.junit, device, runs.length > 1);
+    if (junit) env.UB_JUNIT = junit;
+    clearJUnitTarget(junit);
+
     if (device) console.log(`\n──── دستگاه: ${device} ────`);
-    const r = spawnSync(process.execPath, args, { cwd: ROOT, stdio: 'inherit', env });
-    results.push({ device: device || '(پیش‌فرض)', code: r.status });
+    const processResult = spawnSync(process.execPath, args, { cwd: ROOT, stdio: 'inherit', env });
+    const code = classifyExit(processResult, runId);
+    if (code === 2) {
+      const detail = processResult.error?.message || `کد Playwright: ${processResult.status ?? 'نامشخص'}`;
+      console.error(`\n  خطای اجراگر برای ${device || 'دستگاه پیش‌فرض'} — ${detail}\n`);
+      writeRunnerFailureJUnit(junit, { runId, target, device, detail });
+    }
+    results.push({ device: device || '(پیش‌فرض)', code });
   }
 
   if (runs.length > 1) {
     console.log('\n  خلاصهٔ ماتریس:');
     for (const r of results) {
-      console.log(`   • ${r.device}: ${r.code === 0 ? 'بدون یافته' : 'یافته دارد'}`);
+      const label = r.code === 0 ? 'بدون یافته' : r.code === 1 ? 'یافته دارد' : 'خطای اجراگر';
+      console.log(`   • ${r.device}: ${label}`);
     }
     console.log('');
   }
 
-  // کد خروج غیرصفر یعنی یافته‌ای هست — نه اینکه ابزار خراب شده
-  process.exit(results.some((r) => r.code !== 0) ? 1 : 0);
+  // ۱ فقط finding معتبر است؛ خرابی config/spawn/setup با ۲ به GUI می‌رسد.
+  const exitCode = results.some((r) => r.code === 2) ? 2 : results.some((r) => r.code === 1) ? 1 : 0;
+  process.exit(exitCode);
 }
 
 /**
@@ -283,9 +415,9 @@ function cmdList({ flags }) {
   console.log('');
 }
 
-async function cmdReport({ positional }) {
+async function cmdReport({ flags, positional }) {
   const runId = resolveRunId(positional[0]);
-  printSummary(await finalizeRun(runId));
+  printSummary(await finalizeRun(runId, { junitPath: junitPathFor(flags.junit, null, false) }));
 }
 
 function cmdDiff({ positional }) {

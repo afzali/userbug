@@ -1,4 +1,4 @@
-import { finalizeRun, printSummary } from './finalize.js';
+import { finalizeRun, hasRunDir, printSummary } from './finalize.js';
 
 /**
  * همیشه اجرا می‌شود — حتی وقتی گزارشگرِ کانفیگ با `--reporter=…` کنار رفته باشد.
@@ -7,6 +7,9 @@ import { finalizeRun, printSummary } from './finalize.js';
  * `finalize.js`.
  */
 export default async function globalTeardown() {
+  // `--list` اجرایی نمی‌سازد؛ چیزی برای بستن نیست.
+  if (!hasRunDir()) return;
+
   try {
     printSummary(await finalizeRun());
   } catch (e) {

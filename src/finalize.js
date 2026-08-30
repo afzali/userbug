@@ -13,10 +13,12 @@
  * می‌زند تا وضعیت واقعی تست‌ها را هم بنویسد. تابع idempotent است، پس ترتیبِ
  * این دو اهمیتی ندارد.
  */
+import nodeFs from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { RunStore, getCurrentRun } from './store/run-store.js';
+import { RunStore, getCurrentRun, runDir } from './store/run-store.js';
 import { renderReport } from './report/html.js';
+import { renderJUnit } from './report/junit.js';
 import { dedupe } from './observe/oracle.js';
 
 /**
@@ -42,14 +44,33 @@ function summarizeAi(events) {
 }
 
 /**
- * @param {string} [runId]
- * @param {{status?: string}} [opts] وضعیت واقعی، اگر فراخوان می‌داندش
+ * آیا این اجرا واقعاً روی دیسک هست؟
+ *
+ * `playwright test --list` هیچ اجرایی نمی‌سازد چون `globalSetup` صدا زده
+ * نمی‌شود. هر دو فراخوانِ نهایی‌سازی — `globalTeardown` و گزارشگر — باید پیش
+ * از کار این را بپرسند، وگرنه لاگ CI یک «نهایی‌سازی اجرا ناموفق بود: ENOENT»
+ * می‌گیرد که هیچ ربطی به سلامت تست‌ها ندارد.
  */
-export async function finalizeRun(runId = getCurrentRun(), { status } = {}) {
+export function hasRunDir(runId = null) {
+  try {
+    return nodeFs.existsSync(runDir(runId || getCurrentRun()));
+  } catch {
+    // شناسهٔ اجرا هنوز ساخته نشده؛ چیزی برای بستن نیست.
+    return false;
+  }
+}
+
+/**
+ * @param {string} [runId]
+ * @param {{status?: string, junitPath?: string}} [opts] وضعیت واقعی اگر فراخوان
+ *   می‌داندش، و مسیر دلخواه برای کپی JUnit
+ */
+export async function finalizeRun(runId = getCurrentRun(), { status, junitPath } = {}) {
   const store = new RunStore(runId);
 
   const events = await store.readNdjson('events.ndjson');
   const findings = await store.readNdjson('findings.ndjson');
+  const traces = await store.readNdjson('traces.ndjson');
   const real = findings.filter((f) => !f.synthetic);
   const synthetic = findings.filter((f) => f.synthetic);
   const steps = events.filter((e) => e.kind === 'step');
@@ -87,12 +108,32 @@ export async function finalizeRun(runId = getCurrentRun(), { status } = {}) {
   const file = path.join(store.dir, 'report.html');
   await fs.writeFile(file, renderReport({ run, steps, findings: real, synthetic, events }), 'utf8');
 
-  return { run, store, steps, unique, synthetic, file };
+  /**
+   * JUnit همیشه ساخته می‌شود، مثل `report.html`.
+   *
+   * پرچم نمی‌خواهد چون CI نباید برای دیدن نتیجه، فراخوانی متفاوتی لازم داشته
+   * باشد؛ و اگر یک روز لازم شد، همان فایل از قبل کنار بقیهٔ artifactها هست.
+   */
+  const junit = path.join(store.dir, 'junit.xml');
+  const junitXml = renderJUnit({ run, steps, findings: real, traces });
+  await fs.writeFile(junit, junitXml, 'utf8');
+
+  // کپیِ مسیر دلخواه، برای CI که فایل را جای ثابتی می‌خواهد.
+  const extra = junitPath || process.env.UB_JUNIT || null;
+  let junitCopy = null;
+  if (extra) {
+    junitCopy = path.resolve(extra);
+    await fs.mkdir(path.dirname(junitCopy), { recursive: true });
+    await fs.writeFile(junitCopy, junitXml, 'utf8');
+  }
+
+  return { run, store, steps, unique, synthetic, file, junit, junitCopy };
 }
 
 /** خلاصهٔ کنسولی — همان چیزی که آدم بعد از اجرا می‌خواهد ببیند. */
-export function printSummary({ run, steps, unique, file }) {
+export function printSummary({ run, steps, unique, file, junitCopy }) {
   console.log(`\n  گزارش: ${file}`);
+  if (junitCopy) console.log(`  JUnit: ${junitCopy}`);
   console.log(
     `  قدم: ${steps.length}  ·  یافتهٔ یکتا: ${unique.length}  ·  خط لاگ سرور: ${run.serverLines ?? 0}\n`
   );

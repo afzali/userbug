@@ -7,6 +7,7 @@
  *
  * فایل‌ها روی دیسک می‌مانند و هیچ‌چیز بزرگی داخل دیتابیس نمی‌رود.
  */
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
@@ -15,39 +16,74 @@ import { ROOT } from '../target.js';
 const RUNS_DIR = path.join(ROOT, 'runs');
 const CURRENT = path.join(RUNS_DIR, '.current');
 
+export const GUI_RUN_MARKER = '@@USERBUG_GUI_RUN@@';
+
+export function assertRunId(value) {
+  const runId = String(value || '').trim();
+  if (!/^[\p{L}\p{N}_.-]+$/u.test(runId) || runId === '.' || runId === '..') {
+    throw new Error('شناسهٔ اجرا نامعتبر است');
+  }
+  return runId;
+}
+
 export function newRunId(targetName) {
+  const target = assertRunId(targetName);
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  return `${stamp}_${targetName}`;
+  return `${stamp}_${target}_${randomBytes(4).toString('hex')}`;
 }
 
 export function runDir(runId) {
-  return path.join(RUNS_DIR, runId);
+  const safe = assertRunId(runId);
+  const root = path.resolve(RUNS_DIR);
+  const candidate = path.resolve(root, safe);
+  if (!candidate.startsWith(root + path.sep)) throw new Error('شناسهٔ اجرا بیرون از runs است');
+  return candidate;
 }
 
 /**
- * شناسهٔ اجرای جاری.
- *
- * روی دیسک نوشته می‌شود چون کارگرهای Playwright فرآیندهای جدایی‌اند و متغیر
- * محیطیِ ساخته‌شده در globalSetup به آن‌ها نمی‌رسد.
+ * UB_RUN_ID منبع هویت است. فایل `.current` فقط pointer سازگاری/آخرین اجراست و
+ * هیچ worker یا reporter نباید برای تشخیص مالکیت artifact به آن تکیه کند.
  */
 export function setCurrentRun(runId) {
+  const safe = assertRunId(runId);
+  process.env.UB_RUN_ID = safe;
   fs.mkdirSync(RUNS_DIR, { recursive: true });
-  fs.writeFileSync(CURRENT, runId, 'utf8');
+  const temporary = `${CURRENT}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
+  try {
+    fs.writeFileSync(temporary, safe, 'utf8');
+    fs.renameSync(temporary, CURRENT);
+  } finally {
+    try {
+      fs.rmSync(temporary, { force: true });
+    } catch {
+      // pointer کمکی است؛ پاک‌سازی temp نباید هویت محیطی را خراب کند.
+    }
+  }
 }
 
 export function getCurrentRun() {
-  return fs.readFileSync(CURRENT, 'utf8').trim();
+  if (process.env.UB_RUN_ID) return assertRunId(process.env.UB_RUN_ID);
+  return assertRunId(fs.readFileSync(CURRENT, 'utf8'));
 }
 
 export class RunStore {
   constructor(runId) {
-    this.runId = runId;
-    this.dir = runDir(runId);
+    this.runId = assertRunId(runId);
+    this.dir = runDir(this.runId);
     this.shotsDir = path.join(this.dir, 'shots');
   }
 
   async init(meta) {
-    await fsp.mkdir(this.shotsDir, { recursive: true });
+    // parent در checkout تازه وجود ندارد؛ فقط leaf باید برای تشخیص collision
+    // بهصورت انحصاری ساخته شود.
+    await fsp.mkdir(RUNS_DIR, { recursive: true });
+    try {
+      await fsp.mkdir(this.dir);
+    } catch (cause) {
+      if (cause?.code === 'EEXIST') throw new Error(`شناسهٔ اجرا از قبل وجود دارد: ${this.runId}`);
+      throw cause;
+    }
+    await fsp.mkdir(this.shotsDir);
     await this.writeJson('run.json', {
       runId: this.runId,
       startedAt: new Date().toISOString(),

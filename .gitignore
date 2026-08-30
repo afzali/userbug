@@ -1,8 +1,10 @@
-node_modules/
-runs/
-test-results/
+/node_modules/
+/ui/node_modules/
+/runs/
+/test-results/
+/ui/.svelte-kit/
+/ui/build/
 .env
 .devin/
 userbug.config.js
-.env
 scenarios/*/_drafts/

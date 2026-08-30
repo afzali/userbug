@@ -1,14 +1,12 @@
 import { loadTarget } from './target.js';
-import { RunStore, newRunId, setCurrentRun } from './store/run-store.js';
+import { GUI_RUN_MARKER, RunStore, getCurrentRun, setCurrentRun } from './store/run-store.js';
 import { runHooks } from './hooks.js';
 
 /** یک اجرا = یک فراخوانی. اینجا پوشه‌اش ساخته می‌شود و بقیه فقط داخلش می‌نویسند. */
 export default async function globalSetup() {
   const targetName = process.env.UB_TARGET || 'nepi';
   const target = await loadTarget(targetName);
-  const runId = newRunId(targetName);
-
-  setCurrentRun(runId);
+  const runId = getCurrentRun();
 
   const store = new RunStore(runId);
   await store.init({
@@ -18,6 +16,14 @@ export default async function globalSetup() {
     device: process.env.UB_DEVICE || target.device,
     isolation: target.isolation?.mode,
   });
+  // فقط pointer «آخرین اجرا» را تازه می‌کند؛ هویت workerها از UB_RUN_ID است.
+  setCurrentRun(runId);
+
+  // marker پس از claim موفق پوشه چاپ می‌شود؛ در شکست config/setup لینک خیالی
+  // به run ساخته‌نشده در GUI باقی نمی‌ماند.
+  if (process.env.UB_GUI_JOB) {
+    console.log(`${GUI_RUN_MARKER}${JSON.stringify({ job: process.env.UB_GUI_JOB, runId, target: targetName })}`);
+  }
 
   console.log(`\n  userbug — اجرای ${runId}`);
   console.log(`  هدف: ${target.baseURL}  ·  محیط: ${target.environment}`);

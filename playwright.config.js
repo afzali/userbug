@@ -1,7 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
+import { newRunId } from './src/store/run-store.js';
 import { loadTarget } from './src/target.js';
 
 const targetName = process.env.UB_TARGET || 'nepi';
+// config پیش از globalSetup، reporter و workerها بار می‌شود؛ همه یک هویت ثابت
+// را به ارث می‌برند. CLI برای هر device مقدار خودش را از قبل تنظیم می‌کند.
+process.env.UB_RUN_ID ||= newRunId(targetName);
 const target = await loadTarget(targetName);
 
 // 'desktop' یعنی بدون emulation. بقیه مستقیم از فهرست دستگاه‌های Playwright

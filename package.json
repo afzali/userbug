@@ -4,9 +4,17 @@
   "description": "شبیه‌ساز کاربر برای تست خودکار اپ‌های وب",
   "main": "index.js",
   "scripts": {
+    "postinstall": "node scripts/install-ui.cjs",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "ub": "node bin/userbug.js"
+    "ub": "node bin/userbug.js",
+    "ui:deps": "node scripts/install-ui.cjs",
+    "ui:dev": "npm --prefix ui run dev",
+    "ui:check": "npm --prefix ui run check",
+    "ui:build": "npm --prefix ui run build",
+    "ui:start": "npm --prefix ui run start",
+    "preui": "npm --prefix ui run build",
+    "ui": "npm --prefix ui run start"
   },
   "keywords": [],
   "author": "",
