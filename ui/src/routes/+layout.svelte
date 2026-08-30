@@ -8,12 +8,29 @@
   let { children } = $props();
   let dark = $state(false);
 
-  const nav = [
-    { href: '/', label: 'داشبورد', icon: '◫' },
-    { href: '/triage', label: 'تریاژ', icon: '◇' },
-    { href: '/compare', label: 'مقایسه', icon: '⇄' },
-    { href: '/files', label: 'فایل‌ها', icon: '⌘' },
-  ];
+  /**
+   * ناوبری تابعِ فضای کاری است.
+   *
+   * بیرون از پروژه، فقط فهرست پروژه‌ها معنا دارد: «تریاژ» بی‌آنکه بدانیم کدام
+   * پروژه، یعنی همان پیش‌فرضِ خاموشی که فضای کاری برای حذفش ساخته شد.
+   */
+  let target = $derived(page.params.target || '');
+  let inProject = $derived(Boolean(target) && page.url.pathname.startsWith('/projects/'));
+  let base = $derived(`/projects/${encodeURIComponent(target)}`);
+
+  let nav = $derived(
+    inProject
+      ? [
+          { href: base, label: 'اجرا', icon: '▶', exact: true },
+          { href: `${base}/triage`, label: 'تریاژ', icon: '◇' },
+          { href: `${base}/compare`, label: 'مقایسه', icon: '⇄' },
+          { href: `${base}/files`, label: 'سناریوها', icon: '⌘' },
+        ]
+      : [
+          { href: '/', label: 'پروژه‌ها', icon: '◫', exact: true },
+          { href: '/projects/new', label: 'پروژهٔ تازه', icon: '＋' },
+        ]
+  );
 
   onMount(() => {
     dark = document.documentElement.classList.contains('dark');
@@ -25,8 +42,8 @@
     localStorage.setItem('userbug-theme', dark ? 'dark' : 'light');
   }
 
-  function isActive(href) {
-    return href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href);
+  function isActive(item) {
+    return item.exact ? page.url.pathname === item.href : page.url.pathname.startsWith(item.href);
   }
 </script>
 
@@ -45,9 +62,21 @@
       <Button variant="ghost" size="icon" onclick={toggleTheme} aria-label="تغییر پوسته" title="تغییر پوسته">{dark ? '☀' : '☾'}</Button>
     </div>
 
+    {#if inProject}
+      <!-- کدام پروژه، همیشه دیده شود: بدون آن، تریاژ و مقایسه بی‌بافتار می‌شوند. -->
+      <div class="mx-4 mb-3 rounded-lg border bg-background/60 px-3 py-2">
+        <!--
+          فلش در span جداگانه و aria-hidden است، وگرنه نامِ دسترس‌پذیرِ پیوند
+          «← همهٔ پروژه‌ها» می‌شد و هر توصیفِ دقیقی به آن نمی‌خورد.
+        -->
+        <a href="/" class="text-xs text-muted-foreground hover:text-foreground"><span aria-hidden="true">←</span> همهٔ پروژه‌ها</a>
+        <strong class="code-value mt-1 block truncate text-sm">{target}</strong>
+      </div>
+    {/if}
+
     <nav class="scroll-thin flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:overflow-visible lg:px-4">
-      {#each nav as item}
-        <a href={item.href} class={`flex shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive(item.href) ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`} aria-current={isActive(item.href) ? 'page' : undefined}>
+      {#each nav as item (item.href)}
+        <a href={item.href} class={`flex shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive(item) ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`} aria-current={isActive(item) ? 'page' : undefined}>
           <span class="grid size-6 place-items-center text-base" aria-hidden="true">{item.icon}</span>{item.label}
         </a>
       {/each}

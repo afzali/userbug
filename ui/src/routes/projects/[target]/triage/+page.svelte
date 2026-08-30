@@ -18,10 +18,6 @@
     return matchesText && matchesStatus;
   }));
 
-  function changeTarget(event) {
-    location.href = `/triage?target=${encodeURIComponent(event.currentTarget.value)}`;
-  }
-
   async function save(item) {
     item.saving = true;
     item.feedback = '';
@@ -43,8 +39,8 @@
   }
 </script>
 
-<PageHeader eyebrow="ادغام بر پایهٔ اثرانگشت" title="تریاژ یافته‌ها" description="هر نقص در تمام اجراها یک ردیف می‌شود؛ وضعیت و یادداشت در فایل triage پروژه ذخیره می‌شود، نه دیتابیس.">
-  {#snippet actions()}<select class="app-select min-w-40" value={data.target} onchange={changeTarget}>{#each data.projects as project}<option value={project.key}>{project.name}</option>{/each}</select>{/snippet}
+<PageHeader eyebrow="ادغام بر پایهٔ اثرانگشت" title="تریاژ {data.project.name}" description="هر نقص در تمام اجراها یک ردیف می‌شود؛ وضعیت و یادداشت در فایل triage پروژه ذخیره می‌شود، نه دیتابیس.">
+  {#snippet actions()}<Button href={`/projects/${encodeURIComponent(data.target)}`} variant="outline">بازگشت به اجرا</Button>{/snippet}
 </PageHeader>
 
 <div class="mb-5 grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-[minmax(0,1fr)_13rem_auto]">

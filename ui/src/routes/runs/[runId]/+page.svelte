@@ -25,7 +25,14 @@
   {#snippet actions()}
     <StatusBadge status={data.run.status} />
     <Button href={asset('report.html')} target="_blank" variant="outline">گزارش HTML</Button>
-    <Button href={`/compare?a=${encodeURIComponent(data.run.runId)}`} variant="outline">مقایسه</Button>
+    <!--
+      اجرا زیر مسیر پروژه نرفت چون شناسه‌اش یکتاست، ولی راهِ برگشت به فضای کاری
+      باید باشد؛ وگرنه از صفحهٔ اجرا فقط دکمهٔ back مرورگر می‌ماند.
+    -->
+    {#if data.run.target}
+      <Button href={`/projects/${encodeURIComponent(data.run.target)}/compare?a=${encodeURIComponent(data.run.runId)}`} variant="outline">مقایسه</Button>
+      <Button href={`/projects/${encodeURIComponent(data.run.target)}`} variant="outline">فضای کاری پروژه</Button>
+    {/if}
   {/snippet}
 </PageHeader>
 
