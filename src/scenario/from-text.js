@@ -39,18 +39,76 @@ const SYSTEM = `تو یک سناریوی تست کاربرمحور می‌نوی
 - هر قدم یک شیء با **یک** فعل است. عنوان اختیاری با کلید "as".
 - فعل‌های مجاز: {{VERBS}}
 - فعل دیگری ننویس. اگر کاری با این فعل‌ها بیان‌شدنی نبود، از "do" با توضیح فارسی استفاده کن.
-- هدفِ کلیک و پر کردن را با نامِ دیده‌شده روی صفحه بنویس: {click: {role: button, name: "ورود"}} یا {fill: {"ایمیل": "..."}}.
+- شکل بدنه‌ها دقیقاً همین است:
+    {"go": "/login"}                      ← رشته، نه شیء. مسیر نسبی بهتر از آدرس کامل است.
+    {"click": {"role": "button", "name": "ورود"}}
+    {"fill": {"ایمیل": "a@b.c"}}
+    {"press": "Enter"}
+    {"wait": 2000}
+    {"expect": {"visible": {"role": "heading", "name": "..."}}}
+    {"expect": {"url": "/library"}}
+    {"expect": {"text": "سلام"}}
+    {"clearState": true}
+    {"do": "دکمهٔ ذخیره را بزن"}
 - برای سنجش از "expect" (شکست سخت) یا "assert" (یافته، بدون شکست) استفاده کن.
 - هویتِ تازه با {{identity.email}} و {{identity.password}} در دسترس است.
 - "name" کوتاه و فارسی باشد و کارِ سناریو را بگوید.
 - "notes" جای چیزهایی است که از متن کاربر مشخص نبود و حدس زده‌ای؛ اگر چیزی نبود رشتهٔ خالی.
 - چیزی از خودت به سناریو اضافه نکن که کاربر نگفته.`;
 
-function buildUser({ text, target }) {
+function buildUser({ text, target, source }) {
   const lines = [`متنِ کاربر:\n${text}`];
   if (target?.baseURL) lines.push(`\nآدرس پایهٔ اپ: ${target.baseURL}`);
   if (target?.name) lines.push(`نام پروژه: ${target.name}`);
+
+  /**
+   * سورس، وقتی هست.
+   *
+   * بدون این، مدل برچسب دکمه‌ها را حدس می‌زد و در `notes` هم صادقانه می‌نوشت
+   * «بر اساس الگوهای رایج فرض شده». با این، همان برچسب‌ها را از کد می‌خواند.
+   *
+   * فهرست مسیرها هم می‌رود چون ساختار روت‌ها را می‌گوید — یعنی `go:` هم دیگر
+   * حدسی نیست.
+   */
+  if (source?.tree?.length) {
+    lines.push('\nساختار فایل‌های پروژه (بخشی):');
+    lines.push(source.tree.slice(0, 200).join('\n'));
+  }
+  if (source?.snippets) {
+    lines.push('\nتکه‌های مرتبطِ سورس — برچسب‌ها و متن‌های واقعی را از همین‌ها بردار:');
+    lines.push(source.snippets);
+  }
+
   return lines.join('\n');
+}
+
+/**
+ * فعل‌هایی که بدنه‌شان قطعاً رشته است.
+ *
+ * نخستین اجرای واقعی `{go: {url: 'http://…'}}` داد. فعل شناخته‌شده بود پس از
+ * اعتبارسنجی رد شد، ولی مفسر `page.goto(object)` می‌زد و وسط اجرا می‌شکست —
+ * یعنی سناریویی ذخیره می‌شد که هرگز اجرا نمی‌شد. اعتبارسنجیِ فعل بدونِ
+ * اعتبارسنجیِ بدنه، نیمی از کار است.
+ */
+const STRING_BODY = new Set(['go', 'press', 'note', 'do']);
+
+function assertBody(verb, body, index) {
+  const at = `قدم ${index + 1} («${verb}»)`;
+
+  if (STRING_BODY.has(verb)) {
+    if (typeof body !== 'string' || !body.trim()) {
+      throw new Error(`${at} باید رشته باشد، نه ${JSON.stringify(body)?.slice(0, 60)}`);
+    }
+    return;
+  }
+
+  if (verb === 'wait' && typeof body !== 'number' && !(body && typeof body === 'object')) {
+    throw new Error(`${at} باید عدد میلی‌ثانیه یا شرطِ visible باشد`);
+  }
+
+  if (verb === 'explore' && typeof body !== 'string' && !body?.goal) {
+    throw new Error(`${at} باید رشته باشد یا کلید goal داشته باشد`);
+  }
 }
 
 /**
@@ -76,6 +134,7 @@ export function assertScenarioShape(json) {
     const verb = stepVerb(raw);
     if (!verb) throw new Error(`قدم ${index + 1} فعل ندارد: ${JSON.stringify(raw).slice(0, 80)}`);
     if (!KNOWN_VERBS.has(verb)) unknown.push(`${index + 1}:${verb}`);
+    assertBody(verb, raw[verb], index);
   });
 
   if (unknown.length) {
@@ -86,7 +145,7 @@ export function assertScenarioShape(json) {
 }
 
 /** سناریوی سنجیده‌شده را به متنِ YAML با سرصفحهٔ توضیحی تبدیل کن. */
-export function toYaml({ name, steps, notes }, { text }) {
+export function toYaml({ name, steps, notes }, { text, sourceFiles = [] }) {
   const header = [
     '# ساخته‌شده از متنِ کاربر با هوش مصنوعی.',
     '#',
@@ -95,6 +154,12 @@ export function toYaml({ name, steps, notes }, { text }) {
       .split(/\r?\n/)
       .map((line) => `#   ${line}`),
   ];
+
+  // بدون این، بعداً نمی‌شد فهمید برچسب‌ها از کد آمده‌اند یا حدس بوده‌اند.
+  if (sourceFiles.length) {
+    header.push('#', '# سورس این فایل‌ها خوانده شد:');
+    for (const file of sourceFiles) header.push(`#   ${file}`);
+  }
 
   if (notes) {
     header.push('#', '# چیزهایی که مدل حدس زده و باید بازبینی شود:', `#   ${notes}`);
@@ -117,9 +182,10 @@ export function toYaml({ name, steps, notes }, { text }) {
  * @param {string} o.text     متنِ کاربر
  * @param {object} o.models   خروجی `resolveModel()`
  * @param {object} [o.target] برای اینکه مدل آدرس پایه و نام پروژه را بداند
+ * @param {object} [o.source] خروجی `findRelevantSource()`، اگر کاربر اجازه داده باشد
  * @returns {Promise<{yaml: string, name: string, steps: number, notes: string, slug: string, budget: object}>}
  */
-export async function scenarioFromText({ text, models, target }) {
+export async function scenarioFromText({ text, models, target, source }) {
   const trimmed = String(text ?? '').trim();
   if (trimmed.length < 10) throw new Error('متن خیلی کوتاه است؛ بگویید کاربر چه کاری انجام می‌دهد');
   if (trimmed.length > MAX_TEXT) throw new Error(`متن بیش از ${MAX_TEXT} نویسه است؛ آن را به چند سناریو بشکنید`);
@@ -129,14 +195,15 @@ export async function scenarioFromText({ text, models, target }) {
     models,
     {
       system: SYSTEM.replace('{{VERBS}}', [...KNOWN_VERBS].join(' ')),
-      user: buildUser({ text: trimmed, target }),
+      user: buildUser({ text: trimmed, target, source }),
     },
     budget
   );
 
   const scenario = assertScenarioShape(json);
   return {
-    yaml: toYaml(scenario, { text: trimmed }),
+    yaml: toYaml(scenario, { text: trimmed, sourceFiles: source?.files || [] }),
+    sourceFiles: source?.files || [],
     name: scenario.name,
     steps: scenario.steps.length,
     notes: scenario.notes,

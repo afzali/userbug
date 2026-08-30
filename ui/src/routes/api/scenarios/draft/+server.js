@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { scenarioFromText } from '../../../../../../src/scenario/from-text.js';
+import { findRelevantSource, resolveSourceRoot } from '../../../../../../src/source-access.js';
 import { assertModelSlug, loadGlobalConfig, resolveModel } from '../../../../../../src/models/config.js';
 import { listProjects } from '$lib/server/projects.js';
 import { jsonError } from '$lib/server/http.js';
@@ -44,10 +45,30 @@ export async function POST(event) {
       model,
     });
 
+    /**
+     * سورس فقط با درخواستِ صریح خوانده می‌شود.
+     *
+     * دو شرط، نه یکی: هم کاربر باید `useSource` بفرستد، هم پروژه باید
+     * `source.root` را در کانفیگش اعلام کرده باشد. محتوای این فایل‌ها به مدلِ
+     * بیرونی می‌رود، پس پیش‌فرضش خاموش است.
+     */
+    let source;
+    if (body?.useSource) {
+      if (!project.sourceRoot) {
+        throw new Error(
+          `پروژهٔ «${project.name}» کلید source.root ندارد.\n` +
+            '  آن را در کانفیگ پروژه بگذارید تا سورس قابل خواندن شود.'
+        );
+      }
+      const root = await resolveSourceRoot({ key: target, source: { root: project.sourceRoot } });
+      source = await findRelevantSource({ root, text: body?.text });
+    }
+
     const draft = await scenarioFromText({
       text: body?.text,
       models,
       target: { name: project.name, baseURL: project.baseURL },
+      source,
     });
 
     return json({

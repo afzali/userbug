@@ -49,6 +49,27 @@ test('فعل ناشناخته پیش از ذخیره گرفته می‌شود', 
   expect(() => assertScenarioShape({ name: 'الف', steps: [{ as: 'عنوان' }] })).toThrow(/فعل ندارد/);
 });
 
+test('بدنهٔ بی‌شکل پیش از ذخیره گرفته می‌شود', () => {
+  // نخستین اجرای واقعی همین را داد: فعل درست، بدنهٔ غلط. مفسر `page.goto(object)`
+  // می‌زد و وسط اجرا می‌شکست — یعنی سناریویی ذخیره می‌شد که هرگز اجرا نمی‌شد.
+  expect(() =>
+    assertScenarioShape({ name: 'الف', steps: [{ go: { url: 'http://x' } }] })
+  ).toThrow(/رشته/);
+
+  expect(() => assertScenarioShape({ name: 'الف', steps: [{ press: 12 }] })).toThrow(/رشته/);
+  expect(() => assertScenarioShape({ name: 'الف', steps: [{ do: '' }] })).toThrow(/رشته/);
+  expect(() => assertScenarioShape({ name: 'الف', steps: [{ wait: 'زود' }] })).toThrow(/میلی‌ثانیه/);
+  expect(() => assertScenarioShape({ name: 'الف', steps: [{ explore: 42 }] })).toThrow(/goal/);
+
+  // و شکل‌های درست باید بگذرند
+  expect(() =>
+    assertScenarioShape({
+      name: 'الف',
+      steps: [{ go: '/login' }, { wait: 2000 }, { explore: { goal: 'بگرد' } }, { do: 'ذخیره کن' }],
+    })
+  ).not.toThrow();
+});
+
 test('سناریوی معتبر با فعل‌های شناخته‌شده می‌گذرد', () => {
   const scenario = assertScenarioShape({
     name: 'ورود و دیدن فهرست',

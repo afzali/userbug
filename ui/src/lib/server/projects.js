@@ -42,6 +42,17 @@ function sourceField(source, field) {
   return match?.[1] || '';
 }
 
+/**
+ * `source: { root: '…' }` از متنِ کانفیگ.
+ *
+ * الگو عمداً به بلوکِ `source` بسته است و نه هر `root:`ی در فایل. ریشهٔ اشتباه
+ * یعنی محصورسازی روی پوشهٔ اشتباه بسته می‌شود — و این تنها جایی است که ابزار
+ * بیرون از مخزن خودش می‌خواند.
+ */
+function sourceRootField(source) {
+  return source.match(/\bsource\s*:\s*\{[^}]*\broot\s*:\s*['"]([^'"]+)['"]/)?.[1] || '';
+}
+
 async function scenarioMetadata(directory, relative) {
   const { file } = await existingFileInside(directory, relative);
   const source = await fsp.readFile(file, 'utf8');
@@ -121,6 +132,7 @@ export async function listProjects() {
       baseURL: sourceField(source, 'baseURL'),
       environment: sourceField(source, 'environment') || 'production',
       device: sourceField(source, 'device') || 'desktop',
+      sourceRoot: sourceRootField(source),
       configFile: entry.name,
       scenarios,
     });

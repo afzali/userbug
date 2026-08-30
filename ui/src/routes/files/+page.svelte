@@ -21,6 +21,13 @@
   let model = $state('');
   let models = $state([]);
   let drafting = $state(false);
+  /**
+   * خواندن سورس، خاموش به‌صورت پیش‌فرض.
+   *
+   * محتوای فایل‌ها به مدلِ بیرونی می‌رود، پس این تصمیم باید هر بار صریح باشد
+   * نه یک تنظیمِ جامانده.
+   */
+  let useSource = $state(false);
   /** خروجی مدل، پیش از ذخیره. تا `null` است، هیچ فایلی نوشته نشده. */
   let draft = $state(null);
   let draftPath = $state('');
@@ -113,7 +120,7 @@
       const response = await fetch('/api/scenarios/draft', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ target: data.target, text: intent, model }),
+        body: JSON.stringify({ target: data.target, text: intent, model, useSource }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'سناریو ساخته نشد');
@@ -206,6 +213,14 @@
         <Textarea id="scenario-intent" bind:value={intent} rows={5} class="text-sm leading-6" placeholder="ثبت‌نام کن، کد بازیابی را دانلود کن، خارج شو و با همان کد برگرد" />
         <Input bind:value={model} list="draft-model-options" dir="ltr" spellcheck="false" placeholder="پیش‌فرض کانفیگ" />
         <datalist id="draft-model-options">{#each models as item (item.id)}<option value={item.id}>{item.name}</option>{/each}</datalist>
+        {#if project?.sourceRoot}
+          <label class="flex items-start gap-2 text-xs leading-6">
+            <input type="checkbox" bind:checked={useSource} class="mt-1.5" />
+            <span>سورس پروژه هم خوانده شود تا برچسب‌ها حدسی نباشند. <strong class="text-foreground">محتوای فایل‌های مرتبط به مدل فرستاده می‌شود.</strong></span>
+          </label>
+        {:else}
+          <p class="text-xs leading-6 text-muted-foreground">برای خواندن سورس، کلید <span class="code-value">source.root</span> را در کانفیگ این پروژه بگذارید.</p>
+        {/if}
         <Button variant="outline" class="w-full" onclick={draftFromText} disabled={drafting || intent.trim().length < 10}>{drafting ? 'مدل مشغول است…' : 'ساخت با هوش مصنوعی'}</Button>
       </div>
     </Card.Content>
@@ -277,6 +292,12 @@
         <label class="block space-y-1.5 text-sm font-medium"><span>مسیر فایل</span><Input bind:value={draftPath} dir="ltr" /></label>
         {#if draft.notes}
           <p class="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm leading-6">مدل این‌ها را حدس زده و باید بازبینی شود: {draft.notes}</p>
+        {/if}
+        {#if draft.sourceFiles?.length}
+          <div class="rounded-lg bg-muted p-3 text-xs leading-6 text-muted-foreground">
+            <strong class="block text-foreground">سورس این فایل‌ها خوانده شد</strong>
+            {#each draft.sourceFiles as file (file)}<span class="code-value block">{file}</span>{/each}
+          </div>
         {/if}
       </div>
       <Textarea bind:value={draft.yaml} spellcheck="false" class="scroll-thin min-h-[55vh] resize-y rounded-none border-0 p-5 font-mono text-sm leading-7 focus-visible:ring-0" dir="ltr" />

@@ -132,6 +132,22 @@ export async function askJson(cfg, prompt, budget) {
   budget?.assertWithin();
 
   const text = data.choices?.[0]?.message?.content ?? '';
+
+  /**
+   * پاسخِ خالی، «JSON نامعتبر» نیست.
+   *
+   * پیام قبلی می‌گفت «JSON معتبر نبود: » و بعدش هیچ — که خواننده را دنبالِ
+   * غلطِ قالب می‌فرستاد، در حالی که مدل اصلاً چیزی نگفته بود. پرتکرارترین
+   * دلیلش پرامپتِ بزرگ است.
+   */
+  if (!text.trim()) {
+    throw new Error(
+      `مدل ${cfg.model} پاسخ خالی داد` +
+        (data.choices?.[0]?.finish_reason ? ` (finish_reason: ${data.choices[0].finish_reason})` : '') +
+        '.\n  اگر پرامپت بزرگ است کوچکش کنید، یا مدل دیگری را با --model بیازمایید.'
+    );
+  }
+
   try {
     return { json: extractJson(text), usage: data.usage, model: cfg.model };
   } catch {
