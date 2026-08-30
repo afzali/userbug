@@ -11,6 +11,8 @@ async function serve(params, head = false) {
       'content-type': contentType(path.extname(file)),
       'content-length': String(stat.size),
       'cache-control': 'private, no-cache',
+      // صریح، تا چیزی که وسط راه نشسته آن را «فایل برای دانلود» نبیند
+      'content-disposition': 'inline',
     });
     if (path.extname(file).toLowerCase() === '.html') {
       headers.set('content-security-policy', "default-src 'self' data: blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'");

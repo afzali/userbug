@@ -16,8 +16,16 @@
     return `/api/runs/${encodeURIComponent(data.run.runId)}/assets/${String(relative).split('/').map(encodeURIComponent).join('/')}`;
   }
 
+  /**
+   * آدرسِ trace عمداً پسوند ندارد.
+   *
+   * وقتی به `.zip` ختم می‌شد، مدیرهای دانلود (اینجا IDM) قاپش می‌زدند و
+   * به‌جای نمایشگر، پنجرهٔ دانلود باز می‌شد.
+   */
   function traceViewer(trace) {
-    return `/trace-viewer/index.html?trace=${encodeURIComponent(asset(trace.file))}`;
+    const index = data.traces.indexOf(trace);
+    const source = `/api/runs/${encodeURIComponent(data.run.runId)}/trace/${index}`;
+    return `/trace-viewer/index.html?trace=${encodeURIComponent(source)}`;
   }
 </script>
 
