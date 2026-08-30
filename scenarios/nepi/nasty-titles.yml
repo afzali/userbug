@@ -46,7 +46,9 @@ steps:
       - wait: 1200
       - dismissBlockers: true
 
-      - when: { hidden: { role: button, name: "فایل جدید" }, timeout: 1500 }
+      # `nth: 0` لازم است: در برخی چیدمان‌ها دو دکمهٔ «فایل جدید» هم‌زمان در
+      # DOM هستند و توصیفِ اسمی بلند می‌شکند.
+      - when: { hidden: { role: button, name: "فایل جدید", nth: 0 }, timeout: 1500 }
         then:
           - click: { role: button, name: "Toggle Sidebar" }
           - wait: 600

@@ -1,0 +1,113 @@
+name: نوشتن، ذخیره، رفرش
+persona: novice
+status: approved
+timeout: 300000
+
+# ── سؤالی که این سناریو می‌پرسد ──
+#
+# برای یک اپ یادداشت، این مهم‌ترین ثابتِ ممکن است: چیزی که کاربر نوشت، همان
+# چیزی که می‌ماند؟ و متنِ فارسیِ واقعی — نیم‌فاصله، ارقام فارسی، متن مخلوط —
+# باید همان‌طور برگردد که وارد شده. نرمال‌سازیِ حالت نمایش نباید نیم‌فاصله را
+# بخورد.
+#
+# ── چرا هم صفحه و هم دیتابیس ──
+#
+# داورِ صفحه به‌تنهایی کافی نیست: ممکن است صفحه متن را از حافظه نشان دهد و
+# دیتابیس چیز دیگری داشته باشد. کاربر «✓ ذخیره شده» می‌بیند و فردا متنش نیست.
+# پس هر دو را می‌پرسیم، و بینشان یک رفرش می‌گذاریم — همان کاری که کاربر
+# بعد از ذخیره می‌کند.
+#
+# ── چرا شناسهٔ سند را از آدرس درنمی‌آوریم ──
+#
+# نسخهٔ اسکریپتی، `bookId` را از URL می‌کند تا کوئری را به همان سند محدود کند.
+# اینجا لازم نیست: هر اجرا با `clearState` دیتابیسِ مرورگر را از صفر می‌سازد و
+# این سناریو تنها یک سند دارد. افزودن فعلِ «استخراج از آدرس» فقط برای همین یک
+# مورد، یک چیزِ بیشتر برای شکستن بود.
+
+steps:
+  - as: ثبت‌نام و ورود به فهرست
+    clearState: true
+  - go: /
+  - expect: { url: "/login" }
+  - wait: 2000
+  - dismissBlockers: true
+  - fill:
+      ایمیل: "{{identity.email}}"
+      رمز عبور: "{{identity.password}}"
+  - click: { role: button, name: "ورود / ثبت‌نام" }
+  - expect: { visible: { role: heading, name: "کد بازیابی شما" }, timeout: 30000 }
+  - dismissBlockers: true
+  - check: { role: checkbox }
+  - click: { role: button, name: "ادامه" }
+  - expect: { url: "/contents", timeout: 30000 }
+  - wait: 1500
+  - dismissBlockers: true
+
+  # روی موبایل نوار کناری جمع است و «فایل جدید» دیده نمی‌شود؛ اول بازش می‌کنیم.
+  - as: ساخت سند خالی با عنوان فارسی
+    when: { hidden: { role: button, name: "فایل جدید", nth: 0 }, timeout: 1500 }
+    then:
+      - click: { role: button, name: "Toggle Sidebar" }
+      - wait: 600
+  - click: { role: button, name: "فایل جدید", nth: 0 }
+  - click: { role: tab, name: "فایل خالی جدید" }
+  - fill: { selector: "#blank-title" }
+    value: "یادداشت‌های ۱۴۰۴"
+  # بررسی یکتاییِ slug ۵۰۰ میلی‌ثانیه تأخیر دارد. اینجا مسیر سالم را می‌خواهیم؛
+  # مسابقه با همان بررسی، سناریوی جداگانه دارد (`duplicate-title-race.yml`).
+  - wait: 1000
+  - click: { role: button, name: "ساخت و باز کردن" }
+  - expect: { url: "/content/", timeout: 30000 }
+  - wait: 2500
+  - dismissBlockers: true
+
+  - as: نوشتن متنِ فارسیِ بدخیم در ویرایشگر
+    type:
+      into: { selector: ".ProseMirror", nth: 0 }
+      value: "{{nasty.zwnj}} — {{nasty.persianDigits}} — {{nasty.mixed}}"
+  - wait: 1200
+
+  - as: نشانِ «ذخیره‌نشده» باید بیاید
+    expect: { visible: { text: "ذخیره‌نشده", exact: false }, timeout: 10000 }
+
+  - as: ذخیره و دیدن نشانِ «ذخیره شده»
+    click: { role: button, name: "ذخیره" }
+  - expect: { visible: { text: "ذخیره شده", exact: false }, timeout: 30000 }
+  - wait: 1500
+  - dismissBlockers: true
+
+  - as: چه چیزی واقعاً در دیتابیس نشست؟
+    query:
+      sql: "SELECT content FROM paragraphs ORDER BY sort_order"
+      saveAs: rows
+  - assert: { matches: ["{{vars.rows.0.content}}", "{{nasty.zwnj}}"] }
+    finding: >-
+      متنِ نیم‌فاصله‌دار همان‌طور که وارد شد در دیتابیس ذخیره نشد
+    detail: >-
+      انتظار: «{{nasty.zwnj}}» — آنچه ذخیره شده: «{{vars.rows.0.content}}».
+      کاربر «✓ ذخیره شده» دیده بود، پس این از آن دسته باگ‌هایی است که تا
+      روزِ بازگشتِ سراغ یادداشت، هیچ نشانه‌ای ندارد.
+
+  - as: رفرش — همان کاری که کاربر بعد از ذخیره می‌کند
+    reload: true
+  - wait: 3000
+  - dismissBlockers: true
+  - assert: { visible: { text: "{{nasty.zwnj}}", exact: false }, timeout: 8000 }
+    finding: >-
+      متنِ ذخیره‌شده پس از رفرش روی صفحه نیست
+    detail: >-
+      کاربر «✓ ذخیره شده» دیده بود و بعد صفحه را تازه کرد. اگر متن اینجا
+      نباشد، یعنی نشانِ ذخیره دروغ گفته یا خواندنِ دوباره می‌شکند.
+
+  - as: عنوان در فهرست همان است که کاربر نوشت؟
+    query:
+      sql: "SELECT title FROM books ORDER BY rowid DESC LIMIT 1"
+      saveAs: book
+  - assert: { equals: ["{{vars.book.0.title}}", "یادداشت‌های ۱۴۰۴"] }
+    finding: >-
+      عنوان سند دست‌کاری شد: «یادداشت‌های ۱۴۰۴» ذخیره شد به‌شکل
+      «{{vars.book.0.title}}»
+    detail: >-
+      کلید «نرمال‌سازی عنوان و مشخصات» روشن است و حالتش نمایشی اعلام شده، پس
+      نیم‌فاصله و ارقام باید دست‌نخورده بمانند. عنوانی که کاربر تایپ کرده و
+      عنوانی که بعداً می‌بیند باید یکی باشند.
