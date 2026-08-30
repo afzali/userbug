@@ -13,8 +13,9 @@
    * پس در فهرست هم جدا می‌مانند.
    */
   import { Badge } from '$lib/components/ui/badge/index.js';
+  import { Button } from '$lib/components/ui/button/index.js';
 
-  let { scenarios = [], target, activeKind = 'target', activeRelative = '' } = $props();
+  let { scenarios = [], target, activeKind = 'target', activeRelative = '', onAdd } = $props();
 
   const base = $derived(`/projects/${encodeURIComponent(target)}/files`);
 
@@ -53,6 +54,20 @@
     },
   ].filter((group) => group.items.length));
 
+  /**
+   * فقط گروهی که فایلِ بازشده در آن است، باز می‌ماند.
+   *
+   * وقتی پیکربندی باز است، هیچ گروهی لازم نیست باز باشد — همان حالتی که
+   * فهرست کوتاه و قابل مرور می‌شود.
+   */
+  const openGroups = $derived(
+    new Set(
+      groups
+        .filter((group) => group.items.some((item) => item.path === activeRelative))
+        .map((group) => group.key)
+    )
+  );
+
   function href(item) {
     return `${base}?kind=scenario&relative=${encodeURIComponent(item.path)}`;
   }
@@ -64,6 +79,13 @@
 </script>
 
 <div class="space-y-5">
+  {#if onAdd}
+    <!-- افزودن، همان بالا کنار فهرست — نه ته صفحه بعد از نوزده ردیف. -->
+    <Button variant="outline" class="w-full" onclick={onAdd}>
+      <span aria-hidden="true" class="me-1">＋</span> سناریوی تازه
+    </Button>
+  {/if}
+
   <div>
     <p class="mb-1.5 text-xs font-semibold text-muted-foreground">تنظیمات</p>
     <a href={`${base}?kind=target`} class={rowClass(activeKind === 'target')}>
@@ -73,12 +95,21 @@
   </div>
 
   {#each groups as group (group.key)}
-    <div>
-      <div class="mb-1.5 flex items-baseline justify-between gap-2">
-        <p class="text-xs font-semibold text-muted-foreground">{group.title}</p>
+    <!--
+      آکاردیون، نه فهرستِ باز.
+      با نوزده سناریو، بازِ همیشگی یعنی برای رسیدن به «پیش‌نویس‌ها» باید کل
+      فهرست را رد کرد. گروهی که فایلِ باز در آن است، خودش باز می‌ماند.
+    -->
+    <details class="group" open={openGroups.has(group.key)}>
+      <summary class="flex cursor-pointer list-none items-baseline justify-between gap-2 rounded-md px-1 py-1 hover:bg-accent/40">
+        <span class="flex items-baseline gap-2">
+          <span class="text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true">›</span>
+          <span class="text-xs font-semibold text-muted-foreground">{group.title}</span>
+        </span>
         <span class="text-[11px] text-muted-foreground">{group.items.length}</span>
-      </div>
-      <p class="mb-2 text-[11px] leading-5 text-muted-foreground/80">{group.hint}</p>
+      </summary>
+
+      <p class="mb-2 mt-1 ps-5 text-[11px] leading-5 text-muted-foreground/80">{group.hint}</p>
 
       <ul class="space-y-1">
         {#each group.items as item (item.path)}
@@ -96,7 +127,7 @@
           </li>
         {/each}
       </ul>
-    </div>
+    </details>
   {/each}
 
   {#if !groups.length}

@@ -179,70 +179,9 @@
 <PageHeader eyebrow={`${project.environment} · ${project.baseURL}`} title={project.name} description="سناریو را انتخاب کنید؛ قدم، عکس، خطای مرورگر و لاگ سرور در همان لحظه اینجا می‌آیند.">
   {#snippet actions()}
     <Button href={`/projects/${encodeURIComponent(target)}/files`} variant="outline">سناریوها</Button>
-    <!--
-      تنظیمات پروژه همان ویرایشگرِ فایل است، ولی با ورودی مستقیم.
-      پیش‌تر فقط از دلِ صفحهٔ «سناریوها» و از یک کشویی می‌شد به کانفیگ رسید؛
-      کسی آنجا دنبال تنظیمات پروژه نمی‌گردد.
-    -->
-    <Button href={`/projects/${encodeURIComponent(target)}/files?kind=target`} variant="outline">تنظیمات پروژه</Button>
     <Button href={`/projects/${encodeURIComponent(target)}/compare`} variant="outline">مقایسهٔ اجراها</Button>
   {/snippet}
 </PageHeader>
-
-<!--
-  تنظیماتِ همین پروژه، همان‌جا که واردش می‌شوید.
-  پیش‌تر فقط محیط و baseURL در سربرگ بود؛ آدرس API، مسیر لاگ‌ها و پوشهٔ سورس —
-  یعنی همان چیزهایی که هنگام ساخت پروژه تعریف می‌شوند — هیچ‌جا دیده نمی‌شدند.
--->
-{#if project.settings}
-  <Card.Root class="mb-6">
-    <Card.Header>
-      <Card.Title>تنظیمات پروژه</Card.Title>
-      <Card.Description>
-        از <span dir="ltr" class="font-mono text-xs">targets/{project.configFile}</span> خوانده می‌شود.
-      </Card.Description>
-      <Card.Action>
-        <Button href={`/projects/${encodeURIComponent(target)}/files?kind=target`} variant="outline" size="sm">ویرایش</Button>
-      </Card.Action>
-    </Card.Header>
-    <Card.Content>
-      {#if project.settings.ok}
-        <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
-          <div><dt class="text-xs text-muted-foreground">آدرس فرانت</dt><dd dir="ltr" class="font-mono text-xs">{project.settings.baseURL || '—'}</dd></div>
-          <div><dt class="text-xs text-muted-foreground">آدرس API</dt><dd dir="ltr" class="font-mono text-xs">{project.settings.apiURL || '—'}</dd></div>
-          <div><dt class="text-xs text-muted-foreground">محیط</dt><dd><Badge variant={project.settings.environment === 'production' ? 'destructive' : 'secondary'}>{project.settings.environment}</Badge></dd></div>
-          <div><dt class="text-xs text-muted-foreground">دستگاه</dt><dd>{project.settings.device}</dd></div>
-          <div><dt class="text-xs text-muted-foreground">پوشهٔ سورس</dt><dd dir="ltr" class="font-mono text-xs">{project.settings.sourceRoot || '—'}</dd></div>
-          <div><dt class="text-xs text-muted-foreground">فضای شخصی</dt><dd>{project.settings.isolation || '—'}</dd></div>
-          <div class="sm:col-span-2 xl:col-span-3">
-            <dt class="text-xs text-muted-foreground">لاگ سرور</dt>
-            <dd>
-              {#if project.settings.logs.length}
-                <ul class="mt-1 space-y-1">
-                  {#each project.settings.logs as log}<li dir="ltr" class="font-mono text-xs"><span class="text-muted-foreground">{log.name}:</span> {log.path}</li>{/each}
-                </ul>
-              {:else}
-                <span class="text-xs text-muted-foreground">تعریف نشده — یافته‌های سمت سرور دیده نمی‌شوند</span>
-              {/if}
-            </dd>
-          </div>
-        </dl>
-        <p class="mt-4 text-xs text-muted-foreground">
-          خوانندهٔ دیتابیس: {project.settings.hasStateProbe ? 'دارد' : 'ندارد'} ·
-          allowlist: {project.settings.allowlist} الگو ·
-          ممنوع در کاوش: {project.settings.exploreAvoid} مورد
-        </p>
-      {:else}
-        <p class="text-sm text-destructive">
-          کانفیگ خوانده نشد: {project.settings.error}
-        </p>
-        <p class="mt-2 text-xs text-muted-foreground">
-          تا این خطا رفع نشود، اجرا هم همین را می‌بیند. از «ویرایش» درستش کنید.
-        </p>
-      {/if}
-    </Card.Content>
-  </Card.Root>
-{/if}
 
 <div class="grid gap-6 xl:grid-cols-[23rem_minmax(0,1fr)]">
   <Card.Root class="h-fit gap-5 xl:sticky xl:top-20">

@@ -25,6 +25,8 @@
    * خالی راهِ فرار است نه راهِ اصلی.
    */
   let mode = $state('ai');
+  /** پنل سناریوی تازه؛ از دکمهٔ بالای فهرست باز می‌شود. */
+  let adding = $state(false);
   let creating = $state(false);
   let intent = $state('');
   let model = $state('');
@@ -105,7 +107,9 @@
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'سناریو ساخته نشد');
       draft = payload;
+      // پنل بسته می‌شود تا پیش‌نمایش زیرش دیده شود
       draftPath = payload.relative;
+      adding = false;
     } catch (cause) {
       feedback = cause.message;
     } finally {
@@ -154,68 +158,11 @@
           target={data.target}
           activeKind={data.kind}
           activeRelative={data.relative}
+          onAdd={() => (adding = true)}
         />
       </Card.Content>
     </Card.Root>
 
-    <!--
-      سناریوی تازه، به‌شکل پله.
-      پیش‌تر دو فرمِ جدا زیر هم بودند — «فایل خالی» و «با متن» — بی‌آنکه معلوم
-      باشد کدام کجا تمام می‌شود. حالا اول راه انتخاب می‌شود، بعد ورودی، بعد
-      بازبینی.
-    -->
-    <Card.Root class="gap-4">
-      <Card.Header>
-        <Card.Title>سناریوی تازه</Card.Title>
-        <Card.Description>
-          {mode === 'ai' ? 'گام ۱ از ۳ — بگویید کاربر چه می‌کند' : 'یک فایل خالی بسازید و خودتان بنویسید'}
-        </Card.Description>
-      </Card.Header>
-      <Card.Content class="space-y-4">
-        <div class="flex overflow-hidden rounded-lg border text-sm">
-          <button type="button" class={`flex-1 px-3 py-2 ${mode === 'ai' ? 'bg-accent font-medium' : 'text-muted-foreground hover:bg-accent/50'}`} onclick={() => (mode = 'ai')}>با هوش مصنوعی</button>
-          <button type="button" class={`flex-1 px-3 py-2 ${mode === 'blank' ? 'bg-accent font-medium' : 'text-muted-foreground hover:bg-accent/50'}`} onclick={() => (mode = 'blank')}>فایل خالی</button>
-        </div>
-
-        {#if mode === 'blank'}
-          <label for="new-scenario-path" class="block space-y-1.5 text-sm font-medium">
-            <span>نام فایل</span>
-            <Input id="new-scenario-path" bind:value={newPath} dir="ltr" placeholder="my-test.yml" />
-          </label>
-          <Button variant="outline" class="w-full" onclick={createScenario} disabled={creating || !newPath}>
-            {creating ? 'در حال ساخت…' : 'ساخت فایل YAML'}
-          </Button>
-        {:else}
-          <label for="scenario-intent" class="block space-y-1.5 text-sm font-medium">
-            <span>کاربر چه می‌کند و چه باید ببیند؟</span>
-            <Textarea id="scenario-intent" bind:value={intent} rows={5} class="text-sm leading-6" placeholder="ثبت‌نام کن، کد بازیابی را دانلود کن، خارج شو و با همان کد برگرد" />
-          </label>
-
-          <ModelPicker bind:value={model} disabled={drafting} />
-
-          <div class="rounded-lg border bg-muted/40 p-3">
-            <p class="mb-1 text-xs font-semibold">سورس پروژه</p>
-            {#if project?.sourceRoot}
-              <p dir="ltr" class="mb-2 truncate font-mono text-[11px] text-muted-foreground">{project.sourceRoot}</p>
-              <label class="flex items-start gap-2 text-xs leading-6">
-                <input type="checkbox" bind:checked={useSource} class="mt-1.5" />
-                <span>خوانده شود تا برچسب‌ها حدسی نباشند. <strong class="text-foreground">محتوای فایل‌های مرتبط به مدل می‌رود.</strong></span>
-              </label>
-            {:else}
-              <p class="text-xs leading-6 text-muted-foreground">
-                تعریف نشده. برای خواندن سورس، کلید <span class="code-value">source.root</span> را در
-                <a class="underline underline-offset-4" href={`/projects/${encodeURIComponent(data.target)}/files?kind=target`}>تنظیمات پروژه</a>
-                بگذارید.
-              </p>
-            {/if}
-          </div>
-
-          <Button variant="outline" class="w-full" onclick={draftFromText} disabled={drafting || intent.trim().length < 10}>
-            {drafting ? 'مدل مشغول است…' : 'ساخت پیش‌نویس'}
-          </Button>
-        {/if}
-      </Card.Content>
-    </Card.Root>
   </div>
 
   {#if draft}
@@ -257,6 +204,81 @@
   </Card.Root>
   {/if}
 </div>
+
+
+{#if adding}
+  <!--
+    پاپ‌آور، نه کارتِ ته ستون.
+    پیش‌تر «سناریوی تازه» زیر فهرستِ نوزده‌تایی می‌نشست و برای رسیدن به آن
+    باید تا ته اسکرول می‌شد. حالا از دکمهٔ بالای فهرست باز می‌شود و روی
+    همه‌چیز می‌آید.
+  -->
+  <div
+    class="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
+    role="presentation"
+    onclick={(event) => { if (event.target === event.currentTarget) adding = false; }}
+  >
+    <div
+      class="scroll-thin max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-xl border bg-card p-6 shadow-xl"
+      role="dialog"
+      aria-modal="true"
+      aria-label="سناریوی تازه"
+    >
+      <div class="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <strong class="block text-lg">سناریوی تازه</strong>
+          <span class="text-xs text-muted-foreground">
+            {mode === 'ai' ? 'گام ۱ از ۳ — بگویید کاربر چه می‌کند' : 'یک فایل خالی بسازید و خودتان بنویسید'}
+          </span>
+        </div>
+        <Button variant="ghost" size="sm" onclick={() => (adding = false)} aria-label="بستن">✕</Button>
+      </div>
+
+      <div class="space-y-4">
+        <div class="flex overflow-hidden rounded-lg border text-sm">
+          <button type="button" class={`flex-1 px-3 py-2 ${mode === 'ai' ? 'bg-accent font-medium' : 'text-muted-foreground hover:bg-accent/50'}`} onclick={() => (mode = 'ai')}>با هوش مصنوعی</button>
+          <button type="button" class={`flex-1 px-3 py-2 ${mode === 'blank' ? 'bg-accent font-medium' : 'text-muted-foreground hover:bg-accent/50'}`} onclick={() => (mode = 'blank')}>فایل خالی</button>
+        </div>
+
+        {#if mode === 'blank'}
+          <label for="new-scenario-path" class="block space-y-1.5 text-sm font-medium">
+            <span>نام فایل</span>
+            <Input id="new-scenario-path" bind:value={newPath} dir="ltr" placeholder="my-test.yml" />
+          </label>
+          <Button class="w-full" onclick={createScenario} disabled={creating || !newPath}>
+            {creating ? 'در حال ساخت…' : 'ساخت فایل YAML'}
+          </Button>
+        {:else}
+          <label for="scenario-intent" class="block space-y-1.5 text-sm font-medium">
+            <span>کاربر چه می‌کند و چه باید ببیند؟</span>
+            <Textarea id="scenario-intent" bind:value={intent} rows={5} class="text-sm leading-6" placeholder="ثبت‌نام کن، کد بازیابی را دانلود کن، خارج شو و با همان کد برگرد" />
+          </label>
+
+          <ModelPicker bind:value={model} disabled={drafting} />
+
+          <div class="rounded-lg border bg-muted/40 p-3">
+            <p class="mb-1 text-xs font-semibold">سورس پروژه</p>
+            {#if project?.sourceRoot}
+              <p dir="ltr" class="mb-2 truncate font-mono text-[11px] text-muted-foreground">{project.sourceRoot}</p>
+              <label class="flex items-start gap-2 text-xs leading-6">
+                <input type="checkbox" bind:checked={useSource} class="mt-1.5" />
+                <span>خوانده شود تا برچسب‌ها حدسی نباشند. <strong class="text-foreground">محتوای فایل‌های مرتبط به مدل می‌رود.</strong></span>
+              </label>
+            {:else}
+              <p class="text-xs leading-6 text-muted-foreground">
+                تعریف نشده. برای خواندن سورس، کلید <span class="code-value">source.root</span> را در پیکربندی پروژه بگذارید.
+              </p>
+            {/if}
+          </div>
+
+          <Button class="w-full" onclick={draftFromText} disabled={drafting || intent.trim().length < 10}>
+            {drafting ? 'مدل مشغول است…' : 'ساخت پیش‌نویس'}
+          </Button>
+        {/if}
+      </div>
+    </div>
+  </div>
+{/if}
 
 <svelte:window onbeforeunload={(event) => { if (dirty) event.preventDefault(); }} />
 

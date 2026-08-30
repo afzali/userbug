@@ -35,7 +35,6 @@
           { href: `${base}/triage`, label: 'تریاژ', icon: '◇' },
           { href: `${base}/compare`, label: 'مقایسه', icon: '⇄' },
           { href: `${base}/files`, label: 'سناریوها', icon: '⌘' },
-          { href: `${base}/files?kind=target`, label: 'تنظیمات', icon: '⚙' },
         ]
       : [
           { href: '/', label: 'پروژه‌ها', icon: '◫', exact: true },
@@ -53,21 +52,8 @@
     localStorage.setItem('userbug-theme', dark ? 'dark' : 'light');
   }
 
-  /**
-   * ردیف‌هایی که فقط با query از هم جدا می‌شوند.
-   *
-   * «سناریوها» و «تنظیمات» هر دو `/files` هستند و با `?kind=target` فرق
-   * می‌کنند. مقایسهٔ صرفِ pathname هر دو را هم‌زمان فعال نشان می‌داد.
-   */
   function isActive(item) {
-    const [itemPath, itemQuery] = item.href.split('?');
-    if (page.url.pathname !== itemPath && !(!item.exact && page.url.pathname.startsWith(itemPath))) {
-      return false;
-    }
-    const wantsTarget = itemQuery?.includes('kind=target');
-    const hasTarget = page.url.searchParams.get('kind') === 'target';
-    if (itemPath.endsWith('/files')) return Boolean(wantsTarget) === hasTarget;
-    return item.exact ? page.url.pathname === itemPath : true;
+    return item.exact ? page.url.pathname === item.href : page.url.pathname.startsWith(item.href);
   }
 </script>
 
