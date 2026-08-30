@@ -14,6 +14,13 @@ import { fileURLToPath } from 'node:url';
 import { finalizeRun, printSummary } from '../src/finalize.js';
 import { assertModelSlug, listModels } from '../src/models/config.js';
 import { assertProjectKey, renderTargetConfig } from '../src/target-template.js';
+import {
+  createSchedule,
+  listSchedules,
+  removeSchedule,
+  runScheduleNow,
+  scheduleArgs,
+} from '../src/schedule.js';
 import { renderJUnit } from '../src/report/junit.js';
 import { runDir } from '../src/store/run-store.js';
 import { dedupe } from '../src/observe/oracle.js';
@@ -49,6 +56,15 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --locale <fa> --dir <rtl|ltr>
       --log <نام=مسیر>            لاگ سرور؛ تکرارشدنی
       --source <مسیر>             پوشهٔ سورس پروژه
+
+  userbug schedule list           زمان‌بندی‌های ثبت‌شده و وضعیتشان
+  userbug schedule add <کلید> --target <هدف> --time HH:MM [گزینه‌ها]
+                                  ساخت تسک در زمان‌بندِ سیستم
+      --weekly --days MON,WED     هفتگی به‌جای روزانه
+      --grep --device --persona --model --depth --repeat
+                                  همان پرچم‌های run
+  userbug schedule remove <کلید>  حذف تسک و فایل‌هایش (لاگ می‌ماند)
+  userbug schedule run <کلید>     اجرای دستیِ همان تسک، برای آزمودن
 
   userbug models [--free]         فهرست زندهٔ مدل‌های OpenRouter
   userbug repro <runId> [اثرانگشت]
@@ -553,6 +569,75 @@ function cmdInit({ flags, positional }) {
   console.log(`  سناریوها را در scenarios/${key}/ بگذارید، بعد: node bin/userbug.js run ${key}\n`);
 }
 
+/**
+ * زمان‌بندی — همان کاری که رابط می‌کند.
+ *
+ * زمان‌بندِ واقعی سیستم است؛ این فرمان فقط ورودی‌هایش را می‌سازد و مدیریت
+ * می‌کند. جزئیاتش در `src/schedule.js`.
+ */
+async function cmdSchedule({ flags, positional }) {
+  const [action, key] = positional;
+
+  if (!action || action === 'list') {
+    const rows = await listSchedules();
+    if (!rows.length) {
+      console.log('\n  زمان‌بندی‌ای ثبت نشده. نمونه:');
+      console.log('  node bin/userbug.js schedule add nightly --target nepi --time 02:00\n');
+      return;
+    }
+
+    console.log('');
+    for (const row of rows) {
+      if (row.broken) {
+        console.log(`  ${row.key.padEnd(20)} فایلش خوانده نشد: ${row.broken}`);
+        continue;
+      }
+      const when = row.frequency === 'weekly' ? `هفتگی ${row.days.join(',')} ${row.time}` : `روزانه ${row.time}`;
+      // «در زمان‌بند نیست» مهم‌ترین چیزی است که باید دیده شود
+      console.log(
+        `  ${row.key.padEnd(20)} ${row.target.padEnd(14)} ${when.padEnd(24)} ` +
+          `${row.installed ? 'فعال' : '⚠ در زمان‌بند نیست'}`
+      );
+      if (row.lastLog) console.log(`  ${' '.repeat(20)} ${row.lastLog}`);
+    }
+    console.log('');
+    return;
+  }
+
+  if (action === 'add') {
+    const created = await createSchedule({
+      key,
+      target: flags.target,
+      frequency: flags.weekly ? 'weekly' : 'daily',
+      time: flags.time,
+      days: flags.days,
+      grep: flags.grep,
+      device: flags.device,
+      persona: flags.persona,
+      model: flags.model,
+      depth: flags.depth,
+      repeat: flags.repeat,
+    });
+    console.log(`\n  زمان‌بندی «${created.key}» ساخته شد: ${created.taskName}`);
+    console.log(`  فرمان: userbug ${scheduleArgs(created).join(' ')}\n`);
+    return;
+  }
+
+  if (action === 'remove') {
+    await removeSchedule(key);
+    console.log(`\n  زمان‌بندی «${key}» حذف شد. لاگش در schedules/ می‌ماند.\n`);
+    return;
+  }
+
+  if (action === 'run') {
+    await runScheduleNow(key);
+    console.log(`\n  تسک «${key}» به زمان‌بند سپرده شد. نتیجه در schedules/${key}.log\n`);
+    return;
+  }
+
+  throw new Error(`زیرفرمان ناشناخته: «${action}». مجاز: list | add | remove | run`);
+}
+
 // ── ورودی ──
 
 const [, , cmd, ...rest] = process.argv;
@@ -571,6 +656,9 @@ try {
       break;
     case 'init':
       cmdInit(parsed);
+      break;
+    case 'schedule':
+      await cmdSchedule(parsed);
       break;
     case 'repro':
       cmdRepro(parsed);

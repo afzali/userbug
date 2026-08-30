@@ -8,3 +8,8 @@
 .devin/
 userbug.config.js
 scenarios/*/_drafts/
+
+# تعریفِ زمان‌بندی (json) قابل حمل است و می‌ماند؛ راه‌انداز مسیرِ همین ماشین را
+# دارد و لاگ هم تاریخِ محلی است.
+schedules/*.cmd
+schedules/*.log

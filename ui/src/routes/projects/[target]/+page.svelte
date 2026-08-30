@@ -26,6 +26,9 @@
   let author = $state(false);
   let submitting = $state(false);
   let error = $state('');
+  let showSchedule = $state(false);
+  let scheduleBusy = $state(false);
+  let scheduleForm = $state({ key: '', time: '02:00', frequency: 'daily', days: 'MON' });
   // svelte-ignore state_referenced_locally
   let job = $state(data.activeJob || null);
   let liveSteps = $state([]);
@@ -112,6 +115,55 @@
     const payload = await response.json();
     if (response.ok) job = payload.job;
     else error = payload.error || 'لغو انجام نشد';
+  }
+
+  /**
+   * زمان‌بندی، با همان پرچم‌هایی که در فرم بالا انتخاب شده‌اند.
+   *
+   * صفحه بعد از هر تغییر بازخوانی می‌شود (`location.reload`) چون وضعیت واقعی
+   * در زمان‌بندِ سیستم است، نه در این صفحه — و نشان دادنِ حالتِ خوش‌بینانه
+   * دقیقاً همان چیزی است که «فعال بود ولی اجرا نشد» را می‌سازد.
+   */
+  async function scheduleRequest(url, options) {
+    scheduleBusy = true;
+    error = '';
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'انجام نشد');
+      location.reload();
+    } catch (cause) {
+      error = cause.message;
+      scheduleBusy = false;
+    }
+  }
+
+  function addSchedule() {
+    return scheduleRequest('/api/schedules', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...scheduleForm,
+        target,
+        grep: scenario,
+        device,
+        persona,
+        model,
+        depth,
+        repeat,
+      }),
+    });
+  }
+
+  function runSchedule(key) {
+    return scheduleRequest(`/api/schedules/${encodeURIComponent(key)}`, { method: 'POST' });
+  }
+
+  function removeSchedule(key) {
+    if (!confirm(`زمان‌بندی «${key}» و تسکش در ویندوز حذف شوند؟`)) return;
+    return scheduleRequest(`/api/schedules/${encodeURIComponent(key)}`, { method: 'DELETE' });
   }
 
   /**
@@ -219,6 +271,58 @@
           <Button type="submit" class="w-full" disabled={submitting || busy || !target}>{submitting ? 'در حال شروع…' : 'شروع اجرا'}</Button>
         {/if}
       </form>
+    </Card.Content>
+
+    <!--
+      زمان‌بندی همان‌جایی است که پرچم‌ها را انتخاب می‌کنید، چون همان پرچم‌ها را
+      ذخیره می‌کند. زمان‌بندِ واقعی سیستم است؛ رابط فقط ورودی‌هایش را می‌سازد.
+    -->
+    <Card.Content class="space-y-3 border-t pt-5">
+      <div class="flex items-center justify-between gap-2">
+        <strong class="text-sm">زمان‌بندی</strong>
+        <Button variant="ghost" size="sm" onclick={() => { showSchedule = !showSchedule; }}>{showSchedule ? 'بستن' : 'افزودن'}</Button>
+      </div>
+
+      {#each data.schedules as item (item.key)}
+        <div class="rounded-lg border p-3 text-xs leading-6">
+          <div class="flex items-center justify-between gap-2">
+            <span class="code-value">{item.key}</span>
+            {#if item.installed}
+              <span class="text-emerald-700 dark:text-emerald-300">فعال</span>
+            {:else}
+              <!-- فایلش هست ولی تسک نیست: پنهان کردنش یعنی کاربر فکر کند هر شب اجرا می‌شود. -->
+              <span class="text-destructive">در زمان‌بند نیست</span>
+            {/if}
+          </div>
+          <p class="text-muted-foreground">
+            {item.frequency === 'weekly' ? `هفتگی ${item.days?.join('،')} · ${item.time}` : `روزانه ${item.time}`}
+            {#if item.grep} · {item.grep}{/if}
+          </p>
+          {#if item.lastLog}<p class="text-muted-foreground">{item.lastLog}</p>{/if}
+          <div class="mt-2 flex gap-2">
+            <Button variant="outline" size="sm" onclick={() => runSchedule(item.key)} disabled={scheduleBusy}>اجرا کن</Button>
+            <Button variant="ghost" size="sm" onclick={() => removeSchedule(item.key)} disabled={scheduleBusy}>حذف</Button>
+          </div>
+        </div>
+      {/each}
+
+      {#if showSchedule}
+        <div class="space-y-3 rounded-lg border border-dashed p-3">
+          <label class="block space-y-1.5 text-sm font-medium"><span>کلید</span><Input bind:value={scheduleForm.key} dir="ltr" placeholder="nightly" /></label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="block space-y-1.5 text-sm font-medium"><span>ساعت</span><Input bind:value={scheduleForm.time} dir="ltr" placeholder="02:00" /></label>
+            <label class="block space-y-1.5 text-sm font-medium">
+              <span>تکرار</span>
+              <select class="app-select" bind:value={scheduleForm.frequency}><option value="daily">روزانه</option><option value="weekly">هفتگی</option></select>
+            </label>
+          </div>
+          {#if scheduleForm.frequency === 'weekly'}
+            <label class="block space-y-1.5 text-sm font-medium"><span>روزها</span><Input bind:value={scheduleForm.days} dir="ltr" placeholder="MON,WED,FRI" /></label>
+          {/if}
+          <p class="text-xs leading-6 text-muted-foreground">فیلتر سناریو، دستگاه، رفتار کاربر، مدل و عمقِ همین فرمِ بالا در زمان‌بندی ذخیره می‌شوند.</p>
+          <Button class="w-full" onclick={addSchedule} disabled={scheduleBusy || !scheduleForm.key || !scheduleForm.time}>{scheduleBusy ? 'در حال ساخت…' : 'ساخت زمان‌بندی'}</Button>
+        </div>
+      {/if}
     </Card.Content>
   </Card.Root>
 
