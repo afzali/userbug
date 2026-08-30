@@ -2,12 +2,17 @@
   /**
    * ویرایشگرِ فایل، با دو چیزی که برای متن فارسی لازم است.
    *
-   * ── چرا سوئیچ جهت ──
+   * ── چرا «خودکار» و نه فقط راست/چپ ──
    *
-   * سناریوهای ما YAML‌ای با کلیدهای لاتین و مقدارهای فارسی‌اند. با `dir=ltr`
-   * جمله‌های فارسی وارونه‌چین می‌شوند و خواندنشان سخت است؛ با `dir=rtl`
-   * ساختارِ YAML به هم می‌ریزد. هیچ‌کدام همیشه درست نیست، پس انتخابش با
-   * کسی است که دارد می‌خواند.
+   * سناریوهای ما YAML‌ای با کلیدهای لاتین و مقدارهای فارسی‌اند. با `ltr`
+   * جمله‌های فارسی وارونه‌چین می‌شوند؛ با `rtl` تورفتگی و ساختار YAML به هم
+   * می‌ریزد. هیچ‌کدام برای کلِ فایل درست نیست — و همین بود که سوئیچِ دوحالته
+   * را «کارنکن» نشان می‌داد: جهت واقعاً عوض می‌شد، ولی هیچ حالتی خوانا نبود.
+   *
+   * `dir="auto"` جهت را **خط‌به‌خط** از اولین نویسهٔ قویِ همان خط می‌گیرد.
+   * یعنی کامنت فارسی راست‌چین می‌شود و `- click: { role: button }` چپ‌چین،
+   * در یک فایل. پس پیش‌فرض همین است و دو حالت دیگر برای وقتی‌اند که کاربر
+   * چیز دیگری بخواهد.
    *
    * ── چرا رنگ در نمای جدا و نه روی خودِ ویرایشگر ──
    *
@@ -28,15 +33,7 @@
     minHeight = '70vh',
   } = $props();
 
-  /** فارسی‌بودنِ بیشترِ متن، پیش‌فرضِ جهت را تعیین می‌کند. */
-  function guessDirection(text) {
-    const persian = (String(text).match(/[؀-ۿ]/g) || []).length;
-    const latin = (String(text).match(/[A-Za-z]/g) || []).length;
-    return persian > latin ? 'rtl' : 'ltr';
-  }
-
-  // svelte-ignore state_referenced_locally
-  let dir = $state(guessDirection(value));
+  let dir = $state('auto');
   let colored = $state(false);
 
   const escapeHtml = (text) =>
@@ -79,17 +76,17 @@
 <div class="flex flex-wrap items-center gap-2 border-b px-5 py-2 text-xs">
   <span class="text-muted-foreground">جهت متن</span>
   <div class="flex overflow-hidden rounded-md border">
-    <button
-      type="button"
-      class={`px-2.5 py-1 ${dir === 'rtl' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'}`}
-      onclick={() => (dir = 'rtl')}
-    >راست‌چین</button>
-    <button
-      type="button"
-      class={`px-2.5 py-1 ${dir === 'ltr' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'}`}
-      onclick={() => (dir = 'ltr')}
-    >چپ‌چین</button>
+    {#each [['auto', 'خودکار'], ['rtl', 'راست‌چین'], ['ltr', 'چپ‌چین']] as [option, label] (option)}
+      <button
+        type="button"
+        class={`px-2.5 py-1 ${dir === option ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'}`}
+        onclick={() => (dir = option)}
+      >{label}</button>
+    {/each}
   </div>
+  {#if dir === 'auto'}
+    <span class="text-muted-foreground">— جهتِ هر خط از خودش</span>
+  {/if}
 
   <span class="mx-1 h-4 w-px bg-border"></span>
 
@@ -105,11 +102,11 @@
 </div>
 
 {#if colored}
-  <div class="scroll-thin overflow-auto p-5 font-mono text-sm leading-7" style={`min-height:${minHeight}`} {dir}>
+  <div class="scroll-thin overflow-auto p-5 font-mono text-sm leading-7" style={`min-height:${minHeight}`} dir={dir === 'auto' ? 'ltr' : dir}>
     {#each lines as line, index}
       <div class="flex gap-3">
         <span class="w-10 shrink-0 select-none text-left text-xs text-muted-foreground/60" dir="ltr">{index + 1}</span>
-        <span class="min-w-0 flex-1 whitespace-pre-wrap break-words">{@html highlight(line) || '&nbsp;'}</span>
+        <span class="min-w-0 flex-1 whitespace-pre-wrap break-words" dir={dir === 'auto' ? 'auto' : dir}>{@html highlight(line) || '&nbsp;'}</span>
       </div>
     {/each}
   </div>
