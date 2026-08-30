@@ -57,34 +57,52 @@ export async function runScenario({ page, ub, identity, scenario }) {
     groups: [],
   };
 
-  for (const group of groupSteps(scenario.steps)) {
-    ctx.groups.push({ title: group.title, raw: [] });
-    await ub.step(group.title, async () => {
-      for (const step of group.steps) {
-        await execute({ page, ub, ctx, step });
-        if (step.verb !== 'explore') ctx.groups.at(-1).raw.push(step.raw);
-        // قدم‌های پیش از کاوش، مقدمهٔ پیش‌نویس می‌شوند: پیش‌نویس باید خودش
-        // قابل اجرا باشد، نه اینکه کسی دستی «چطور به اینجا برسیم» را بنویسد.
-        if (step.verb !== 'explore') ctx.executed.push(step.raw);
-      }
+  /**
+   * چه سناریو تمام شود چه وسط راه بشکند، آموخته‌ها و هزینه باید ثبت شوند.
+   *
+   * پیش‌تر این سه کار بعد از حلقه بودند، پس یک `throw` وسط سناریو هر سه را
+   * می‌برد. بدترینش آمار مدل بود: اجرایی که کش‌اش نخورد، مدل را صدا زد، پول
+   * داد و بعد شکست، در `run.json` می‌گفت `ai: null` — یعنی گران‌ترین اجرا،
+   * بی‌هزینه‌ترین به نظر می‌رسید. همین اشتباه یک بار برای کاوش رخ داده بود و
+   * اینجا تکرار شده بود، با یک لایه فاصله.
+   *
+   * کشِ heal‌شده هم از دست می‌رفت: مدل مسیر تازه را پیدا می‌کرد، سناریو در قدم
+   * بعدی می‌شکست، و اجرای بعدی دوباره از صفر می‌پرسید.
+   */
+  try {
+    for (const group of groupSteps(scenario.steps)) {
+      ctx.groups.push({ title: group.title, raw: [] });
+      await ub.step(group.title, async () => {
+        for (const step of group.steps) {
+          await execute({ page, ub, ctx, step });
+          if (step.verb !== 'explore') ctx.groups.at(-1).raw.push(step.raw);
+          // قدم‌های پیش از کاوش، مقدمهٔ پیش‌نویس می‌شوند: پیش‌نویس باید خودش
+          // قابل اجرا باشد، نه اینکه کسی دستی «چطور به اینجا برسیم» را بنویسد.
+          if (step.verb !== 'explore') ctx.executed.push(step.raw);
+        }
+      });
+    }
+  } finally {
+    if (ctx.cacheDirty) saveCache(ub.target.key, scenario.id, ctx.cache);
+
+    // «یافته بدون بازتولید، یافته نیست» — قانون سوم پروژه. تا امروز فقط شعار
+    // بود؛ حالا برای هر یافته یک فایل اجراپذیر ساخته می‌شود.
+    await writeRepros({ ub, scenario, ctx }).catch((cause) => {
+      console.error(`  نوشتن فایل بازتولید ناموفق بود: ${cause.message}`);
     });
-  }
 
-  if (ctx.cacheDirty) saveCache(ub.target.key, scenario.id, ctx.cache);
-
-  // «یافته بدون بازتولید، یافته نیست» — قانون سوم پروژه. تا امروز فقط شعار
-  // بود؛ حالا برای هر یافته یک فایل اجراپذیر ساخته می‌شود.
-  await writeRepros({ ub, scenario, ctx });
-
-  // آمار در گزارش می‌نشیند: اگر نسبت «مدل» به «کش» بالا بماند، یعنی یا کش
-  // کار نمی‌کند یا رابط مدام عوض می‌شود — هر دو ارزش دانستن دارند.
-  if (ctx.aiStats.cache + ctx.aiStats.model + ctx.aiStats.healed > 0) {
-    await ub.store.appendEvent({
-      kind: 'ai',
-      scenario: scenario.name,
-      ...ctx.aiStats,
-      budget: ctx.budget.snapshot(),
-    });
+    // آمار در گزارش می‌نشیند: اگر نسبت «مدل» به «کش» بالا بماند، یعنی یا کش
+    // کار نمی‌کند یا رابط مدام عوض می‌شود — هر دو ارزش دانستن دارند.
+    if (ctx.aiStats.cache + ctx.aiStats.model + ctx.aiStats.healed > 0) {
+      await ub.store
+        .appendEvent({
+          kind: 'ai',
+          scenario: scenario.name,
+          ...ctx.aiStats,
+          budget: ctx.budget.snapshot(),
+        })
+        .catch(() => {});
+    }
   }
 
   return ctx;
