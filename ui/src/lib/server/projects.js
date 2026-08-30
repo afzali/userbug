@@ -242,6 +242,68 @@ function fileExistsError(kind) {
   return error;
 }
 
+
+/**
+ * رسمی کردنِ یک پیش‌نویس.
+ *
+ * ── چرا یک دکمه لازم بود ──
+ *
+ * پیش‌نویس دو چیز دارد که نمی‌گذارد اجرا شود، و هر دو باید با هم عوض شوند:
+ *
+ *   ۱. `status: draft` — تا هست، رگرسیون شمرده نمی‌شود
+ *   ۲. جایش در `_drafts/` — زیرپوشه است و `loadScenarios` نمی‌بیندش
+ *
+ * کاربر می‌توانست وضعیت را دستی عوض کند و «ذخیره» بزند، ولی فایل همان‌جا
+ * می‌ماند و هیچ‌وقت اجرا نمی‌شد — بدترین حالت: کاری که به نظر انجام شده و
+ * نشده. پس هر دو با هم انجام می‌شوند یا هیچ‌کدام.
+ *
+ * فایل تازه با `wx` نوشته می‌شود، پس اگر نامی با همان عنوان از قبل باشد،
+ * چیزی بازنویسی نمی‌شود.
+ */
+export async function promoteScenario({ target, relative }) {
+  const key = assertSafeSegment(target, "هدف");
+  const safeRelative = assertScenarioPath(relative);
+
+  const { file } = await existingFileInside(SCENARIOS_DIR, key, safeRelative);
+  const source = await fsp.readFile(file, "utf8");
+
+  const doc = YAML.parse(source);
+  if (!doc || typeof doc !== "object") throw new Error("این فایل سناریوی معتبری نیست");
+
+  // فقط همین یک کلید عوض می‌شود؛ بقیهٔ فایل — کامنت‌ها هم — دست‌نخورده می‌ماند.
+  const promoted = /^status:\s*\S+\s*$/m.test(source)
+    ? source.replace(/^status:\s*\S+\s*$/m, "status: approved")
+    : `status: approved${eolOf(source)}${source}`;
+
+
+  // پیشوندِ «[پیش‌نویس]» هم می‌رود: همین نام است که در فهرست اجرا و در
+  // گزارش دیده می‌شود، و سناریوی رسمی نباید پیش‌نویس صدا زده شود.
+  const named = promoted.replace(
+    /^(name:\s*["']?)\s*\[پیش‌نویس\]\s*/m,
+    "$1"
+  );
+
+  const targetRelative = safeRelative.replace(/^_drafts\//, "");
+  if (targetRelative === safeRelative && doc.status !== "draft") {
+    throw new Error("این سناریو از قبل رسمی است");
+  }
+
+  const destination = await ensureWritableInside(SCENARIOS_DIR, key, targetRelative);
+  if (destination !== file) {
+    await fsp.writeFile(destination, named, { encoding: "utf8", flag: "wx" });
+    await fsp.rm(file, { force: true });
+  } else {
+    await fsp.writeFile(destination, named, "utf8");
+  }
+
+  return { relative: targetRelative, movedFrom: destination === file ? null : safeRelative };
+}
+
+/** پایان‌خطِ همان فایل، تا سطر تازه با بقیه هم‌شکل باشد. */
+function eolOf(source) {
+  return source.includes("\r\n") ? "\r\n" : "\n";
+}
+
 export async function writeProjectFile({ kind, target, relative, content, createOnly = false }) {
   const key = assertSafeSegment(target, 'هدف');
   const source = String(content ?? '');

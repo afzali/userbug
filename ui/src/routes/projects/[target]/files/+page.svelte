@@ -45,6 +45,39 @@
   // پروژه از لایهٔ فضای کاری می‌آید، پس کشویی انتخاب پروژه اینجا لازم نیست.
   let project = $derived(data.project);
   let dirty = $derived(content !== original);
+  let promoting = $state(false);
+
+  /**
+   * فایلِ باز پیش‌نویس است؟
+   *
+   * دو نشانه دارد و هر کدام کافی است: کلید `status: draft` در متن، یا
+   * نشستن در پوشهٔ `_drafts/`. دومی مهم‌تر است — موتور فقط سطح بالا را
+   * می‌خواند، پس فایلِ آنجا حتی با وضعیت approved هم اجرا نمی‌شود.
+   */
+  const isDraft = $derived(
+    data.kind === 'scenario' &&
+      Boolean(data.file) &&
+      (/^status:s*drafts*$/m.test(content) || String(data.relative || '').startsWith('_drafts/'))
+  );
+
+  async function promote() {
+    if (dirty && !confirm('تغییرات ذخیره‌نشده کنار گذاشته می‌شود. ادامه؟')) return;
+    promoting = true;
+    feedback = '';
+    try {
+      const response = await fetch('/api/scenarios/promote', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({ target: data.target, relative: data.relative }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'رسمی نشد');
+      location.href = fileHref(payload.relative);
+    } catch (cause) {
+      feedback = cause.message;
+      promoting = false;
+    }
+  }
 
   const base = $derived(`/projects/${encodeURIComponent(data.target)}/files`);
   const fileHref = (relative) => `${base}?kind=scenario&relative=${encodeURIComponent(relative)}`;
@@ -198,7 +231,21 @@
     </Card.Root>
   {:else}
   <Card.Root class="min-w-0 gap-0 overflow-hidden py-0">
-    <div class="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4"><div><strong class="code-value block">{data.file?.relative || 'فایلی انتخاب نشده'}</strong><span class="text-xs text-muted-foreground">{data.file?.kind === 'target' ? 'پیکربندی هدف' : 'سناریو'}</span></div><div class="flex items-center gap-2">{#if dirty}<span class="text-xs text-amber-600 dark:text-amber-300">ذخیره‌نشده</span>{/if}<Button onclick={save} disabled={!dirty || saving || !data.file}>{saving ? 'در حال بررسی…' : 'اعتبارسنجی و ذخیره'}</Button></div></div>
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4"><div><strong class="code-value block">{data.file?.relative || 'فایلی انتخاب نشده'}</strong><span class="text-xs text-muted-foreground">{data.file?.kind === 'target' ? 'پیکربندی هدف' : isDraft ? 'پیش‌نویس — تا رسمی نشود اجرا نمی‌شود' : 'سناریو'}</span></div><div class="flex items-center gap-2">
+        {#if dirty}<span class="text-xs text-amber-600 dark:text-amber-300">ذخیره‌نشده</span>{/if}
+        {#if isDraft}
+          <!--
+            رسمی کردن، یک دکمه.
+            پیش‌تر باید هم `status` را دستی عوض می‌کردید هم فایل را از
+            `_drafts/` بیرون می‌آوردید؛ و اگر دومی را فراموش می‌کردید، سناریو
+            رسمی به نظر می‌رسید و هرگز اجرا نمی‌شد.
+          -->
+          <Button variant="secondary" onclick={promote} disabled={promoting}>
+            {promoting ? 'در حال رسمی کردن…' : 'تأیید و رسمی کردن'}
+          </Button>
+        {/if}
+        <Button onclick={save} disabled={!dirty || saving || !data.file}>{saving ? 'در حال بررسی…' : 'اعتبارسنجی و ذخیره'}</Button>
+      </div></div>
     {#if data.file}<CodeView bind:value={content} language={data.file.relative?.endsWith('.js') ? 'js' : 'yaml'} minHeight="70vh" />{:else}<div class="grid min-h-[60vh] place-items-center text-muted-foreground">{data.fileError || 'فایلی انتخاب نشده است'}</div>{/if}
     {#if feedback}<div class={`border-t px-5 py-3 text-sm ${feedback.includes('ذخیره شد') ? 'text-emerald-700 dark:text-emerald-300' : 'text-destructive'}`}>{feedback}</div>{/if}
   </Card.Root>
