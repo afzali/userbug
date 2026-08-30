@@ -144,14 +144,33 @@ async function execute({ page, ub, ctx, step }) {
       return;
 
     /**
-     * حلقه روی مجموعه‌ای از مقدارها.
+     * حلقه روی مجموعه‌ای از مقدارها، یا `n` بار.
      *
-     * برای سنجیدن دادهٔ بدخیم لازم است: همان چند قدم با ده رشتهٔ متفاوت. بدون
-     * آن یا سناریو ده برابر می‌شد یا فقط یک نمونه را می‌آزمودیم.
+     * `in` برای سنجیدن دادهٔ بدخیم لازم بود: همان چند قدم با ده رشتهٔ متفاوت.
+     *
+     * `times` برای سنجشِ حجم اضافه شد. «n یادداشت بساز» را نمی‌شد با فهرستِ
+     * ادبی نوشت جز با تکرارِ دستیِ n سطر، و آن‌وقت عددِ حجم در دلِ داده گم
+     * می‌شد. شمارنده از ۱ شروع می‌شود تا در عنوان‌ها خوانا باشد.
      */
     case 'forEach': {
-      const { var: name, in: values } = body;
-      for (const value of values) {
+      const { var: name, in: values, times } = body;
+
+      let sequence;
+      if (times !== undefined) {
+        if (values !== undefined) throw new Error('forEach یا `in` می‌گیرد یا `times`، نه هر دو');
+        const count = Number(times);
+        // سقف عمدی: یک `times` تایپی نباید اجرا را تا بی‌نهایت ببرد
+        if (!Number.isInteger(count) || count < 1 || count > 500) {
+          throw new Error(`forEach.times باید عددی صحیح بین ۱ و ۵۰۰ باشد؛ «${times}» نبود`);
+        }
+        sequence = Array.from({ length: count }, (_, index) => index + 1);
+      } else if (Array.isArray(values)) {
+        sequence = values;
+      } else {
+        throw new Error(`forEach نامفهوم: ${JSON.stringify(body)}`);
+      }
+
+      for (const value of sequence) {
         ctx.vars[name] = value;
         for (const sub of raw.then || []) {
           await execute({ page, ub, ctx, step: normalizeStep(sub) });
