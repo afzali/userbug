@@ -27,6 +27,7 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --scenario <مسیر>           فیلتر روی مسیر فایل سناریو
       --grep <عنوان>              فیلتر روی عنوان تست
       --persona <novice|pro>      سرعت و رفتار کاربر؛ بر سناریو می‌چربد
+      --depth <n>                 سقف قدمِ هر کاوش؛ بر سناریو می‌چربد
       --device <a,b>              یک یا چند دستگاه؛ هر کدام یک اجرای جدا
       --author                    از کاوش، پیش‌نویس سناریو بنویس
       --headed                    مرورگر دیده شود
@@ -200,10 +201,32 @@ function writeRunnerFailureJUnit(file, { runId, target, device, detail }) {
   }
 }
 
+/**
+ * `--depth` — سقف قدمِ هر کاوش.
+ *
+ * عمق را عمداً به‌شکل عددِ قدم می‌گیریم، نه نامی مثل «کم/متوسط/زیاد». هر قدمِ
+ * کاوش یک فراخوانی مدل است، پس عدد همان هزینه است؛ نامِ خوش‌آهنگ فقط پنهانش
+ * می‌کرد.
+ *
+ * ورودیِ نامعتبر بلند می‌شکند، نه اینکه بی‌صدا نادیده گرفته شود: یک `--depth`
+ * تایپیِ رد‌شده یعنی کاربر فکر می‌کند عمق را عوض کرده و نکرده — همان شکستِ
+ * خاموشی که این ابزار برای شکارش هست.
+ */
+function parseDepth(flag) {
+  if (flag === undefined) return null;
+  const depth = Number(flag);
+  if (!Number.isInteger(depth) || depth < 1 || depth > 100) {
+    throw new Error(`--depth باید عددی صحیح بین ۱ و ۱۰۰ باشد؛ «${flag}» نبود`);
+  }
+  return depth;
+}
+
 // ── زیرفرمان‌ها ──
 
 function cmdRun({ flags, positional }) {
   const target = positional[0] || 'nepi';
+  // پیش از spawn اعتبارسنجی می‌شود تا خطای پرچم، وسط اجرا پیدا نشود
+  const depth = parseDepth(flags.depth);
   const devices = String(flags.device || '')
     .split(',')
     .map((d) => d.trim())
@@ -252,6 +275,7 @@ function cmdRun({ flags, positional }) {
     const env = { ...process.env, UB_TARGET: target, UB_RUN_ID: runId };
     if (device) env.UB_DEVICE = device;
     if (flags.persona) env.UB_PERSONA = String(flags.persona);
+    if (depth) env.UB_DEPTH = String(depth);
     if (flags.author) env.UB_AUTHOR = '1';
     if (flags.file) env.UB_SCENARIO_FILE = String(flags.file);
 

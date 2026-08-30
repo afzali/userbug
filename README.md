@@ -72,6 +72,7 @@ node bin/userbug.js run nepi
 | `run nepi --device "desktop,Pixel 7"` | ماتریس دستگاه — هر کدام یک اجرای جدا |
 | `run nepi --headed` | مرورگر دیده شود |
 | `run nepi --repeat 3` | هر سناریو سه بار (برای سنجیدن تکرارپذیری) |
+| `run nepi --depth 20` | سقف قدمِ هر کاوش؛ بر سناریو می‌چربد |
 | `list` | فهرست اجراهای گذشته |
 | `report latest` | بازسازی گزارش از مخزن، **بدون اجرای دوباره** |
 | `replay <runId> --only-findings` | همان هدف و دستگاه و سناریوها، دوباره |

@@ -462,7 +462,17 @@ async function execute({ page, ub, ctx, step }) {
      */
     case 'explore': {
       const goal = typeof body === 'string' ? body : body.goal;
-      const maxSteps = typeof body === 'object' ? body.maxSteps : undefined;
+
+      // همان ترتیبِ پرسونا: `--depth` بر سناریو می‌چربد، تا بشود همان سناریو
+      // را یک بار کم‌عمق برای دیدنِ مسیر و یک بار عمیق برای شکار اجرا کرد،
+      // بدون دست زدن به فایل.
+      const fromFlag = Number(process.env.UB_DEPTH);
+      const maxSteps = Number.isInteger(fromFlag) && fromFlag > 0
+        ? fromFlag
+        : typeof body === 'object'
+          ? body.maxSteps
+          : undefined;
+
       // نوشتنِ پیش‌نویس یا از سناریو می‌آید یا از پرچم خط فرمان
       const author = (typeof body === 'object' && body.author) || process.env.UB_AUTHOR === '1';
       await explore({ page, ub, ctx, goal, maxSteps, author, preamble: ctx.executed });

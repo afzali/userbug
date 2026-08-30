@@ -20,6 +20,7 @@
   let scenario = $state('');
   let device = $state('');
   let persona = $state('');
+  let depth = $state('');
   let repeat = $state(1);
   let headed = $state(false);
   let author = $state(false);
@@ -86,7 +87,7 @@
       const response = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ target, grep: scenario, device, persona, repeat, headed, author }),
+        body: JSON.stringify({ target, grep: scenario, device, persona, depth, repeat, headed, author }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'اجرا شروع نشد');
@@ -165,12 +166,19 @@
             <Input type="number" min="1" max="10" bind:value={repeat} disabled={busy} />
           </label>
         </div>
-        <label class="block space-y-1.5 text-sm font-medium">
-          <span>رفتار کاربر</span>
-          <select class="app-select" bind:value={persona} disabled={busy}>
-            <option value="">پیش‌فرض سناریو</option><option value="novice">تازه‌کار</option><option value="pro">حرفه‌ای</option>
-          </select>
-        </label>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label class="block space-y-1.5 text-sm font-medium">
+            <span>رفتار کاربر</span>
+            <select class="app-select" bind:value={persona} disabled={busy}>
+              <option value="">پیش‌فرض سناریو</option><option value="novice">تازه‌کار</option><option value="pro">حرفه‌ای</option>
+            </select>
+          </label>
+          <!-- هر قدمِ کاوش یک فراخوانی مدل است، پس این عدد همان هزینه است. -->
+          <label class="block space-y-1.5 text-sm font-medium">
+            <span>عمق کاوش</span>
+            <Input type="number" min="1" max="100" bind:value={depth} placeholder="پیش‌فرض سناریو" disabled={busy} />
+          </label>
+        </div>
         <div class="flex flex-wrap gap-4 text-sm text-muted-foreground">
           <label class="flex items-center gap-2"><input type="checkbox" bind:checked={headed} disabled={busy} /> مرورگر دیده شود</label>
           <label class="flex items-center gap-2"><input type="checkbox" bind:checked={author} disabled={busy} /> ساخت پیش‌نویس کاوش</label>
