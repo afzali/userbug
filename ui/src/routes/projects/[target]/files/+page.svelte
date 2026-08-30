@@ -3,8 +3,10 @@
   import * as Card from '$lib/components/ui/card/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
-  import { onMount } from 'svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import ScenarioList from '$lib/components/ScenarioList.svelte';
+  import CodeView from '$lib/components/CodeView.svelte';
+  import ModelPicker from '$lib/components/ModelPicker.svelte';
 
   let { data } = $props();
   // editor باید نسخهٔ قابل‌ویرایش snapshot اولیه را نگه دارد.
@@ -16,10 +18,16 @@
   // svelte-ignore state_referenced_locally
   let feedback = $state(data.fileError || '');
   let newPath = $state('my-test.yml');
+  /**
+   * «با هوش مصنوعی» یا «فایل خالی».
+   *
+   * پیش‌فرض روی AI است، چون همان چیزی است که این محصول رویش بنا شده؛ فایل
+   * خالی راهِ فرار است نه راهِ اصلی.
+   */
+  let mode = $state('ai');
   let creating = $state(false);
   let intent = $state('');
   let model = $state('');
-  let models = $state([]);
   let drafting = $state(false);
   /**
    * خواندن سورس، خاموش به‌صورت پیش‌فرض.
@@ -38,12 +46,6 @@
 
   const base = $derived(`/projects/${encodeURIComponent(data.target)}/files`);
   const fileHref = (relative) => `${base}?kind=scenario&relative=${encodeURIComponent(relative)}`;
-
-  function goFile(event) {
-    if (dirty && !confirm('تغییرات ذخیره‌نشده کنار گذاشته شود؟')) return;
-    const value = event.currentTarget.value;
-    location.href = value === 'target' ? base : fileHref(value);
-  }
 
   async function save() {
     if (!data.file) return;
@@ -128,16 +130,6 @@
       creating = false;
     }
   }
-
-  // فهرست مدل‌ها بی‌صدا می‌آید: نیامدنش یعنی «پیش‌فرض کانفیگ» که همیشه کار می‌کند.
-  onMount(async () => {
-    try {
-      const response = await fetch('/api/models?free=1&limit=60');
-      if (response.ok) models = (await response.json()).models || [];
-    } catch {
-      models = [];
-    }
-  });
 </script>
 
 <PageHeader
@@ -150,31 +142,81 @@
 </PageHeader>
 
 <div class="grid gap-6 lg:grid-cols-[19rem_minmax(0,1fr)]">
-  <Card.Root class="h-fit gap-5 lg:sticky lg:top-20">
-    <Card.Header><Card.Title>فایل‌ها</Card.Title><Card.Description>{project?.baseURL || 'آدرس هدف مشخص نیست'}</Card.Description></Card.Header>
-    <Card.Content class="space-y-4">
-      <label class="block space-y-1.5 text-sm font-medium"><span>فایل</span><select class="app-select" value={data.kind === 'target' ? 'target' : data.relative} onchange={goFile}><option value="target">{data.target}.config.js</option>{#each project?.scenarios || [] as scenario}<option value={scenario.path}>{scenario.path}{scenario.status === 'invalid' ? ' ⚠' : ''}</option>{/each}</select></label>
-      <div class="rounded-lg bg-muted p-3 text-xs leading-6 text-muted-foreground"><strong class="block text-foreground">{project?.environment || '—'} · {project?.device || '—'}</strong>{formatCount(project?.scenarios?.length || 0)} سناریو در پوشهٔ پروژه</div>
-      <div class="space-y-2 border-t pt-4"><label for="new-scenario-path" class="block text-sm font-medium">سناریوی تازه</label><Input id="new-scenario-path" bind:value={newPath} dir="ltr" placeholder="my-test.yml" /><Button variant="outline" class="w-full" onclick={createScenario} disabled={creating || !newPath}>{creating ? 'در حال ساخت…' : 'ساخت فایل YAML'}</Button></div>
+  <div class="space-y-6 lg:sticky lg:top-20 lg:h-fit">
+    <Card.Root class="gap-4">
+      <Card.Header>
+        <Card.Title>فایل‌های پروژه</Card.Title>
+        <Card.Description>هر جنس، دستهٔ خودش. کلیک کنید تا در ویرایشگر باز شود.</Card.Description>
+      </Card.Header>
+      <Card.Content>
+        <ScenarioList
+          scenarios={project?.scenarios || []}
+          target={data.target}
+          activeKind={data.kind}
+          activeRelative={data.relative}
+        />
+      </Card.Content>
+    </Card.Root>
 
-      <div class="space-y-2 border-t pt-4">
-        <label for="scenario-intent" class="block text-sm font-medium">یا با متن بنویسید</label>
-        <p class="text-xs leading-6 text-muted-foreground">بگویید کاربر چه می‌کند و چه باید ببیند. هوش مصنوعی آن را به YAML تبدیل می‌کند و پیش از ذخیره نشانتان می‌دهد.</p>
-        <Textarea id="scenario-intent" bind:value={intent} rows={5} class="text-sm leading-6" placeholder="ثبت‌نام کن، کد بازیابی را دانلود کن، خارج شو و با همان کد برگرد" />
-        <Input bind:value={model} list="draft-model-options" dir="ltr" spellcheck="false" placeholder="پیش‌فرض کانفیگ" />
-        <datalist id="draft-model-options">{#each models as item (item.id)}<option value={item.id}>{item.name}</option>{/each}</datalist>
-        {#if project?.sourceRoot}
-          <label class="flex items-start gap-2 text-xs leading-6">
-            <input type="checkbox" bind:checked={useSource} class="mt-1.5" />
-            <span>سورس پروژه هم خوانده شود تا برچسب‌ها حدسی نباشند. <strong class="text-foreground">محتوای فایل‌های مرتبط به مدل فرستاده می‌شود.</strong></span>
+    <!--
+      سناریوی تازه، به‌شکل پله.
+      پیش‌تر دو فرمِ جدا زیر هم بودند — «فایل خالی» و «با متن» — بی‌آنکه معلوم
+      باشد کدام کجا تمام می‌شود. حالا اول راه انتخاب می‌شود، بعد ورودی، بعد
+      بازبینی.
+    -->
+    <Card.Root class="gap-4">
+      <Card.Header>
+        <Card.Title>سناریوی تازه</Card.Title>
+        <Card.Description>
+          {mode === 'ai' ? 'گام ۱ از ۳ — بگویید کاربر چه می‌کند' : 'یک فایل خالی بسازید و خودتان بنویسید'}
+        </Card.Description>
+      </Card.Header>
+      <Card.Content class="space-y-4">
+        <div class="flex overflow-hidden rounded-lg border text-sm">
+          <button type="button" class={`flex-1 px-3 py-2 ${mode === 'ai' ? 'bg-accent font-medium' : 'text-muted-foreground hover:bg-accent/50'}`} onclick={() => (mode = 'ai')}>با هوش مصنوعی</button>
+          <button type="button" class={`flex-1 px-3 py-2 ${mode === 'blank' ? 'bg-accent font-medium' : 'text-muted-foreground hover:bg-accent/50'}`} onclick={() => (mode = 'blank')}>فایل خالی</button>
+        </div>
+
+        {#if mode === 'blank'}
+          <label for="new-scenario-path" class="block space-y-1.5 text-sm font-medium">
+            <span>نام فایل</span>
+            <Input id="new-scenario-path" bind:value={newPath} dir="ltr" placeholder="my-test.yml" />
           </label>
+          <Button variant="outline" class="w-full" onclick={createScenario} disabled={creating || !newPath}>
+            {creating ? 'در حال ساخت…' : 'ساخت فایل YAML'}
+          </Button>
         {:else}
-          <p class="text-xs leading-6 text-muted-foreground">برای خواندن سورس، کلید <span class="code-value">source.root</span> را در کانفیگ این پروژه بگذارید.</p>
+          <label for="scenario-intent" class="block space-y-1.5 text-sm font-medium">
+            <span>کاربر چه می‌کند و چه باید ببیند؟</span>
+            <Textarea id="scenario-intent" bind:value={intent} rows={5} class="text-sm leading-6" placeholder="ثبت‌نام کن، کد بازیابی را دانلود کن، خارج شو و با همان کد برگرد" />
+          </label>
+
+          <ModelPicker bind:value={model} disabled={drafting} />
+
+          <div class="rounded-lg border bg-muted/40 p-3">
+            <p class="mb-1 text-xs font-semibold">سورس پروژه</p>
+            {#if project?.sourceRoot}
+              <p dir="ltr" class="mb-2 truncate font-mono text-[11px] text-muted-foreground">{project.sourceRoot}</p>
+              <label class="flex items-start gap-2 text-xs leading-6">
+                <input type="checkbox" bind:checked={useSource} class="mt-1.5" />
+                <span>خوانده شود تا برچسب‌ها حدسی نباشند. <strong class="text-foreground">محتوای فایل‌های مرتبط به مدل می‌رود.</strong></span>
+              </label>
+            {:else}
+              <p class="text-xs leading-6 text-muted-foreground">
+                تعریف نشده. برای خواندن سورس، کلید <span class="code-value">source.root</span> را در
+                <a class="underline underline-offset-4" href={`/projects/${encodeURIComponent(data.target)}/files?kind=target`}>تنظیمات پروژه</a>
+                بگذارید.
+              </p>
+            {/if}
+          </div>
+
+          <Button variant="outline" class="w-full" onclick={draftFromText} disabled={drafting || intent.trim().length < 10}>
+            {drafting ? 'مدل مشغول است…' : 'ساخت پیش‌نویس'}
+          </Button>
         {/if}
-        <Button variant="outline" class="w-full" onclick={draftFromText} disabled={drafting || intent.trim().length < 10}>{drafting ? 'مدل مشغول است…' : 'ساخت با هوش مصنوعی'}</Button>
-      </div>
-    </Card.Content>
-  </Card.Root>
+      </Card.Content>
+    </Card.Root>
+  </div>
 
   {#if draft}
     <!--
@@ -185,11 +227,11 @@
       <div class="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
         <div>
           <strong class="block">{draft.name}</strong>
-          <span class="text-xs text-muted-foreground">{formatCount(draft.steps)} قدم · پیش‌نویس · {draft.model}</span>
+          <span class="text-xs text-muted-foreground">گام ۲ از ۳ — بازبینی · {formatCount(draft.steps)} قدم · {draft.model}</span>
         </div>
         <div class="flex items-center gap-2">
           <Button variant="ghost" onclick={() => { draft = null; }}>دور بریز</Button>
-          <Button onclick={saveDraft} disabled={creating || !draftPath}>{creating ? 'در حال ذخیره…' : 'ذخیره به‌عنوان سناریو'}</Button>
+          <Button onclick={saveDraft} disabled={creating || !draftPath}>{creating ? 'در حال ذخیره…' : 'گام ۳ — ذخیره'}</Button>
         </div>
       </div>
       <div class="space-y-3 border-b px-5 py-4">
@@ -204,13 +246,13 @@
           </div>
         {/if}
       </div>
-      <Textarea bind:value={draft.yaml} spellcheck="false" class="scroll-thin min-h-[55vh] resize-y rounded-none border-0 p-5 font-mono text-sm leading-7 focus-visible:ring-0" dir="ltr" />
+      <CodeView bind:value={draft.yaml} language="yaml" minHeight="55vh" />
       {#if feedback}<div class="border-t px-5 py-3 text-sm text-destructive">{feedback}</div>{/if}
     </Card.Root>
   {:else}
   <Card.Root class="min-w-0 gap-0 overflow-hidden py-0">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4"><div><strong class="code-value block">{data.file?.relative || 'فایلی انتخاب نشده'}</strong><span class="text-xs text-muted-foreground">{data.file?.kind === 'target' ? 'پیکربندی هدف' : 'سناریو'}</span></div><div class="flex items-center gap-2">{#if dirty}<span class="text-xs text-amber-600 dark:text-amber-300">ذخیره‌نشده</span>{/if}<Button onclick={save} disabled={!dirty || saving || !data.file}>{saving ? 'در حال بررسی…' : 'اعتبارسنجی و ذخیره'}</Button></div></div>
-    {#if data.file}<Textarea bind:value={content} spellcheck="false" class="scroll-thin min-h-[70vh] resize-y rounded-none border-0 p-5 font-mono text-sm leading-7 focus-visible:ring-0" dir="ltr" />{:else}<div class="grid min-h-[60vh] place-items-center text-muted-foreground">{data.fileError || 'فایلی انتخاب نشده است'}</div>{/if}
+    {#if data.file}<CodeView bind:value={content} language={data.file.relative?.endsWith('.js') ? 'js' : 'yaml'} minHeight="70vh" />{:else}<div class="grid min-h-[60vh] place-items-center text-muted-foreground">{data.fileError || 'فایلی انتخاب نشده است'}</div>{/if}
     {#if feedback}<div class={`border-t px-5 py-3 text-sm ${feedback.includes('ذخیره شد') ? 'text-emerald-700 dark:text-emerald-300' : 'text-destructive'}`}>{feedback}</div>{/if}
   </Card.Root>
   {/if}
