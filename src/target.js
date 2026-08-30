@@ -16,7 +16,10 @@ export async function loadTarget(name) {
   t.device ??= 'desktop';
   t.allowlist ??= [];
   t.logs ??= [];
-  t.isolation ??= { mode: 'fresh-signup' };
+  // نبودِ isolation یعنی «هیچ» — نه «ثبت‌نام تازه». این مقدار در `run.json`
+  // می‌نشیند و گزارش می‌شود، پس ادعای جداسازی‌ای که وجود ندارد، خواننده را
+  // گمراه می‌کند. هدفِ جعبه‌سیاه دقیقاً همین حالت است.
+  t.isolation ??= { mode: 'none' };
   t.key = name;
   return t;
 }

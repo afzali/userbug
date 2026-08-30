@@ -1,0 +1,40 @@
+name: ناوبری بین صفحه‌های رابط
+status: approved
+
+# نخستین سناریوی یک هدفِ غیرِ نپی.
+#
+# کارش ساده است و عمداً ساده مانده: چهار صفحهٔ اصلی را مثل کاربر باز می‌کند و
+# می‌گوید آیا رسیدند. ارزشش در چیزی است که همین حین **خودکار** سنجیده می‌شود —
+# هر خطای جاوااسکریپت، هر promise رهاشده و هر پاسخ ۴xx/۵xx در همان قدم یافته
+# می‌شود، بدون اینکه سناریو چیزی درباره‌شان بنویسد.
+#
+# روی هدفی بدون لاگ سرور و بدون سورس، این تنها لایهٔ رصد است.
+
+steps:
+  - as: باز کردن داشبورد
+    clearState: true
+  - go: /
+  - expect: { visible: { role: heading, name: "اجرای سناریو مثل یک کاربر واقعی" } }
+
+  - as: رفتن به تریاژ
+    click: { role: link, name: "تریاژ" }
+  - expect: { url: "/triage" }
+  - expect: { visible: { role: heading, name: "تریاژ یافته‌ها" } }
+
+  - as: رفتن به مقایسه
+    click: { role: link, name: "مقایسه" }
+  - expect: { url: "/compare" }
+  - expect: { visible: { role: heading, name: "مقایسهٔ دو اجرا" } }
+
+  - as: رفتن به فایل‌ها
+    click: { role: link, name: "فایل‌ها" }
+  - expect: { url: "/files" }
+  - expect: { visible: { role: heading, name: "پروژه‌ها و سناریوها" } }
+
+  - as: بازگشت با دکمهٔ back مرورگر
+    back: true
+  - expect: { url: "/compare" }
+
+  - as: بازگشت به داشبورد
+    click: { role: link, name: "داشبورد" }
+  - expect: { visible: { role: heading, name: "اجرای سناریو مثل یک کاربر واقعی" } }

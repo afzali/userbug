@@ -29,6 +29,15 @@ const INVALID_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g;
 const FAILED_TEST_STATUSES = new Set(['failed', 'timedOut', 'timedout', 'interrupted']);
 
 /**
+ * تستی که اجرا نشده، نه سبز است نه قرمز.
+ *
+ * سناریویی که به‌عمد رد می‌شود (مثلاً خودآزمایی که به DOM هدفِ دیگری وابسته
+ * است) اگر مثل بقیه رندر شود، در CI «موفق» شمرده می‌شود و شمار پاس را باد
+ * می‌کند — یعنی پوشش نداشته را پوشش نشان می‌دهد.
+ */
+const SKIPPED_TEST_STATUSES = new Set(['skipped']);
+
+/**
  * وضعیت‌هایی که یعنی «اجرا به نتیجه رسید» — فهرستِ خوب‌ها، نه فهرستِ بدها.
  *
  * فهرستِ بدها fail-open است: `undefined` یا هر وضعیت ناشناختهٔ آیندهٔ پلی‌رایت
@@ -154,6 +163,8 @@ export function renderJUnit({ run, steps, findings, traces = [] }) {
       name,
       time: own.reduce((sum, step) => sum + (step.ms || 0), 0),
       steps: own.length,
+      // یافته بر skip می‌چربد: اگر چیزی ثبت شده، تست واقعاً اجرا شده است.
+      skipped: !unique.length && !brokenTest && SKIPPED_TEST_STATUSES.has(String(status)),
       failure: reasons.length
         ? {
             message: reasons.join(' · '),
@@ -220,8 +231,24 @@ export function renderJUnit({ run, steps, findings, traces = [] }) {
     });
   }
 
+  /**
+   * اجرایی که همهٔ تست‌هایش رد شده، پوششی ندارد.
+   *
+   * `failures="0"` در آن حالت درست است ولی گمراه‌کننده: «هیچ‌چیز اجرا نشد» با
+   * «همه‌چیز سالم بود» یک رنگ می‌شود. همان استدلالِ «فایل بی‌testcase ممنوع»،
+   * یک پله بالاتر.
+   */
+  if (cases.length && cases.every((item) => item.skipped)) {
+    errors.push({
+      name: 'پوشش صفر',
+      message: `همهٔ ${cases.length} سناریو رد شدند؛ این اجرا هیچ چیزی را نسنجید`,
+      body: context(),
+    });
+  }
+
   const total = cases.length + errors.length;
   const failures = cases.filter((item) => item.failure).length;
+  const skipped = cases.filter((item) => item.skipped).length;
 
   /**
    * زمان از جمع قدم‌ها می‌آید، نه از `startedAt` تا `finishedAt`.
@@ -241,6 +268,9 @@ export function renderJUnit({ run, steps, findings, traces = [] }) {
   const body = [
     ...cases.map((item) => {
       const open = `    <testcase classname="${esc(className)}" name="${esc(item.name)}" time="${seconds(item.time)}"`;
+      if (item.skipped) {
+        return [`${open}>`, '      <skipped message="این سناریو اجرا نشد"/>', '    </testcase>'].join('\n');
+      }
       if (!item.failure) return `${open}/>`;
       return [
         `${open}>`,
@@ -259,7 +289,7 @@ export function renderJUnit({ run, steps, findings, traces = [] }) {
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites name="userbug" tests="${total}" failures="${failures}" errors="${errors.length}" time="${seconds(suiteTime)}">
-  <testsuite name="${esc(suiteName)}" tests="${total}" failures="${failures}" errors="${errors.length}" skipped="0" time="${seconds(suiteTime)}" timestamp="${esc(run.startedAt || '')}">
+  <testsuite name="${esc(suiteName)}" tests="${total}" failures="${failures}" errors="${errors.length}" skipped="${skipped}" time="${seconds(suiteTime)}" timestamp="${esc(run.startedAt || '')}">
     <properties>
 ${properties(run)}
     </properties>

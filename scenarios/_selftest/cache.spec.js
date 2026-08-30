@@ -21,7 +21,20 @@ import { resolveModel, DEFAULTS } from '../../src/models/config.js';
 
 test.use({ probe: true });
 
+/**
+ * دو سنجشِ امضا به DOM نپی وابسته‌اند — مسیر `/login` و دکمهٔ «ورود / ثبت‌نام».
+ *
+ * وقتی هدف دوم وصل شد، همین فایل با baseURL آن اجرا شد و شکست. آن شکست هیچ
+ * چیزی دربارهٔ امضا نمی‌گفت؛ فقط می‌گفت «آن اپ صفحهٔ ورودِ نپی را ندارد» —
+ * یعنی نویزی که گزارش را بی‌اعتبار می‌کند. پس وابستگی صریح اعلام می‌شود.
+ *
+ * سنجش‌های بی‌مرورگرِ همین فایل (ماسک و لایه‌بندی مدل) روی هر هدفی اجرا
+ * می‌شوند، چون به هیچ اپی کار ندارند.
+ */
+const NEEDS_NEPI_DOM = (process.env.UB_TARGET || 'nepi') !== 'nepi';
+
 test('امضا بین دو رندر پایدار می‌ماند', async ({ page, ub }) => {
+  test.skip(NEEDS_NEPI_DOM, 'به صفحهٔ ورود نپی وابسته است');
   let first;
 
   await ub.step('امضای دکمهٔ ورود', async () => {
@@ -50,6 +63,7 @@ test('امضا بین دو رندر پایدار می‌ماند', async ({ page
 });
 
 test('امضا تغییرِ ساختاری را می‌گیرد', async ({ page, ub }) => {
+  test.skip(NEEDS_NEPI_DOM, 'به صفحهٔ ورود نپی وابسته است');
   await ub.step('امضا پیش و پس از جابه‌جایی عنصر', async () => {
     await page.goto('/');
     await page.waitForURL(/\/login/, { timeout: 20_000 });
