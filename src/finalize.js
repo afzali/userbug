@@ -30,7 +30,8 @@ import { dedupe } from './observe/oracle.js';
 function summarizeAi(events) {
   const rows = events.filter((e) => e.kind === 'ai');
   if (!rows.length) return null;
-  return rows.reduce(
+
+  const totals = rows.reduce(
     (acc, r) => ({
       cache: acc.cache + (r.cache || 0),
       model: acc.model + (r.model || 0),
@@ -41,6 +42,11 @@ function summarizeAi(events) {
     }),
     { cache: 0, model: 0, healed: 0, verified: 0, calls: 0, costUsd: 0 }
   );
+
+  // فهرست است نه یک رشته، چون `--model` روی کل اجرا اثر می‌گذارد ولی کانفیگِ
+  // هدف می‌تواند برای هر نقش مدل دیگری بدهد.
+  totals.slugs = [...new Set(rows.map((r) => r.slug).filter(Boolean))];
+  return totals;
 }
 
 /**
@@ -142,7 +148,9 @@ export function printSummary({ run, steps, unique, file, junitCopy }) {
     const a = run.ai;
     console.log(
       `  مدل: کش ${a.cache} · مدل ${a.model} · heal ${a.healed} · بازبینی ${a.verified} · ` +
-        `${a.calls} فراخوانی · $${a.costUsd}
+        `${a.calls} فراخوانی · $${a.costUsd}` +
+        (a.slugs?.length ? `\n  ${a.slugs.join(' · ')}` : '') +
+        `
 `
     );
   }

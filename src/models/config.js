@@ -47,6 +47,51 @@ export const DEFAULTS = {
 
 let globalCache;
 
+/**
+ * فهرست زندهٔ مدل‌ها.
+ *
+ * اسلاگ‌ها را از حافظه ننویسید: عوض می‌شوند، و مدلی که وجود ندارد با یک ۴۰۰
+ * وسط اجرا خودش را نشان می‌دهد نه پیش از آن.
+ *
+ * اینجا نشسته نه در CLI، چون رابط گرافیکی هم همین فهرست را برای کشویی انتخاب
+ * مدل می‌خواهد. دو تا واکشیِ جدا یعنی دو رفتار که دیر یا زود واگرا می‌شوند.
+ */
+export async function listModels({ free = false, limit = 200 } = {}) {
+  const response = await fetch(`${DEFAULTS.baseURL}/models`, {
+    headers: process.env.OPENROUTER_API_KEY
+      ? { authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` }
+      : {},
+  });
+  if (!response.ok) throw new Error(`فهرست مدل‌ها نیامد: ${response.status}`);
+
+  const all = (await response.json()).data || [];
+  return all
+    .filter((model) => (free ? String(model.id).endsWith(':free') : true))
+    .map((model) => ({
+      id: model.id,
+      name: model.name || model.id,
+      context: model.context_length || 0,
+      free: String(model.id).endsWith(':free'),
+    }))
+    .sort((a, b) => b.context - a.context)
+    .slice(0, Math.max(1, Math.min(500, Number(limit) || 200)));
+}
+
+/**
+ * اسلاگ مدل، اگر شکلش معقول باشد.
+ *
+ * اعتبارسنجی عمداً سبک است: فهرست مجاز را نگه نمی‌داریم چون اسلاگ‌ها عوض
+ * می‌شوند و ابزار نباید از فهرستِ زندهٔ ارائه‌دهنده عقب بماند. ولی رشتهٔ
+ * بی‌شکل هم نباید بی‌صدا رد شود و وسط اجرا با ۴۰۰ خودش را نشان دهد.
+ */
+export function assertModelSlug(value) {
+  const slug = String(value ?? '').trim();
+  if (!/^[\w.-]+\/[\w.:-]+$/.test(slug) || slug.length > 120) {
+    throw new Error(`اسلاگ مدل معتبر نیست: «${value}». نمونه: openai/gpt-4o-mini`);
+  }
+  return slug;
+}
+
 /** `userbug.config.js` کنار ریشه، اگر باشد. */
 export async function loadGlobalConfig() {
   if (globalCache) return globalCache;
@@ -63,7 +108,7 @@ export async function loadGlobalConfig() {
  * @param {object} opts.global   `userbug.config.js`
  * @param {object} opts.target   کانفیگ هدف
  * @param {string} opts.role     `resolve` | `author` | `analyze`
- * @param {string} [opts.model]  بازنویسیِ تک‌درخواست، از خودِ قدمِ سناریو
+ * @param {string} [opts.model]  بازنویسیِ تک‌درخواست — پرچم `--model` یا قدمِ سناریو
  */
 export function resolveModel({ global = {}, target = {}, role, model }) {
   const g = global.models || {};

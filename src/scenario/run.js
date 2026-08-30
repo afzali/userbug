@@ -38,7 +38,15 @@ export async function runScenario({ page, ub, identity, scenario }) {
   const persona = resolvePersona(process.env.UB_PERSONA || scenario.persona || 'novice');
 
   const globalConfig = await loadGlobalConfig();
-  const models = resolveModel({ global: globalConfig, target: ub.target, role: 'resolve' });
+  // `--model` بر کانفیگ هدف و پیش‌فرض کلی می‌چربد — همان ترتیبِ `--persona` و
+  // `--depth`: پرچم خط فرمان بر فایل. تا بشود همان سناریو را یک بار با مدل
+  // ارزان و یک بار با مدل قوی اجرا کرد و تفاوت را دید.
+  const models = resolveModel({
+    global: globalConfig,
+    target: ub.target,
+    role: 'resolve',
+    model: process.env.UB_MODEL || undefined,
+  });
 
   const ctx = {
     identity: { ...identity, local: identity.email.split('@')[0] },
@@ -98,6 +106,10 @@ export async function runScenario({ page, ub, identity, scenario }) {
         .appendEvent({
           kind: 'ai',
           scenario: scenario.name,
+          // کدام مدل، نه فقط چند فراخوانی. بدون این، «یک بار ارزان و یک بار قوی
+          // اجرا کن و تفاوت را ببین» از روی آرتیفکت‌ها قابل انجام نبود: هر دو
+          // اجرا یک‌شکل به نظر می‌رسیدند.
+          slug: `${models.provider}:${models.model}`,
           ...ctx.aiStats,
           budget: ctx.budget.snapshot(),
         })

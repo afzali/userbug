@@ -86,7 +86,9 @@ ${
   <div class="kpi"><div class="n">${run.ai.verified}</div><div class="l">بازبینی نمونه‌ای</div></div>
   <div class="kpi"><div class="n">$${run.ai.costUsd}</div><div class="l">هزینه · ${run.ai.calls} فراخوانی</div></div>
 </div>
-<p class="empty">نسبت «از کش» به «حل تازه» مهم‌ترین عدد اینجاست: اگر بالا نماند، یا کش کار نمی‌کند یا رابط مدام عوض می‌شود. عددِ heal بالا یعنی آن گوشهٔ رابط ناپایدار است.</p>`
+<p class="empty">نسبت «از کش» به «حل تازه» مهم‌ترین عدد اینجاست: اگر بالا نماند، یا کش کار نمی‌کند یا رابط مدام عوض می‌شود. عددِ heal بالا یعنی آن گوشهٔ رابط ناپایدار است.${
+    run.ai.slugs?.length ? `<br>مدل: ${esc(run.ai.slugs.join(' · '))}` : ''
+  }</p>`
     : ''
 }
 

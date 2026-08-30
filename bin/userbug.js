@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { finalizeRun, printSummary } from '../src/finalize.js';
+import { assertModelSlug, listModels } from '../src/models/config.js';
 import { renderJUnit } from '../src/report/junit.js';
 import { runDir } from '../src/store/run-store.js';
 import { dedupe } from '../src/observe/oracle.js';
@@ -28,6 +29,7 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --grep <عنوان>              فیلتر روی عنوان تست
       --persona <novice|pro>      سرعت و رفتار کاربر؛ بر سناریو می‌چربد
       --depth <n>                 سقف قدمِ هر کاوش؛ بر سناریو می‌چربد
+      --model <اسلاگ>             مدل هوش مصنوعی؛ بر کانفیگ می‌چربد
       --device <a,b>              یک یا چند دستگاه؛ هر کدام یک اجرای جدا
       --author                    از کاوش، پیش‌نویس سناریو بنویس
       --headed                    مرورگر دیده شود
@@ -225,8 +227,9 @@ function parseDepth(flag) {
 
 function cmdRun({ flags, positional }) {
   const target = positional[0] || 'nepi';
-  // پیش از spawn اعتبارسنجی می‌شود تا خطای پرچم، وسط اجرا پیدا نشود
+  // پیش از spawn اعتبارسنجی می‌شوند تا خطای پرچم، وسط اجرا پیدا نشود
   const depth = parseDepth(flags.depth);
+  const model = flags.model === undefined ? null : assertModelSlug(flags.model);
   const devices = String(flags.device || '')
     .split(',')
     .map((d) => d.trim())
@@ -276,6 +279,7 @@ function cmdRun({ flags, positional }) {
     if (device) env.UB_DEVICE = device;
     if (flags.persona) env.UB_PERSONA = String(flags.persona);
     if (depth) env.UB_DEPTH = String(depth);
+    if (model) env.UB_MODEL = model;
     if (flags.author) env.UB_AUTHOR = '1';
     if (flags.file) env.UB_SCENARIO_FILE = String(flags.file);
 
@@ -347,30 +351,17 @@ function cmdReplay({ flags, positional }) {
 /**
  * فهرست زندهٔ مدل‌ها.
  *
- * اسلاگ‌ها را از حافظه ننویسید: عوض می‌شوند، و مدلی که وجود ندارد با یک ۴۰۰
- * وسط اجرا خودش را نشان می‌دهد نه پیش از آن.
+ * واکشی در `src/models/config.js` است، نه اینجا: رابط گرافیکی هم همین فهرست را
+ * برای کشویی انتخاب مدل می‌خواهد و دو واکشیِ جدا دیر یا زود واگرا می‌شوند.
  */
 async function cmdModels({ flags }) {
-  const { loadEnv } = await import('../src/env.js');
-  loadEnv();
+  const rows = await listModels({ free: Boolean(flags.free), limit: Number(flags.limit || 30) });
 
-  const res = await fetch('https://openrouter.ai/api/v1/models', {
-    headers: process.env.OPENROUTER_API_KEY
-      ? { authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` }
-      : {},
-  });
-  if (!res.ok) throw new Error(`فهرست مدل‌ها نیامد: ${res.status}`);
+  for (const row of rows) {
+    console.log('  ' + row.id.padEnd(52) + String(row.context).padStart(9));
+  }
 
-  const all = (await res.json()).data || [];
-  const rows = flags.free ? all.filter((m) => m.id.endsWith(':free')) : all;
-
-  rows
-    .map((m) => ({ id: m.id, ctx: m.context_length || 0 }))
-    .sort((a, b) => b.ctx - a.ctx)
-    .slice(0, Number(flags.limit || 30))
-    .forEach((m) => console.log('  ' + m.id.padEnd(52) + String(m.ctx).padStart(9)));
-
-    console.log(`\n  ${rows.length} مدل${flags.free ? ' رایگان' : ''}\n`);
+  console.log(`\n  ${rows.length} مدل${flags.free ? ' رایگان' : ''}\n`);
 }
 
 /**

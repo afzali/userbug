@@ -410,10 +410,17 @@ export async function startJob(rawOptions = {}) {
   // خالی یعنی «پیش‌فرض سناریو»، پس صفر و مقدار بی‌معنا هر دو به null می‌روند و
   // پرچمی ساخته نمی‌شود.
   const depth = Number(rawOptions?.depth);
+
+  // اسلاگ مدل همان شکلی سنجیده می‌شود که CLI می‌سنجد؛ خالی یعنی «پیش‌فرض
+  // کانفیگ» و پرچمی ساخته نمی‌شود.
+  const rawModel = String(rawOptions?.model ?? '').trim();
+  const model = rawModel && /^[\w.-]+\/[\w.:-]+$/.test(rawModel) && rawModel.length <= 120 ? rawModel : '';
+
   const options = {
     grep: rawOptions?.grep ? String(rawOptions.grep).slice(0, 500) : '',
     device: rawOptions?.device ? String(rawOptions.device).slice(0, 100) : '',
     persona: rawOptions?.persona ? String(rawOptions.persona).slice(0, 40) : '',
+    model,
     depth: Number.isInteger(depth) && depth > 0 ? Math.min(100, depth) : null,
     repeat: Number.isFinite(repeat) ? Math.max(1, Math.min(10, repeat)) : 1,
     headed: Boolean(rawOptions?.headed),
@@ -490,6 +497,7 @@ export async function startJob(rawOptions = {}) {
   if (options.device) args.push('--device', options.device);
   if (options.persona) args.push('--persona', options.persona);
   if (options.depth) args.push('--depth', String(options.depth));
+  if (options.model) args.push('--model', options.model);
   if (options.repeat > 1) args.push('--repeat', String(options.repeat));
   if (options.headed) args.push('--headed');
   if (options.author) args.push('--author');

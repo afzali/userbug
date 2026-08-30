@@ -21,6 +21,8 @@
   let device = $state('');
   let persona = $state('');
   let depth = $state('');
+  let model = $state('');
+  let models = $state([]);
   let repeat = $state(1);
   let headed = $state(false);
   let author = $state(false);
@@ -87,7 +89,7 @@
       const response = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ target, grep: scenario, device, persona, depth, repeat, headed, author }),
+        body: JSON.stringify({ target, grep: scenario, device, persona, depth, model, repeat, headed, author }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'اجرا شروع نشد');
@@ -116,7 +118,23 @@
     device = project?.device === 'desktop' ? '' : project?.device || '';
   }
 
+  /**
+   * فهرست مدل‌ها برای پیشنهادِ ورودی.
+   *
+   * بی‌صدا شکست می‌خورد: نبودنِ فهرست نباید مانع اجرا شود، چون خالی گذاشتنِ
+   * این فیلد یعنی «پیش‌فرض کانفیگ» که همیشه کار می‌کند.
+   */
+  async function loadModels() {
+    try {
+      const response = await fetch('/api/models?free=1&limit=60');
+      if (response.ok) models = (await response.json()).models || [];
+    } catch {
+      models = [];
+    }
+  }
+
   onMount(() => {
+    loadModels();
     if (data.activeJob) {
       resetLive();
       for (const event of data.activeJob.events || []) applyEvent(event);
@@ -179,6 +197,25 @@
             <Input type="number" min="1" max="100" bind:value={depth} placeholder="پیش‌فرض سناریو" disabled={busy} />
           </label>
         </div>
+        <!--
+          ورودی است نه کشویی، چون فهرست زنده است و ممکن است نیاید (کلید نباشد یا
+          شبکه نرسد). این‌طور هم انتخاب از فهرست کار می‌کند، هم تایپِ اسلاگی که
+          در فهرست رایگان نیست.
+        -->
+        <label class="block space-y-1.5 text-sm font-medium">
+          <span>مدل هوش مصنوعی</span>
+          <Input
+            bind:value={model}
+            list="model-options"
+            spellcheck="false"
+            dir="ltr"
+            placeholder="پیش‌فرض کانفیگ"
+            disabled={busy}
+          />
+          <datalist id="model-options">
+            {#each models as item (item.id)}<option value={item.id}>{item.name}</option>{/each}
+          </datalist>
+        </label>
         <div class="flex flex-wrap gap-4 text-sm text-muted-foreground">
           <label class="flex items-center gap-2"><input type="checkbox" bind:checked={headed} disabled={busy} /> مرورگر دیده شود</label>
           <label class="flex items-center gap-2"><input type="checkbox" bind:checked={author} disabled={busy} /> ساخت پیش‌نویس کاوش</label>
