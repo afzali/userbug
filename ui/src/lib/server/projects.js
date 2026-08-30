@@ -37,6 +37,48 @@ async function walk(dir, base = dir) {
   return files;
 }
 
+/**
+ * تنظیماتِ واقعیِ پروژه، با `import` نه با regex.
+ *
+ * ── چرا regex کافی نبود ──
+ *
+ * خواندنِ متنِ فایل با الگو فقط رشته‌های تک‌خطیِ داخل کوتیشن را می‌گیرد. یعنی
+ * `apiURL` و `logs` و `source` اصلاً دیده نمی‌شدند، و اگر کسی `baseURL` را
+ * با بک‌تیک یا متغیر می‌نوشت، رابط خالی نشانش می‌داد **بدون هیچ خطایی** —
+ * همان شکستِ خاموشی که این ابزار برای گرفتنش ساخته شده.
+ *
+ * حالا همان `loadTarget` موتور صدا زده می‌شود: یک منبعِ حقیقت، و پیش‌فرض‌ها
+ * دقیقاً همان‌هایی‌اند که هنگام اجرا اعمال می‌شوند. فایل خراب هم خطا
+ * برمی‌گرداند، که از فهرستِ خالی خیلی بهتر است.
+ */
+async function projectSettings(key) {
+  try {
+    const { loadTarget } = await import('../../../../src/target.js');
+    const target = await loadTarget(key);
+    return {
+      ok: true,
+      name: target.name || key,
+      baseURL: target.baseURL || '',
+      apiURL: target.apiURL || '',
+      environment: target.environment,
+      device: target.device,
+      locale: target.locale || '',
+      dir: target.dir || '',
+      logs: (target.logs || []).map((log) => ({
+        name: log.name || log.type || 'log',
+        path: log.path || log.url || '',
+      })),
+      sourceRoot: target.source?.root || '',
+      isolation: target.isolation?.mode || '',
+      allowlist: (target.allowlist || []).length,
+      hasStateProbe: Boolean(target.state?.sql),
+      exploreAvoid: (target.explore?.avoid || []).length,
+    };
+  } catch (cause) {
+    return { ok: false, error: cause.message };
+  }
+}
+
 function sourceField(source, field) {
   const match = source.match(new RegExp(`\\b${field}\\s*:\\s*['\"]([^'\"]+)['\"]`));
   return match?.[1] || '';
@@ -126,14 +168,17 @@ export async function listProjects() {
     const key = entry.name.replace(/\.config\.js$/, '');
     const source = await fsp.readFile(path.join(TARGETS_DIR, entry.name), 'utf8');
     const scenarios = await listScenarios(key);
+    // regex فقط سقفِ سقوط است: اگر کانفیگ import نشود، دست‌کم چیزی نشان بدهیم.
+    const settings = await projectSettings(key);
     projects.push({
       key,
-      name: sourceField(source, 'name') || key,
-      baseURL: sourceField(source, 'baseURL'),
-      environment: sourceField(source, 'environment') || 'production',
-      device: sourceField(source, 'device') || 'desktop',
-      sourceRoot: sourceRootField(source),
+      name: settings.ok ? settings.name : sourceField(source, 'name') || key,
+      baseURL: settings.ok ? settings.baseURL : sourceField(source, 'baseURL'),
+      environment: settings.ok ? settings.environment : sourceField(source, 'environment') || 'production',
+      device: settings.ok ? settings.device : sourceField(source, 'device') || 'desktop',
+      sourceRoot: settings.ok ? settings.sourceRoot : sourceRootField(source),
       configFile: entry.name,
+      settings,
       scenarios,
     });
   }

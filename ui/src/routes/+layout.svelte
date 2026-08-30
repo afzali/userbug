@@ -14,9 +14,19 @@
    * بیرون از پروژه، فقط فهرست پروژه‌ها معنا دارد: «تریاژ» بی‌آنکه بدانیم کدام
    * پروژه، یعنی همان پیش‌فرضِ خاموشی که فضای کاری برای حذفش ساخته شد.
    */
-  let target = $derived(page.params.target || '');
-  let inProject = $derived(Boolean(target) && page.url.pathname.startsWith('/projects/'));
+  /**
+   * پروژه فقط از مسیر نمی‌آید.
+   *
+   * صفحهٔ `/runs/<runId>` زیر `/projects/` نیست و `params.target` ندارد، پس
+   * منوی کناری به فهرست پروژه‌ها برمی‌گشت — درست وسط کاری که کاربر داخل یک
+   * پروژه شروع کرده بود. ولی خودِ اجرا می‌داند مالِ کدام هدف است، پس همان را
+   * می‌خوانیم.
+   */
+  let target = $derived(page.params.target || page.data?.run?.target || '');
+  let inProject = $derived(Boolean(target));
   let base = $derived(`/projects/${encodeURIComponent(target)}`);
+  /** روی صفحهٔ اجرا هیچ‌کدام از ردیف‌ها فعال نیست؛ نشانِ جداگانه‌اش را می‌گذاریم. */
+  let onRunPage = $derived(page.url.pathname.startsWith('/runs/'));
 
   let nav = $derived(
     inProject
@@ -25,6 +35,7 @@
           { href: `${base}/triage`, label: 'تریاژ', icon: '◇' },
           { href: `${base}/compare`, label: 'مقایسه', icon: '⇄' },
           { href: `${base}/files`, label: 'سناریوها', icon: '⌘' },
+          { href: `${base}/files?kind=target`, label: 'تنظیمات', icon: '⚙' },
         ]
       : [
           { href: '/', label: 'پروژه‌ها', icon: '◫', exact: true },
@@ -42,8 +53,21 @@
     localStorage.setItem('userbug-theme', dark ? 'dark' : 'light');
   }
 
+  /**
+   * ردیف‌هایی که فقط با query از هم جدا می‌شوند.
+   *
+   * «سناریوها» و «تنظیمات» هر دو `/files` هستند و با `?kind=target` فرق
+   * می‌کنند. مقایسهٔ صرفِ pathname هر دو را هم‌زمان فعال نشان می‌داد.
+   */
   function isActive(item) {
-    return item.exact ? page.url.pathname === item.href : page.url.pathname.startsWith(item.href);
+    const [itemPath, itemQuery] = item.href.split('?');
+    if (page.url.pathname !== itemPath && !(!item.exact && page.url.pathname.startsWith(itemPath))) {
+      return false;
+    }
+    const wantsTarget = itemQuery?.includes('kind=target');
+    const hasTarget = page.url.searchParams.get('kind') === 'target';
+    if (itemPath.endsWith('/files')) return Boolean(wantsTarget) === hasTarget;
+    return item.exact ? page.url.pathname === itemPath : true;
   }
 </script>
 
@@ -71,6 +95,10 @@
         -->
         <a href="/" class="text-xs text-muted-foreground hover:text-foreground"><span aria-hidden="true">←</span> همهٔ پروژه‌ها</a>
         <strong class="code-value mt-1 block truncate text-sm">{target}</strong>
+        {#if onRunPage}
+          <!-- روی صفحهٔ اجرا هیچ ردیفی فعال نیست؛ پس همین‌جا می‌گوییم کجاییم. -->
+          <span class="mt-1 block text-[11px] text-muted-foreground">در حال دیدنِ یک اجرا</span>
+        {/if}
       </div>
     {/if}
 
