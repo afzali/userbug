@@ -25,11 +25,10 @@ export async function loadTarget(name) {
 }
 
 /**
- * آیا قلاب مخرب روی این هدف مجاز است؟
+ * دروازهٔ ایمنی اینجا نیست — در `src/guard.js` است.
  *
- * قلاب‌های shell و http می‌توانند دیتابیس پاک کنند. یک اشتباه تایپی در آدرس
- * نباید به دادهٔ واقعی برسد، پس پیش‌فرضِ ندانستن، «نه» است.
+ * یک بار همین تصمیم دو جا نوشته شده بود: `mayRunDestructiveHooks` اینجا و
+ * `isSafeEnvironment` آنجا. دومی به‌کار می‌رفت و اولی کدِ مرده بود. دو منبعِ
+ * حقیقت برای یک تصمیمِ ایمنی، دیر یا زود واگرا می‌شوند و آن‌وقت کسی نمی‌داند
+ * کدام معتبر است. پس فقط یکی ماند.
  */
-export function mayRunDestructiveHooks(target) {
-  return target.environment === 'local' || target.environment === 'staging';
-}

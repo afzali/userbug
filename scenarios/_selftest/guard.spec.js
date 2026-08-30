@@ -9,7 +9,7 @@
  * نشده — که باید محافظه‌کارانه تولیدی فرض شود.
  */
 import { test, expect } from '@playwright/test';
-import { assertMayMutate, assertMayRequest, isSafeEnvironment } from '../../src/guard.js';
+import { assertMayMutate, assertMayQuery, assertMayRequest, isSafeEnvironment } from '../../src/guard.js';
 import { loadTarget } from '../../src/target.js';
 
 test('دروازه: محیط توسعه اجازه می‌دهد', async () => {
@@ -30,6 +30,42 @@ test('دروازه: محیط تولیدی نوشتن را رد می‌کند', a
 
   // خواندن آزاد است — سناریوی فقط‌خواندنی روی تولیدی معنا دارد
   expect(() => assertMayRequest(target, 'GET', '/health')).not.toThrow();
+});
+
+/**
+ * `query` تابعِ دیتابیسیِ خودِ اپ را می‌راند، پس `DELETE` در آن واقعاً پاک
+ * می‌کند. تا امروز دروازه نداشت.
+ */
+test('دروازه: پرس‌وجوی خواندنی آزاد است، نوشتن نه', async () => {
+  const prod = await loadTarget('nepi-prod');
+  const local = await loadTarget('nepi');
+
+  // همان چیزی که سناریوهای واقعی می‌زنند
+  expect(() => assertMayQuery(prod, 'SELECT COUNT(*) AS n FROM users WHERE email = ?')).not.toThrow();
+  expect(() => assertMayQuery(prod, '  select title from books order by rowid desc limit 1')).not.toThrow();
+
+  for (const sql of ['DELETE FROM books', 'UPDATE users SET email = ?', 'DROP TABLE users', 'PRAGMA journal_mode = WAL']) {
+    expect(() => assertMayQuery(prod, sql), sql).toThrow(/رد شد/);
+  }
+
+  // روی محیط توسعه همه‌شان مجازند
+  expect(() => assertMayQuery(local, 'DELETE FROM books')).not.toThrow();
+});
+
+test('دروازه: جملهٔ دوم و کامنت نمی‌توانند نوشتن را پنهان کنند', async () => {
+  const prod = await loadTarget('nepi-prod');
+
+  // بدون بررسی چندجمله‌ای، این از کنار شرطِ «با select شروع می‌شود» رد می‌شد
+  expect(() => assertMayQuery(prod, 'SELECT 1; DELETE FROM users')).toThrow(/رد شد/);
+
+  // و بدون حذف کامنت، اینها هم
+  expect(() => assertMayQuery(prod, '-- select\nDELETE FROM users')).toThrow(/رد شد/);
+  expect(() => assertMayQuery(prod, '/* select */ DELETE FROM users')).toThrow(/رد شد/);
+
+  // `WITH` با فعلِ خواندن شروع می‌شود ولی می‌تواند بنویسد
+  expect(() => assertMayQuery(prod, 'WITH x AS (SELECT id FROM users) DELETE FROM users')).toThrow(/رد شد/);
+
+  expect(() => assertMayQuery(prod, '   ')).toThrow(/خالی/);
 });
 
 test('دروازه: محیط اعلام‌نشده تولیدی فرض می‌شود', async () => {

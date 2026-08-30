@@ -20,7 +20,7 @@ import { expect } from '@playwright/test';
 import { interpolate } from './interpolate.js';
 import { resolveTarget } from './resolve.js';
 import { NASTY } from '../data/persian.js';
-import { assertMayRequest } from '../guard.js';
+import { assertMayQuery, assertMayRequest } from '../guard.js';
 import { resolvePersona } from '../personas.js';
 import { loadGlobalConfig, resolveModel } from '../models/config.js';
 import { Budget } from '../models/provider.js';
@@ -250,6 +250,11 @@ async function execute({ page, ub, ctx, step }) {
     case 'query': {
       const probe = ub.target.state?.sql;
       if (!probe) throw new Error(`هدف «${ub.target.key}» تابع state.sql ندارد`);
+
+      // این تابع همان دیتابیسِ خودِ اپ را می‌راند، پس نوشتن با آن واقعاً
+      // می‌نویسد. خواندن روی هر محیطی آزاد است، نوشتن فقط روی توسعه.
+      assertMayQuery(ub.target, body.sql);
+
       const rows = await page.evaluate(probe, { query: body.sql, params: body.params || [] });
       ctx.vars[body.saveAs || 'rows'] = rows;
       return;

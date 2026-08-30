@@ -14,6 +14,20 @@
 const SAFE = new Set(['local', 'staging']);
 const READ_ONLY_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+/**
+ * SQL فقط‌خواندنی.
+ *
+ * دو شرط، چون هیچ‌کدام تنها کافی نیست: باید با فعلِ خواندن شروع شود، **و**
+ * هیچ‌جایش فعلِ نوشتن نداشته باشد. شرط دوم برای `WITH x AS (…) DELETE FROM …`
+ * است که با فعلِ خواندن شروع می‌شود ولی می‌نویسد.
+ *
+ * سخت‌گیری‌اش عمدی است: `SELECT … WHERE msg = 'delete'` هم روی محیط تولیدی رد
+ * می‌شود. جهتِ اشتباه اینجا ارزان است — پیام خطا می‌گوید چه شد — ولی جهتِ
+ * دیگر یعنی پاک شدن دادهٔ واقعی.
+ */
+const READ_ONLY_SQL_START = /^(select|with|explain)\b/i;
+const WRITE_SQL = /\b(insert|update|delete|drop|alter|create|replace|truncate|attach|detach|vacuum|reindex|pragma)\b/i;
+
 export function isSafeEnvironment(target) {
   return SAFE.has(target?.environment);
 }
@@ -39,4 +53,37 @@ export function assertMayMutate(target, what) {
 export function assertMayRequest(target, method, path) {
   if (READ_ONLY_METHODS.has(String(method).toUpperCase())) return;
   assertMayMutate(target, `درخواست ${method} به ${path}`);
+}
+
+/** جمله‌های SQL، بدون کامنت — تا `--` یا `/* *\/` نیتِ نوشتن را پنهان نکند. */
+function sqlStatements(sql) {
+  return String(sql ?? '')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/--[^\n]*/g, ' ')
+    .split(';')
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+}
+
+/**
+ * داورِ وضعیت: خواندن آزاد، نوشتن فقط روی محیط توسعه.
+ *
+ * `query` تابعی را صدا می‌زند که خودِ هدف در کانفیگش گذاشته و همان ماژول
+ * دیتابیسی را می‌راند که اپ استفاده می‌کند. یعنی یک `DELETE FROM books` در
+ * سناریو، واقعاً پاک می‌کند. `request` از روز اول دروازه داشت؛ این یکی نداشت،
+ * در حالی که خطرش کمتر نیست.
+ *
+ * چند جمله در یک رشته هم بررسی می‌شود، وگرنه
+ * `SELECT 1; DELETE FROM users` از کنار شرطِ «با select شروع می‌شود» رد می‌شد.
+ */
+export function assertMayQuery(target, sql) {
+  const statements = sqlStatements(sql);
+  if (!statements.length) throw new Error('پرس‌وجوی خالی است');
+
+  const readOnly = statements.every(
+    (statement) => READ_ONLY_SQL_START.test(statement) && !WRITE_SQL.test(statement)
+  );
+  if (readOnly) return;
+
+  assertMayMutate(target, `پرس‌وجوی نویسنده «${statements[0].slice(0, 60)}»`);
 }
