@@ -25,6 +25,7 @@ import { resolvePersona } from '../personas.js';
 import { loadGlobalConfig, resolveModel } from '../models/config.js';
 import { Budget } from '../models/provider.js';
 import { loadCache, saveCache, getEntry, putEntry, shouldReverify } from '../steps/cache.js';
+import { KNOWN_VERBS, stepVerb } from './verbs.js';
 import { resolveDo, performAction } from '../steps/do.js';
 import { explore } from '../steps/explore.js';
 import { getCurrentRun } from '../store/run-store.js';
@@ -148,12 +149,14 @@ function groupSteps(rawSteps) {
 /** هر قدم یک شیء تک‌کلیدی است: `{click: …}`. عنوان اختیاری با `as`. */
 function normalizeStep(raw) {
   if (typeof raw === 'string') throw new Error(`قدم باید شیء باشد، نه رشته: «${raw}»`);
-  const keys = Object.keys(raw).filter((k) => k !== 'as');
-  const verb = keys.find((k) => !['detail', 'finding', 'else', 'then', 'value', 'timeout', 'delay'].includes(k));
+  const verb = stepVerb(raw);
   if (!verb) throw new Error(`قدم بدون فعل: ${JSON.stringify(raw)}`);
   if (NEEDS_AI.has(verb)) {
     throw new Error(`فعل «${verb}» به فاز ۲ (AI) نیاز دارد و در این نسخه پشتیبانی نمی‌شود`);
   }
+  // اینجا می‌شکند نه در `switch`، چون `groupSteps` همهٔ قدم‌ها را پیش از اجرا
+  // نرمال می‌کند: غلطِ املایی در قدم ۳۸ دیگر بعد از اجرای ۳۷ قدم پیدا نمی‌شود.
+  if (!KNOWN_VERBS.has(verb)) throw new Error(`فعل ناشناخته: «${verb}»`);
   return { verb, body: raw[verb], raw, title: raw.as || defaultTitle(verb, raw[verb]) };
 }
 
