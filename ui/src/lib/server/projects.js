@@ -178,8 +178,8 @@ async function validateScenarioYaml(file) {
   if (!Array.isArray(doc.steps)) throw new Error('سناریو «steps» معتبر ندارد');
 }
 
-function fileExistsError() {
-  const error = new Error('سناریو از قبل وجود دارد');
+function fileExistsError(kind) {
+  const error = new Error(`${kind === 'target' ? 'پروژه' : 'سناریو'} از قبل وجود دارد`);
   error.code = 'FILE_EXISTS';
   error.status = 409;
   return error;
@@ -216,7 +216,7 @@ export async function writeProjectFile({ kind, target, relative, content, create
       try {
         await fsp.link(temporary, file);
       } catch (cause) {
-        if (cause?.code === 'EEXIST') throw fileExistsError();
+        if (cause?.code === 'EEXIST') throw fileExistsError(kind);
         throw cause;
       }
     } else {

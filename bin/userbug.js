@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { finalizeRun, printSummary } from '../src/finalize.js';
 import { assertModelSlug, listModels } from '../src/models/config.js';
+import { assertProjectKey, renderTargetConfig } from '../src/target-template.js';
 import { renderJUnit } from '../src/report/junit.js';
 import { runDir } from '../src/store/run-store.js';
 import { dedupe } from '../src/observe/oracle.js';
@@ -39,6 +40,16 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
   userbug replay <runId> [--only-findings]
                                   اجرای دوبارهٔ همان سناریوها روی همان دستگاه
 
+  userbug init <کلید> --base-url <آدرس> [گزینه‌ها]
+                                  ساخت کانفیگ یک پروژهٔ تازه در targets/
+      --title <نام>               نام خوانا (پیش‌فرض: همان کلید)
+      --api-url <آدرس>            آدرس API، برای فعل request
+      --environment <local|staging|production>
+      --device <نام>              پیش‌فرض desktop
+      --locale <fa> --dir <rtl|ltr>
+      --log <نام=مسیر>            لاگ سرور؛ تکرارشدنی
+      --source <مسیر>             پوشهٔ سورس پروژه
+
   userbug models [--free]         فهرست زندهٔ مدل‌های OpenRouter
   userbug repro <runId> [اثرانگشت]
                                   بازتولید یک یافته از اجرای گذشته
@@ -63,8 +74,13 @@ function parseArgs(argv) {
     if (a.startsWith('--')) {
       const key = a.slice(2);
       const next = argv[i + 1];
-      if (next === undefined || next.startsWith('--')) flags[key] = true;
-      else flags[key] = argv[++i];
+      const value = next === undefined || next.startsWith('--') ? true : argv[++i];
+
+      // پرچمِ تکرارشده جمع می‌شود، نه اینکه قبلی را دور بریزد: `--log` باید
+      // چند بار بیاید (`--log php=… --log vite=…`). پیش‌تر آخری برنده بود و
+      // بقیه بی‌صدا گم می‌شدند.
+      if (key in flags) flags[key] = [].concat(flags[key], value);
+      else flags[key] = value;
     } else positional.push(a);
   }
   return { flags, positional };
@@ -494,6 +510,49 @@ function cmdDiff({ positional }) {
   console.log('');
 }
 
+/**
+ * ساختِ کانفیگ یک هدفِ تازه.
+ *
+ * همان کاری که فرمِ «پروژهٔ تازه» در رابط می‌کند، با همان قالب. قاعدهٔ پروژه
+ * این است: هر کاری از رابط می‌شود، از CLI هم بشود.
+ *
+ * `--log` تکرارشدنی است: `--log php=D:/x/err.log --log vite=D:/y/out.log`
+ */
+function cmdInit({ flags, positional }) {
+  const key = assertProjectKey(positional[0]);
+  const file = path.join(ROOT, 'targets', `${key}.config.js`);
+
+  // بازنویسیِ بی‌صدا بدترین حالت است: کانفیگی که کسی دستی کاملش کرده بود
+  // می‌رفت و کسی نمی‌فهمید.
+  if (fs.existsSync(file)) throw new Error(`هدف «${key}» از قبل وجود دارد: ${file}`);
+
+  const logs = (Array.isArray(flags.log) ? flags.log : flags.log ? [flags.log] : []).map((entry) => {
+    const text = String(entry);
+    const eq = text.indexOf('=');
+    if (eq < 1) throw new Error(`--log باید «نام=مسیر» باشد؛ «${text}» نبود`);
+    return { name: text.slice(0, eq), path: text.slice(eq + 1) };
+  });
+
+  const content = renderTargetConfig({
+    key,
+    name: flags.title || key,
+    baseURL: flags['base-url'],
+    apiURL: flags['api-url'],
+    environment: flags.environment || 'local',
+    device: flags.device,
+    locale: flags.locale,
+    dir: flags.dir,
+    logs,
+    sourceRoot: flags.source,
+  });
+
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, content, 'utf8');
+
+  console.log(`\n  هدف «${key}» ساخته شد: ${file}`);
+  console.log(`  سناریوها را در scenarios/${key}/ بگذارید، بعد: node bin/userbug.js run ${key}\n`);
+}
+
 // ── ورودی ──
 
 const [, , cmd, ...rest] = process.argv;
@@ -509,6 +568,9 @@ try {
       break;
     case 'models':
       await cmdModels(parsed);
+      break;
+    case 'init':
+      cmdInit(parsed);
       break;
     case 'repro':
       cmdRepro(parsed);
