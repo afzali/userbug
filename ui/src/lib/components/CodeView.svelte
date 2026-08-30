@@ -105,8 +105,22 @@
   <div class="scroll-thin overflow-auto p-5 font-mono text-sm leading-7" style={`min-height:${minHeight}`} dir={dir === 'auto' ? 'ltr' : dir}>
     {#each lines as line, index}
       <div class="flex gap-3">
-        <span class="w-10 shrink-0 select-none text-left text-xs text-muted-foreground/60" dir="ltr">{index + 1}</span>
-        <span class="min-w-0 flex-1 whitespace-pre-wrap break-words" dir={dir === 'auto' ? 'auto' : dir}>{@html highlight(line) || '&nbsp;'}</span>
+        <span class="w-10 shrink-0 select-none text-xs text-muted-foreground/60" dir="ltr" style={`text-align: ${dir === 'rtl' ? 'left' : 'right'}`}>{index + 1}</span>
+        <!--
+          جهتِ هر خط از خودش، ولی چیدمانش از ستون.
+
+          با `dir=auto` تنها، خطِ فارسی به لبهٔ راست می‌چسبید و خطِ لاتین به
+          چپ — یعنی متن از شمارهٔ خط فرار می‌کرد و ستون دندانه‌دار می‌شد.
+
+          `text-align` صریح، همان کاری است که ویرایشگرهای کد می‌کنند: کلمات
+          فارسی درست راست‌به‌چپ خوانده می‌شوند، ولی خط از همان لبه‌ای شروع
+          می‌شود که بقیه.
+        -->
+        <span
+          class="min-w-0 flex-1 whitespace-pre-wrap break-words"
+          dir={dir === 'auto' ? 'auto' : dir}
+          style={`text-align: ${dir === 'rtl' ? 'right' : 'left'}`}
+        >{@html highlight(line) || '&nbsp;'}</span>
       </div>
     {/each}
   </div>

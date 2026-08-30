@@ -27,7 +27,7 @@ export async function load({ params }) {
 
   return {
     runs: await listRuns({ target: params.target, limit: 60 }),
-    activeJob: getActiveJob(true),
+    activeJob: getActiveJob(true, params.target),
     schedules,
   };
 }

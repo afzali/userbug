@@ -14,6 +14,28 @@
   let content = $state(data.file?.content || '');
   // svelte-ignore state_referenced_locally
   let original = $state(data.file?.content || '');
+
+  /**
+   * با تعویض فایل، متنِ ویرایشگر هم عوض شود.
+   *
+   * فهرست فایل‌ها پیوند است، پس SvelteKit ناوبری سمت کلاینت می‌کند و همین
+   * کامپوننت را نگه می‌دارد. مقدارِ اولیهٔ `$state` فقط یک بار خوانده می‌شود،
+   * پس با کلیک روی فایل بعدی، `data` عوض می‌شد و ویرایشگر همان متنِ قبلی را
+   * نشان می‌داد — و بدتر: «ذخیره» محتوای فایل قبلی را روی فایل تازه می‌نوشت.
+   *
+   * شرطِ تغییرِ مسیر لازم است: بدون آن، هر تایپِ کاربر دوباره از `data`
+   * بازنویسی می‌شد.
+   */
+  let loadedKey = $state(`${data.kind}:${data.relative}`);
+  $effect(() => {
+    const key = `${data.kind}:${data.relative}`;
+    if (key === loadedKey) return;
+    loadedKey = key;
+    content = data.file?.content || "";
+    original = data.file?.content || "";
+    feedback = data.fileError || "";
+    draft = null;
+  });
   let saving = $state(false);
   // svelte-ignore state_referenced_locally
   let feedback = $state(data.fileError || '');

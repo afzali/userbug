@@ -550,9 +550,23 @@ export function getJob(id, includeHistory = false) {
   return job ? publicJob(job, includeHistory) : null;
 }
 
-export function getActiveJob(includeHistory = false) {
+/**
+ * اجرای در جریان — و اگر هدف داده شود، فقط وقتی مالِ همان هدف باشد.
+ *
+ * ── چرا فیلترِ هدف لازم است ──
+ *
+ * هر بار فقط یک اجرا از رابط می‌رود، پس وضعیتش سراسری است. ولی صفحهٔ هر
+ * پروژه همان را نشان می‌داد؛ یعنی وقتی نپی در حال اجرا بود، صفحهٔ پروژهٔ
+ * دیگری هم می‌گفت «در حال اجرا» و قدم‌ها و عکس‌های نپی را نشان می‌داد.
+ *
+ * سراسری بودنِ صف، دلیل نمی‌شود که سراسری هم دیده شود.
+ */
+export function getActiveJob(includeHistory = false, target = null) {
   if (!state.activeId) return null;
-  return getJob(state.activeId, includeHistory);
+  const job = getJob(state.activeId, includeHistory);
+  if (!job) return null;
+  if (target && job.target !== target) return null;
+  return job;
 }
 
 export function subscribeJob(id, after, listener) {
