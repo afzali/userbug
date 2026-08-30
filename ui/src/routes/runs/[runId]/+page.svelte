@@ -8,9 +8,19 @@
   import { formatDate, formatDuration, formatNumber, sourceLabel } from '$lib/format.js';
 
   let { data } = $props();
-  // انتخاب trace فقط از مقدار اولیهٔ route آغاز می‌شود و بعد محلی است.
+  /**
+   * شمارهٔ trace نگه داشته می‌شود، نه خودِ شیء.
+   *
+   * نسخهٔ اول شیء را در `$state` می‌گذاشت و بعد با `data.traces.indexOf(trace)`
+   * شماره‌اش را پیدا می‌کرد. ولی `$state` شیء را در پروکسی می‌پیچد، پس
+   * `indexOf` روی آرایهٔ خام `-1` برمی‌گرداند و آدرس `/trace/-1` می‌شد —
+   * نمایشگر می‌گفت «Could not load trace».
+   *
+   * با نگه‌داشتن شماره، هویتِ شیء اصلاً وسط نمی‌آید.
+   */
   // svelte-ignore state_referenced_locally
-  let selectedTrace = $state(data.traces[0] || null);
+  let selectedIndex = $state(data.traces.length ? 0 : -1);
+  const selectedTrace = $derived(selectedIndex >= 0 ? data.traces[selectedIndex] : null);
 
   function asset(relative) {
     return `/api/runs/${encodeURIComponent(data.run.runId)}/assets/${String(relative).split('/').map(encodeURIComponent).join('/')}`;
@@ -22,8 +32,7 @@
    * وقتی به `.zip` ختم می‌شد، مدیرهای دانلود (اینجا IDM) قاپش می‌زدند و
    * به‌جای نمایشگر، پنجرهٔ دانلود باز می‌شد.
    */
-  function traceViewer(trace) {
-    const index = data.traces.indexOf(trace);
+  function traceViewer(index) {
     const source = `/api/runs/${encodeURIComponent(data.run.runId)}/trace/${index}`;
     return `/trace-viewer/index.html?trace=${encodeURIComponent(source)}`;
   }
@@ -107,9 +116,9 @@
     <div class="mb-4"><h2 class="text-xl font-bold">Playwright Trace Viewer</h2><p class="mt-1 text-sm text-muted-foreground">viewer اصلی همان نسخهٔ نصب‌شدهٔ Playwright، درون رابط محلی embed شده است.</p></div>
     <Card.Root class="gap-0 overflow-hidden py-0">
       <div class="flex flex-wrap gap-2 border-b p-3">
-        {#each data.traces as trace}<Button size="sm" variant={selectedTrace?.file === trace.file ? 'default' : 'outline'} onclick={() => selectedTrace = trace}>{trace.scenario || trace.title || 'trace'}</Button>{/each}
+        {#each data.traces as trace, index}<Button size="sm" variant={selectedIndex === index ? 'default' : 'outline'} onclick={() => (selectedIndex = index)}>{trace.scenario || trace.title || 'trace'}</Button>{/each}
       </div>
-      {#if selectedTrace}<iframe src={traceViewer(selectedTrace)} title={`Trace ${selectedTrace.scenario || ''}`} class="h-[75vh] min-h-[620px] w-full bg-white"></iframe>{/if}
+      {#if selectedTrace}<iframe src={traceViewer(selectedIndex)} title={`Trace ${selectedTrace.scenario || ''}`} class="h-[75vh] min-h-[620px] w-full bg-white"></iframe>{/if}
     </Card.Root>
   </section>
 {:else}

@@ -4,6 +4,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
+  import ModelPicker from '$lib/components/ModelPicker.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import RunCard from '$lib/components/RunCard.svelte';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
@@ -20,7 +21,6 @@
   let persona = $state('');
   let depth = $state('');
   let model = $state('');
-  let models = $state([]);
   let repeat = $state(1);
   let headed = $state(false);
   let author = $state(false);
@@ -166,23 +166,7 @@
     return scheduleRequest(`/api/schedules/${encodeURIComponent(key)}`, { method: 'DELETE' });
   }
 
-  /**
-   * فهرست مدل‌ها برای پیشنهادِ ورودی.
-   *
-   * بی‌صدا شکست می‌خورد: نبودنِ فهرست نباید مانع اجرا شود، چون خالی گذاشتنِ
-   * این فیلد یعنی «پیش‌فرض کانفیگ» که همیشه کار می‌کند.
-   */
-  async function loadModels() {
-    try {
-      const response = await fetch('/api/models?free=1&limit=60');
-      if (response.ok) models = (await response.json()).models || [];
-    } catch {
-      models = [];
-    }
-  }
-
   onMount(() => {
-    loadModels();
     if (data.activeJob) {
       resetLive();
       for (const event of data.activeJob.events || []) applyEvent(event);
@@ -195,6 +179,12 @@
 <PageHeader eyebrow={`${project.environment} · ${project.baseURL}`} title={project.name} description="سناریو را انتخاب کنید؛ قدم، عکس، خطای مرورگر و لاگ سرور در همان لحظه اینجا می‌آیند.">
   {#snippet actions()}
     <Button href={`/projects/${encodeURIComponent(target)}/files`} variant="outline">سناریوها</Button>
+    <!--
+      تنظیمات پروژه همان ویرایشگرِ فایل است، ولی با ورودی مستقیم.
+      پیش‌تر فقط از دلِ صفحهٔ «سناریوها» و از یک کشویی می‌شد به کانفیگ رسید؛
+      کسی آنجا دنبال تنظیمات پروژه نمی‌گردد.
+    -->
+    <Button href={`/projects/${encodeURIComponent(target)}/files?kind=target`} variant="outline">تنظیمات پروژه</Button>
     <Button href={`/projects/${encodeURIComponent(target)}/compare`} variant="outline">مقایسهٔ اجراها</Button>
   {/snippet}
 </PageHeader>
@@ -233,31 +223,7 @@
               <option value="">پیش‌فرض سناریو</option><option value="novice">تازه‌کار</option><option value="pro">حرفه‌ای</option>
             </select>
           </label>
-          <!-- هر قدمِ کاوش یک فراخوانی مدل است، پس این عدد همان هزینه است. -->
-          <label class="block space-y-1.5 text-sm font-medium">
-            <span>عمق کاوش</span>
-            <Input type="number" min="1" max="100" bind:value={depth} placeholder="پیش‌فرض سناریو" disabled={busy} />
-          </label>
-        </div>
-        <!--
-          ورودی است نه کشویی، چون فهرست زنده است و ممکن است نیاید (کلید نباشد یا
-          شبکه نرسد). این‌طور هم انتخاب از فهرست کار می‌کند، هم تایپِ اسلاگی که
-          در فهرست رایگان نیست.
-        -->
-        <label class="block space-y-1.5 text-sm font-medium">
-          <span>مدل هوش مصنوعی</span>
-          <Input
-            bind:value={model}
-            list="model-options"
-            spellcheck="false"
-            dir="ltr"
-            placeholder="پیش‌فرض کانفیگ"
-            disabled={busy}
-          />
-          <datalist id="model-options">
-            {#each models as item (item.id)}<option value={item.id}>{item.name}</option>{/each}
-          </datalist>
-        </label>
+          <ModelPicker bind:value={model} disabled={busy} />
         <div class="flex flex-wrap gap-4 text-sm text-muted-foreground">
           <label class="flex items-center gap-2"><input type="checkbox" bind:checked={headed} disabled={busy} /> مرورگر دیده شود</label>
           <label class="flex items-center gap-2"><input type="checkbox" bind:checked={author} disabled={busy} /> ساخت پیش‌نویس کاوش</label>

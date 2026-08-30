@@ -140,7 +140,12 @@
   });
 </script>
 
-<PageHeader eyebrow="فایل، نه دیتابیس" title="سناریوهای {project.name}" description="ویرایش روی فایل واقعی انجام می‌شود؛ YAML و JavaScript پیش از rename اعتبارسنجی می‌شوند.">
+<PageHeader
+  eyebrow="فایل، نه دیتابیس"
+  title={data.kind === 'target' ? `تنظیمات ${project.name}` : `سناریوهای ${project.name}`}
+  description={data.kind === 'target'
+    ? 'آدرس فرانت و API، محیط، دستگاه، مسیر لاگ‌ها و پوشهٔ سورس — همه در همین فایل.'
+    : 'ویرایش روی فایل واقعی انجام می‌شود؛ YAML و JavaScript پیش از rename اعتبارسنجی می‌شوند.'}>
   {#snippet actions()}<Button href={`/projects/${encodeURIComponent(data.target)}`} variant="outline">بازگشت به اجرا</Button>{/snippet}
 </PageHeader>
 
