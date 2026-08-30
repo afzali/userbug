@@ -443,6 +443,20 @@ function cmdDiff({ positional }) {
     if (onlyB.length) console.log(`    فقط در دومی: ${onlyB.join('، ')}`);
   }
 
+  /**
+   * دستگاهِ ناهم‌جنس، همان تلهٔ بالا با لباس دیگر.
+   *
+   * مقایسهٔ یک اجرای دسکتاپ با یک اجرای موبایل، «رفته» را جای «فقط روی دسکتاپ
+   * بود» می‌گذارد. رابط گرافیکی این هشدار را داشت و خط فرمان نه.
+   */
+  const deviceA = readRun(a).device;
+  const deviceB = readRun(b).device;
+  if (deviceA !== deviceB) {
+    console.log('');
+    console.log(`  ⚠ دستگاه دو اجرا یکی نیست: ${deviceA || '—'} در برابر ${deviceB || '—'}`);
+    console.log('    «رفته» ممکن است یعنی «روی این دستگاه اصلاً دیده نمی‌شود».');
+  }
+
   const fa = new Map(readFindings(a).map((f) => [f.fingerprint, f]));
   const fb = new Map(readFindings(b).map((f) => [f.fingerprint, f]));
 
@@ -453,8 +467,15 @@ function cmdDiff({ positional }) {
   console.log(`\n  ${a}\n  ${b}\n`);
   console.log(`  تازه: ${added.length}  ·  رفته: ${gone.length}  ·  مانده: ${kept.length}\n`);
 
-  for (const f of added) console.log(`   + [${f.source}] ${f.normalized.slice(0, 110)}`);
-  for (const f of gone) console.log(`   − [${f.source}] ${f.normalized.slice(0, 110)}`);
+  // برچسب دستگاه فقط وقتی چاپ می‌شود که یافته خودش می‌داند. اجراهای قدیمی‌تر
+  // این فیلد را ندارند و نبودش بهتر از حدس است.
+  const where = (f) => {
+    const devices = (f.devices || [f.device]).filter(Boolean);
+    return devices.length ? ` (${devices.join('، ')})` : '';
+  };
+
+  for (const f of added) console.log(`   + [${f.source}] ${f.normalized.slice(0, 110)}${where(f)}`);
+  for (const f of gone) console.log(`   − [${f.source}] ${f.normalized.slice(0, 110)}${where(f)}`);
   console.log('');
 }
 

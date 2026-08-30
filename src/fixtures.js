@@ -47,6 +47,11 @@ export const test = base.extend({
     let stepIndex = 0;
     let currentStep = 'setup';
 
+    // همان مقداری که `globalSetup` در `run.json` می‌نویسد. روی یافته می‌نشیند
+    // تا `findings.ndjson` خودش را توضیح بدهد و تریاژ برای فهمیدنِ «فقط
+    // موبایل» مجبور نباشد به `run.json` برگردد.
+    const device = process.env.UB_DEVICE || target.device;
+
     const sink = (e) => {
       const event = { ...e, at: new Date().toISOString(), step: currentStep, scenario: testInfo.title };
       events.push(event);
@@ -108,6 +113,7 @@ export const test = base.extend({
             allowlist: target.allowlist,
             step: name,
             route,
+            device,
           });
           for (const f of found) {
             const tagged = probe ? { ...f, synthetic: true } : f;
@@ -155,6 +161,7 @@ export const test = base.extend({
           normalized: normalizeMessage(message),
           step: currentStep,
           route: new URL(page.url()).pathname,
+          device,
           at: new Date().toISOString(),
           detail,
           synthetic: probe || synthetic,

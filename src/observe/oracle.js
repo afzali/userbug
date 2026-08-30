@@ -52,7 +52,7 @@ function isAllowed(message, allowlist) {
  *
  * @returns {{findings: object[], suppressed: number}}
  */
-export function judge(events, { allowlist = [], step, route } = {}) {
+export function judge(events, { allowlist = [], step, route, device } = {}) {
   const findings = [];
   let suppressed = 0;
 
@@ -70,6 +70,9 @@ export function judge(events, { allowlist = [], step, route } = {}) {
       normalized: normalizeMessage(e.message),
       step,
       route,
+      // دستگاه در اثرانگشت نیست، کنارش است — مثل قدم و مسیر. «همین باگ روی
+      // موبایل هم هست» یک یافته است با دو دستگاه، نه دو یافته.
+      device,
       at: e.at,
       detail: e.stack || e.location || e.url || null,
     });
@@ -82,7 +85,8 @@ export function judge(events, { allowlist = [], step, route } = {}) {
  * یافته‌های هم‌اثرانگشت را یکی کن.
  *
  * قدم‌هایی که در آن‌ها دیده شده جمع می‌شوند، چون «این باگ در پنج قدم مختلف
- * ظاهر می‌شود» خودش اطلاعات است — ولی پنج ردیف در فهرست، نویز.
+ * ظاهر می‌شود» خودش اطلاعات است — ولی پنج ردیف در فهرست، نویز. دستگاه هم
+ * همین‌طور: «فقط موبایل» با «همه‌جا» یک باگ نیست، ولی دو یافته هم نیست.
  */
 export function dedupe(findings) {
   const byPrint = new Map();
@@ -95,9 +99,12 @@ export function dedupe(findings) {
     if (seen) {
       seen.count++;
       if (!seen.steps.includes(f.step)) seen.steps.push(f.step);
+      if (f.device && !seen.devices.includes(f.device)) seen.devices.push(f.device);
       continue;
     }
-    byPrint.set(f.fingerprint, { ...f, count: 1, steps: [f.step] });
+    // یافته‌های قدیمی `device` ندارند؛ آرایهٔ خالی یعنی «نمی‌دانیم»، نه
+    // «هیچ دستگاهی». مصرف‌کننده باید همان را از `run.json` جبران کند.
+    byPrint.set(f.fingerprint, { ...f, count: 1, steps: [f.step], devices: f.device ? [f.device] : [] });
   }
   return [...byPrint.values()];
 }

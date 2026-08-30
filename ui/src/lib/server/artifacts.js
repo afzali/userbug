@@ -210,6 +210,18 @@ export async function aggregateTriage(target) {
   const state = await readTriageState(target);
   const grouped = new Map();
 
+  /**
+   * دستگاهِ یک یافته: از خودش، وگرنه از اجرایی که در آن دیده شد.
+   *
+   * یافته‌های تازه `device` دارند. اجراهای قدیمی که پیش از این فیلد ثبت شده‌اند
+   * ندارند، پس `run.device` جبرانش می‌کند — وگرنه تریاژِ تاریخ موجود یک‌شبه
+   * «دستگاه نامعلوم» می‌شد.
+   */
+  const devicesOf = (finding, run) => {
+    const own = (finding.devices || []).filter(Boolean);
+    return own.length ? own : [run.device].filter(Boolean);
+  };
+
   for (const run of [...runs].reverse()) {
     const detail = await readRunDetails(run.runId);
     for (const finding of detail.findings) {
@@ -219,6 +231,9 @@ export async function aggregateTriage(target) {
         seen.runs.push(run.runId);
         seen.lastSeen = run.startedAt;
         seen.latest = finding;
+        for (const device of devicesOf(finding, run)) {
+          if (!seen.devices.includes(device)) seen.devices.push(device);
+        }
       } else {
         grouped.set(finding.fingerprint, {
           fingerprint: finding.fingerprint,
@@ -227,6 +242,7 @@ export async function aggregateTriage(target) {
           normalized: finding.normalized,
           detail: finding.detail,
           steps: finding.steps || [],
+          devices: devicesOf(finding, run),
           count: finding.count || 1,
           runs: [run.runId],
           firstSeen: run.startedAt,
