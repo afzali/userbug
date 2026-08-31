@@ -140,8 +140,8 @@ knowledge/<پروژه>/
 - [x] `src/knowledge/schema.js` — شکلِ بالا، با `assertDossier()`. پروندهٔ
       خراب باید همان لحظه بشکند نه وقتی مدل چیز عجیبی تحویل داد.
 - [x] `src/knowledge/render.js` — `dossier.json` → `dossier.md` برای خواندن.
-- [ ] رابط: `/projects/<کلید>/knowledge` — نمایش، ویرایشِ دستی، نشانِ `by`،
-      فهرست تعارض‌ها، و پاسخ به `openQuestions`.
+- [x] رابط: `/projects/<کلید>/knowledge` — نمایش، نشانِ `by`، فهرست تعارض‌ها،
+      پاسخ به `openQuestions`، چک‌ها، fixtureها، و تاریخچه
 - [x] `userbug knowledge <پروژه>` در CLI (`--json`، `--history`، `--questions`، `--answer`). قاعدهٔ پروژه: هر کاری
       که رابط می‌کند از CLI هم بشود.
 - [x] `knowledge/*/credentials.json` و `knowledge/*/tours/` به `.gitignore`.
@@ -189,8 +189,8 @@ knowledge/<پروژه>/
 - [x] `src/knowledge/routes.js` — شش آشکارساز، هرکدام با تست، هرکدام یک
       تابعِ خالص با تست در `scenarios/_selftest/`.
 - [x] پرسش و پاسخ — در `digest.js` و `merge.js` (`answerQuestion`)
-- [x] `userbug learn <پروژه>` با `--dry`  ·  [ ] `POST /api/knowledge/digest`
-- [ ] رابط: کارتِ «سؤال‌های بی‌جواب» در صفحهٔ پروژه، با شمارنده.
+- [x] `userbug learn <پروژه>` با `--dry` · `POST /api/knowledge`
+- [x] رابط: پرسش‌های بی‌جواب با جعبهٔ پاسخ، بالای صفحهٔ شناخت
 
 ---
 
@@ -224,9 +224,9 @@ knowledgeFor({ dossier, text, url, budget = 1200 })
 
 ## کارها
 
-- [ ] `src/knowledge/select.js` — `knowledgeFor()`.
-- [ ] وصل به سه مصرف‌کننده. هرکدام یک تستِ خودآزما: با پرونده و بی پرونده.
-- [ ] ادغام `risks` در `explore.avoid` هنگام `loadTarget`.
+- [x] `src/knowledge/select.js` — `knowledgeFor()` با سقفِ بودجه
+- [x] وصل به سه مصرف‌کننده، با تستِ انتخاب و سقف
+- [x] ادغام `risks` در `explore.avoid` (در خودِ `explore.js`، نه `loadTarget`)
 - [ ] در `run.json` ثبت شود که کدام نسخهٔ پرونده استفاده شده — وگرنه «چرا این
       اجرا فرق داشت» جواب ندارد.
 
@@ -427,12 +427,12 @@ const text = await fs.readFile(await download.path(), 'utf8');
 
 ## کارها
 
-- [ ] `run.js`: بازنویسی `download`، افزودن `upload`.
-- [ ] `verbs.js`: ثبت `upload` (خودآزمای فعل‌ها خودش اجبارش می‌کند).
-- [ ] `src/knowledge/fixtures.js` — دسترسیِ محصور به پوشهٔ فایل‌ها.
-- [ ] `expect: { download: … }`.
-- [ ] رابط: آپلودِ fixture در صفحهٔ شناخت.
-- [ ] خودآزما با یک صفحهٔ محلی که هم آپلود دارد هم دانلودِ باینری.
+- [x] `run.js`: بازنویسی `download`، افزودن `upload`.
+- [x] `verbs.js`: ثبت `upload`
+- [x] `src/knowledge/fixtures.js` — دسترسیِ محصور به پوشهٔ فایل‌ها
+- [x] `expect: { download: … }` — اندازه، نام، و فایلِ خالی
+- [x] رابط: فهرست fixtureها در صفحهٔ شناخت (بارگذاری از مرورگر هنوز نه)
+- [x] خودآزما: `scenarios/_selftest/files.spec.js` — ۱۱ تست
 
 ---
 

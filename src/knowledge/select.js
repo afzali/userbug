@@ -120,9 +120,10 @@ function trim(text, max) {
  * @param {string} [o.text] متنِ کاربر یا نیتِ قدم
  * @param {string} [o.url] آدرس صفحهٔ فعلی
  * @param {number} [o.budget] سقفِ نویسه
+ * @param {{relative: string}[]} [o.fixtures] فایل‌های آمادهٔ آپلود، از `listFixtures()`
  * @returns {string} خالی اگر شناختی نباشد
  */
-export function knowledgeFor({ target, dossier, text = '', url = '', budget = DEFAULT_BUDGET } = {}) {
+export function knowledgeFor({ target, dossier, text = '', url = '', budget = DEFAULT_BUDGET, fixtures } = {}) {
   let data = dossier;
   if (!data) {
     try {
@@ -197,6 +198,18 @@ export function knowledgeFor({ target, dossier, text = '', url = '', budget = DE
     for (const item of relevant.slice(0, 8)) {
       if (!push(`  ${item.term}: ${trim(item.meaning, 90)}`)) break;
     }
+  }
+
+  /**
+   * فایل‌هایی که برای آپلود آماده‌اند.
+   *
+   * بدون این، مدل نامِ فایل را اختراع می‌کرد و سناریو در اجرا با «فایلِ آپلود
+   * پیدا نشد» می‌شکست — یعنی همان حدس‌زدنی که این تابع برای حذفش هست، فقط
+   * یک لایه پایین‌تر.
+   */
+  if (fixtures?.length) {
+    push('فایل‌های آمادهٔ آپلود:');
+    for (const item of fixtures.slice(0, 12)) if (!push(`  ${item.relative}`)) break;
   }
 
   return lines.join('\n');

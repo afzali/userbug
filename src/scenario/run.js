@@ -28,6 +28,7 @@ import { loadCache, saveCache, getEntry, putEntry, shouldReverify } from '../ste
 import { KNOWN_VERBS, stepVerb } from './verbs.js';
 import { resolveDo, performAction } from '../steps/do.js';
 import { explore } from '../steps/explore.js';
+import { resolveFixture } from '../knowledge/fixtures.js';
 import { getCurrentRun } from '../store/run-store.js';
 import { writeRepros } from '../repro.js';
 
@@ -392,25 +393,107 @@ async function execute({ page, ub, ctx, step }) {
       return;
     }
 
-    /** دانلود فایل و ریختن محتوایش در یک متغیر. */
+    /**
+     * دانلود فایل.
+     *
+     * ── چرا این فعل بازنویسی شد ──
+     *
+     * نسخهٔ اول همیشه `readFile(..., 'utf8')` می‌زد. برای فایلِ متنی درست بود
+     * و برای PDF و ZIP و تصویر، یک رشتهٔ مخدوش در متغیر می‌نشست **بی‌آنکه
+     * چیزی بشکند**. یعنی سناریویی که PDF دانلود می‌کند سبز می‌شد و هیچ
+     * نمی‌گفت — همان شکستِ خاموشی که این ابزار برای گرفتنش ساخته شده.
+     *
+     * حالا فایل در `runs/<id>/downloads/` می‌نشیند و متغیر یک شیء می‌شود:
+     * `{path, filename, size}`. رمزگشاییِ متنی فقط با درخواستِ صریح
+     * (`as: text`)، چون تنها آنجاست که می‌دانیم متن است.
+     *
+     * ── چرا فایل نگه داشته می‌شود ──
+     *
+     * «یافته بدون بازتولید، یافته نیست.» دانلودی که خراب باشد، بدونِ خودِ
+     * فایل قابل بررسی نیست — و پلی‌رایت فایل‌های موقت را در پایان اجرا پاک
+     * می‌کند.
+     */
     case 'download': {
       const wait = page.waitForEvent('download', { timeout: body.timeout ?? 20_000 });
       const { locator } = resolveTarget(page, body.click);
       await locator.click();
       const download = await wait;
-      const fs = await import('node:fs/promises');
-      const text = await fs.readFile(await download.path(), 'utf8');
-      if (body.saveAs) {
-        ctx.vars[body.saveAs] = text;
-        ctx.vars[body.saveAs + 'Filename'] = download.suggestedFilename();
-        if (body.line !== undefined) ctx.vars[body.saveAs] = text.split(/\r?\n/)[body.line]?.trim() ?? '';
+
+      const saved = await ub.store.saveDownload(download.suggestedFilename(), await download.path());
+      const info = { ...saved, filename: download.suggestedFilename() };
+
+      if (body.as === 'text') {
+        const fs = await import('node:fs/promises');
+        const text = await fs.readFile(info.path, 'utf8');
+        info.text = body.line !== undefined ? (text.split(/\r?\n/)[body.line]?.trim() ?? '') : text;
       }
+
+      if (body.saveAs) {
+        /**
+         * ── چرا هنوز رشته است وقتی `as: text` خواسته شده ──
+         *
+         * سناریوهای موجود `{{vars.code}}` را داخل یک `fill` می‌گذارند. اگر
+         * ناگهان شیء می‌شد، همه‌شان `[object Object]` تایپ می‌کردند — و
+         * چکِ همگانیِ خودمان آن را روی صفحه پیدا می‌کرد، که خنده‌دار ولی
+         * دیر است. پس شکلِ قدیمی برای متن حفظ شد و اطلاعاتِ فایل کنارش
+         * می‌آید.
+         */
+        ctx.vars[body.saveAs] = body.as === 'text' ? info.text : info;
+        ctx.vars[body.saveAs + 'Filename'] = info.filename;
+        ctx.vars[body.saveAs + 'File'] = info;
+      }
+      return;
+    }
+
+    /**
+     * آپلود فایل.
+     *
+     * دو شکل، چون اپ‌ها هر دو را دارند:
+     *
+     *   {upload: {to: {label: "انتخاب فایل"}, file: "fixtures/sample.pdf"}}
+     *   {upload: {trigger: {role: button, name: "بارگذاری"}, file: "…"}}
+     *
+     * اولی مستقیم روی `input[type=file]` می‌نشیند. دومی برای رابط‌هایی است
+     * که input را پنهان کرده‌اند و دکمهٔ خودشان را نشان می‌دهند — که در
+     * اپ‌های امروزی بیشتر از حالت اول است.
+     *
+     * فایل فقط از `knowledge/<کلید>/fixtures/` می‌آید. دلیلش در
+     * `src/knowledge/fixtures.js` نوشته شده: این رشته را ممکن است مدل نوشته
+     * باشد.
+     */
+    case 'upload': {
+      const names = [].concat(body.file ?? body.files ?? []);
+      if (!names.length) throw new Error('upload بدون `file` معنا ندارد');
+
+      const targetKey = ub.target.key || process.env.UB_TARGET || '';
+      const resolved = [];
+      for (const name of names) resolved.push(await resolveFixture(targetKey, name));
+      const paths = resolved.map((item) => item.file);
+
+      if (body.trigger) {
+        const wait = page.waitForEvent('filechooser', { timeout: body.timeout ?? 15_000 });
+        const { locator } = resolveTarget(page, body.trigger);
+        await locator.click();
+        await (await wait).setFiles(paths);
+      } else if (body.to) {
+        const { locator } = resolveTarget(page, body.to);
+        await locator.setInputFiles(paths);
+      } else {
+        throw new Error('upload باید `to` (خودِ input) یا `trigger` (دکمه) داشته باشد');
+      }
+
+      // تا سناریو بتواند بعداً بگوید «همین فایل باید در فهرست دیده شود»
+      ctx.vars[body.saveAs || 'uploaded'] = resolved.map((item) => ({
+        name: item.relative.split('/').pop(),
+        relative: item.relative,
+        bytes: item.bytes,
+      }));
       return;
     }
 
     /** شرط: اگر شرط برقرار بود، قدم‌های `then` را اجرا کن. */
     case 'when': {
-      const ok = await checkCondition(page, body);
+      const ok = await checkCondition(page, body, ctx);
       if (ok) {
         for (const sub of raw.then || []) {
           const s = normalizeStep(sub);
@@ -421,14 +504,14 @@ async function execute({ page, ub, ctx, step }) {
     }
 
     case 'expect': {
-      const ok = await checkCondition(page, body);
+      const ok = await checkCondition(page, body, ctx);
       expect(ok, `expect نخورد: ${JSON.stringify(body)}`).toBe(true);
       return;
     }
 
     /** سنجشِ نرم: نخوردنش یافته است، نه شکست. */
     case 'assert': {
-      const ok = await checkCondition(page, body);
+      const ok = await checkCondition(page, body, ctx);
       if (!ok) {
         await ub.note({
           message: interpolate(raw.finding || `سنجش نخورد: ${JSON.stringify(body)}`, ctx),
@@ -592,7 +675,7 @@ function conditionFailed(err) {
  * یکی بودنشان عمدی است: هر شرطی که بشود انتظار داشت، باید بشود شرطِ اجرا هم
  * باشد و برعکس.
  */
-async function checkCondition(page, cond) {
+async function checkCondition(page, cond, ctx) {
   const timeout = cond.timeout ?? 10_000;
 
   if (cond.url !== undefined) {
@@ -628,6 +711,32 @@ async function checkCondition(page, cond) {
   if (cond.disabled !== undefined) {
     const { locator } = resolveTarget(page, cond.disabled);
     return await locator.isDisabled({ timeout }).then(Boolean).catch(conditionFailed);
+  }
+
+  /**
+   * سنجشِ فایلِ دانلودشده.
+   *
+   * ── چرا این شرط لازم است ──
+   *
+   * تا دیروز تنها سنجشِ ممکن روی دانلود، مقایسهٔ متنِ فایل بود — که روی
+   * باینری بی‌معناست. یعنی «PDF درست ساخته شد» اصلاً بیان‌شدنی نبود، و
+   * سناریو مجبور بود به دیدنِ یک پیامِ موفقیت روی صفحه بسنده کند. آن پیام
+   * وقتی هم نشان داده می‌شود که فایل صفر بایت باشد.
+   *
+   *   {expect: {download: {var: "pdf", minSize: 1000, filename: "\\.pdf$"}}}
+   */
+  if (cond.download !== undefined) {
+    const spec = cond.download;
+    const info = spec.var ? ctx?.vars?.[spec.var + 'File'] ?? ctx?.vars?.[spec.var] : ctx?.vars?.uploaded;
+    if (!info || typeof info !== 'object' || !info.relative) return false;
+
+    if (spec.minSize !== undefined && !(info.size >= spec.minSize)) return false;
+    if (spec.maxSize !== undefined && !(info.size <= spec.maxSize)) return false;
+    if (spec.filename && !new RegExp(spec.filename).test(String(info.filename || ''))) return false;
+    // فایلِ خالی پیش‌فرضاً شکست است: اپی که دکمهٔ دانلود دارد و صفر بایت
+    // می‌دهد، از اپی که اصلاً دکمه ندارد بدتر است
+    if (spec.allowEmpty !== true && info.empty) return false;
+    return true;
   }
 
   if (cond.equals !== undefined) {

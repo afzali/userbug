@@ -50,6 +50,14 @@ const SYSTEM = `تو یک سناریوی تست کاربرمحور می‌نوی
     {"expect": {"text": "سلام"}}
     {"clearState": true}
     {"do": "دکمهٔ ذخیره را بزن"}
+    {"upload": {"to": {"label": "انتخاب فایل"}, "file": "fixtures/نام-فایل"}}
+    {"upload": {"trigger": {"role": "button", "name": "بارگذاری"}, "file": "fixtures/نام-فایل"}}
+    {"download": {"click": {"role": "link", "name": "دانلود"}, "saveAs": "گزارش"}}
+- آپلود فقط از «fixtures/» است. اگر کاربر فایلی نام برد که در فهرستِ fixtures نیست،
+  همان نام را بنویس و در "notes" بگو که باید ساخته شود.
+- برای فایلِ متنی که محتوایش لازم است، به download کلید "as": "text" بده.
+  بدون آن، متغیر یک شیء با path و size و filename است و برای فایل باینری همین درست است.
+- سنجشِ دانلود: {"expect": {"download": {"var": "گزارش", "minSize": 1000}}}
 - برای سنجش از "expect" (شکست سخت) یا "assert" (یافته، بدون شکست) استفاده کن.
 - هویتِ تازه با {{identity.email}} و {{identity.password}} در دسترس است.
 - "name" کوتاه و فارسی باشد و کارِ سناریو را بگوید.

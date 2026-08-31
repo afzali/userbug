@@ -4,6 +4,7 @@ import { digestSource } from '../../../../../src/knowledge/digest.js';
 import { readHistory } from '../../../../../src/knowledge/history.js';
 import { answerQuestion, mergeIntoDossier } from '../../../../../src/knowledge/merge.js';
 import { knowledgeDir, listPages, readDossier, writeDossier } from '../../../../../src/knowledge/store.js';
+import { listFixtures } from '../../../../../src/knowledge/fixtures.js';
 import { readChecksConfig, setCheckMode } from '../../../../../src/checks/config.js';
 import { assertModelSlug, loadGlobalConfig, resolveModel } from '../../../../../src/models/config.js';
 import { Budget } from '../../../../../src/models/provider.js';
@@ -39,7 +40,7 @@ async function assertProject(key) {
   return project;
 }
 
-function snapshot(target) {
+async function snapshot(target) {
   return {
     target,
     dossier: readDossier(target),
@@ -47,6 +48,7 @@ function snapshot(target) {
     coverage: coverageOf(target),
     checks: readChecksConfig(target),
     history: readHistory(knowledgeDir(target), { limit: 60 }),
+    fixtures: await listFixtures(target).catch(() => []),
   };
 }
 
@@ -54,7 +56,7 @@ export async function GET(event) {
   try {
     assertLoopbackRequest(event);
     const project = await assertProject(event.url.searchParams.get('target'));
-    return json(snapshot(project.key));
+    return json(await snapshot(project.key));
   } catch (cause) {
     return jsonError(cause, 400);
   }
@@ -72,12 +74,12 @@ export async function POST(event) {
     if (action === 'answer') {
       const next = answerQuestion(readDossier(project.key), String(body?.question), String(body?.answer));
       await writeDossier(project.key, next, { by: 'user', why: 'پاسخ از رابط' });
-      return json(snapshot(project.key));
+      return json(await snapshot(project.key));
     }
 
     if (action === 'check-mode') {
       setCheckMode(project.key, String(body?.id), String(body?.mode), String(body?.why ?? ''));
-      return json(snapshot(project.key));
+      return json(await snapshot(project.key));
     }
 
     throw new Error(`کنشِ ناشناخته: «${action}»`);
@@ -135,7 +137,7 @@ async function digest({ project, body }) {
   await writeDossier(project.key, merged.dossier, { by: 'source', why: 'هضم سورس از رابط' });
 
   return {
-    ...snapshot(project.key),
+    ...(await snapshot(project.key)),
     merge: { kept: merged.kept, replaced: merged.replaced, conflicts: merged.conflicts },
     scan: { files: scan.files.length, routes: scan.routes.length, byDetector: scan.byDetector },
     note,

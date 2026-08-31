@@ -32,6 +32,8 @@
   let checksConfig = $state(data.checksConfig || { checks: {} });
   // svelte-ignore state_referenced_locally
   let history = $state(data.history || []);
+  // svelte-ignore state_referenced_locally
+  let fixtures = $state(data.fixtures || []);
 
   let busy = $state('');
   let feedback = $state('');
@@ -81,7 +83,10 @@
     coverage = payload.coverage;
     checksConfig = payload.checks || { checks: {} };
     history = payload.history || [];
+    fixtures = payload.fixtures || [];
   }
+
+  const kb = (bytes) => (bytes < 1024 ? `${bytes} B` : `${Math.round(bytes / 1024)} KB`);
 
   async function digest({ dry }) {
     dryResult = null;
@@ -326,6 +331,27 @@
     </ul>
   </section>
 {/if}
+
+<section class="mb-6 rounded-xl border p-4">
+  <h2 class="mb-1 text-sm font-bold">فایل‌های آپلود</h2>
+  <p class="mb-3 text-xs leading-6 text-muted-foreground">
+    سناریو فقط از اینجا فایل آپلود می‌کند — چون آن رشته را ممکن است مدل نوشته باشد و مسیرِ آزاد
+    یعنی هر فایلی از دیسک قابل فرستادن است. فایل را در
+    <code class="break-all">{data.fixturesPath}</code> بگذارید تا در فهرست بیاید و مدل نامش را بداند.
+  </p>
+  {#if fixtures.length}
+    <ul class="flex flex-wrap gap-2 text-sm">
+      {#each fixtures as item (item.relative)}
+        <li class="rounded-lg border px-3 py-1.5">
+          <code>{item.relative}</code>
+          <span class="text-xs text-muted-foreground"> · {kb(item.bytes)}</span>
+        </li>
+      {/each}
+    </ul>
+  {:else}
+    <p class="text-sm text-muted-foreground">هنوز فایلی نیست. سناریوهای آپلود تا وقتی فایل نباشد اجرا نمی‌شوند.</p>
+  {/if}
+</section>
 
 <section class="mb-6 rounded-xl border p-4">
   <h2 class="mb-1 text-sm font-bold">چکِ همگانی</h2>

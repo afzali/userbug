@@ -4,6 +4,7 @@ import { findRelevantSource, resolveSourceRoot } from '../../../../../../src/sou
 import { assertModelSlug, loadGlobalConfig, resolveModel } from '../../../../../../src/models/config.js';
 import { listProjects } from '$lib/server/projects.js';
 import { knowledgeFor } from '../../../../../../src/knowledge/select.js';
+import { listFixtures } from '../../../../../../src/knowledge/fixtures.js';
 import { jsonError } from '$lib/server/http.js';
 import { assertMutationRequest } from '$lib/server/security.js';
 
@@ -73,7 +74,13 @@ export async function POST(event) {
      * رد شده. شرط گذاشتن رویش یعنی کاربر باید دو بار اجازه بدهد برای چیزی
      * که یک بار داده.
      */
-    const knowledge = knowledgeFor({ target, text: body?.text });
+    const knowledge = knowledgeFor({
+      target,
+      text: body?.text,
+      // بدون این، مدل نامِ فایلِ آپلود را اختراع می‌کند و سناریو در اجرا
+      // با «فایل پیدا نشد» می‌شکند
+      fixtures: await listFixtures(target).catch(() => []),
+    });
 
     const draft = await scenarioFromText({
       text: body?.text,

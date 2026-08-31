@@ -40,6 +40,7 @@ export const KNOWN_VERBS = new Set([
   'clearState',
   'set',
   'download',
+  'upload',
   'query',
   'request',
   'offline',

@@ -135,6 +135,49 @@ export class RunStore {
     return `shots/${file}`;
   }
 
+  /**
+   * فایلِ دانلودشده را نگه دار.
+   *
+   * ── چرا کپی و نه اشاره به مسیرِ پلی‌رایت ──
+   *
+   * پلی‌رایت فایل‌های موقتِ دانلود را در پایانِ اجرا پاک می‌کند. پس گزارشی که
+   * فقط مسیر را نگه می‌داشت، وقتی کسی می‌خواست ببیند «چه دانلود شد» به یک
+   * مسیرِ مرده می‌رسید — و «یافته بدون بازتولید، یافته نیست».
+   *
+   * نامِ پیشنهادیِ اپ پاک‌سازی می‌شود ولی پسوندش می‌ماند: پسوند همان چیزی
+   * است که بعداً می‌گوید فایل باید چه بوده باشد.
+   */
+  async saveDownload(suggestedName, sourcePath) {
+    const dir = path.join(this.dir, 'downloads');
+    await fsp.mkdir(dir, { recursive: true });
+
+    const raw = String(suggestedName || 'download');
+    const extension = (raw.match(/\.[\p{L}\p{N}]{1,12}$/u) || [''])[0];
+    const base = raw.slice(0, raw.length - extension.length).replace(/[^\p{L}\p{N}_-]+/gu, '-').slice(0, 60) || 'file';
+
+    let file = path.join(dir, `${base}${extension}`);
+    // دو دانلود با یک نام در یک اجرا، هر دو باید بمانند
+    for (let n = 2; ; n++) {
+      try {
+        await fsp.access(file);
+        file = path.join(dir, `${base}-${n}${extension}`);
+      } catch {
+        break;
+      }
+    }
+
+    await fsp.copyFile(sourcePath, file);
+    const stat = await fsp.stat(file);
+    return {
+      path: file,
+      relative: `downloads/${path.basename(file)}`,
+      size: stat.size,
+      // اندازهٔ صفر یعنی دانلود شکست خورده ولی رخدادش رسیده — و این را
+      // سناریو باید بتواند بسنجد، نه اینکه در فایلِ خالی گم شود.
+      empty: stat.size === 0,
+    };
+  }
+
   async finish(patch) {
     const run = (await this.readJson('run.json')) || {};
     await this.writeJson('run.json', {
