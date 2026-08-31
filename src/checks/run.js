@@ -1,0 +1,98 @@
+/**
+ * اجراگرِ چک‌ها.
+ *
+ * ── چرا هیچ چکی `throw` نمی‌کند ──
+ *
+ * اگر چکِ اول سناریو را بشکند، چهار مسئلهٔ بعدیِ همان صفحه هرگز دیده
+ * نمی‌شوند و اجرای بعدی همان یکی را دوباره پیدا می‌کند. پس همه از لولهٔ
+ * `findings` رد می‌شوند — همان لوله‌ای که داورِ رخدادها استفاده می‌کند، تا
+ * تریاژ و گزارش و JUnit لازم نباشد چیز تازه‌ای یاد بگیرند.
+ *
+ * `expect` تنها استثناست، و فقط وقتی آدم صریح ترفیعش داده باشد.
+ *
+ * ── چرا یافته شناسهٔ چک را حمل می‌کند ──
+ *
+ * بدون `checkId`، حلقهٔ یادگیری نمی‌تواند بفهمد کدام چک پرسروصداست. یعنی
+ * «چکی که از آستانهٔ قلابی رد شود خودش خاموش می‌شود» غیرقابلِ پیاده‌سازی
+ * می‌ماند — و آن تنها محافظی است که نگذارد این قابلیت گزارش را خفه کند.
+ */
+import { fingerprint, normalizeMessage } from '../observe/oracle.js';
+import { modeOf, readChecksConfig } from './config.js';
+import { UNIVERSAL, probePage } from './universal.js';
+
+/**
+ * چک‌های همگانی را روی وضعیتِ فعلیِ صفحه اجرا کن.
+ *
+ * @param {object} o
+ * @param {import('@playwright/test').Page} o.page
+ * @param {string} o.target کلید پروژه — برای خواندنِ `checks.json`
+ * @param {object} [o.config] تنظیم از قبل خوانده‌شده، تا هر قدم از دیسک نخواند
+ * @param {string} [o.step] نام قدمِ جاری
+ * @param {string} [o.device]
+ * @param {boolean} [o.synthetic] یافته‌های خودآزما، تا گزارش واقعی آلوده نشود
+ * @returns {Promise<{findings: object[], hard: object[], probe: object|null}>}
+ */
+export async function runUniversalChecks({ page, target, config, step = 'checks', device, synthetic = false }) {
+  let probe;
+  try {
+    probe = await probePage(page);
+  } catch {
+    // صفحه‌ای که بسته شده یا وسط ناوبری است، وضعیتی برای سنجیدن ندارد.
+    // این نبودِ سنجش است، نه سنجشِ موفق — و نباید یافته بسازد.
+    return { findings: [], hard: [], probe: null };
+  }
+
+  const settings = config || readChecksConfig(target);
+  const findings = [];
+  const hard = [];
+
+  for (const check of UNIVERSAL) {
+    const mode = modeOf(settings, check.id);
+    if (mode === 'off') continue;
+
+    let result = null;
+    try {
+      result = check.run(probe);
+    } catch {
+      // چکِ شکسته نباید بقیه را ببرد؛ خودش هم یافته نمی‌سازد
+      continue;
+    }
+    if (!result) continue;
+
+    const finding = {
+      fingerprint: fingerprint({
+        source: 'check',
+        message: result.message,
+        route: probe.path,
+        step,
+      }),
+      source: 'check',
+      checkId: check.id,
+      severity: 'error',
+      message: result.message,
+      normalized: normalizeMessage(result.message),
+      step,
+      route: probe.path,
+      device,
+      at: new Date().toISOString(),
+      detail: { ...result.detail, check: check.title, mode },
+      synthetic,
+    };
+
+    findings.push(finding);
+    if (mode === 'expect') hard.push(finding);
+  }
+
+  return { findings, hard, probe };
+}
+
+/**
+ * پیامِ شکستِ سخت.
+ *
+ * جدا شده چون هم مفسرِ سناریو و هم گشت به آن نیاز دارند، و پیامِ متفاوت برای
+ * یک چیز یعنی دو باگِ به‌ظاهر جدا در گزارش.
+ */
+export function hardFailureMessage(hard) {
+  const lines = hard.map((finding) => `  · [${finding.checkId}] ${finding.message}`);
+  return `چکِ تأییدشده شکست:\n${lines.join('\n')}`;
+}

@@ -15,6 +15,8 @@ import { createServerCollectors, startAll, drainAll } from './observe/server.js'
 import { judge, fingerprint, normalizeMessage } from './observe/oracle.js';
 import { RunStore, getCurrentRun } from './store/run-store.js';
 import { freshIdentity } from './data/persian.js';
+import { countHits, readChecksConfig } from './checks/config.js';
+import { hardFailureMessage, runUniversalChecks } from './checks/run.js';
 
 export const test = base.extend({
   target: [
@@ -51,6 +53,27 @@ export const test = base.extend({
     // تا `findings.ndjson` خودش را توضیح بدهد و تریاژ برای فهمیدنِ «فقط
     // موبایل» مجبور نباشد به `run.json` برگردد.
     const device = process.env.UB_DEVICE || target.device;
+
+    /**
+     * تنظیمِ چک‌ها یک بار خوانده می‌شود، نه هر قدم.
+     *
+     * پایانِ هر قدم پرترافیک‌ترین نقطهٔ اجراست (عکس، لاگ سرور، داور). یک
+     * `readFileSync` دیگر در همان نقطه، روی سناریوی چهل‌قدمی چهل بار است
+     * برای فایلی که وسط اجرا عوض نمی‌شود.
+     *
+     * نبودِ `knowledge/` یعنی همهٔ چک‌ها در حالت پیش‌فرض — پروژه‌ای که هنوز
+     * شناختی ندارد هم باید چک بگیرد.
+     */
+    let checksConfig = { version: 1, checks: {} };
+    try {
+      checksConfig = readChecksConfig(target.key || process.env.UB_TARGET || '');
+    } catch {
+      // کلیدِ نامعتبر یا پوشهٔ نبوده — پیش‌فرض کار می‌کند
+    }
+    /** شناسهٔ چک‌هایی که در این تست یافته ساختند، برای شمارندهٔ سروصدا. */
+    const checkHits = new Set();
+    /** چک‌های `expect` که شکستند — بر خلاف بقیه، تست را سخت می‌شکنند. */
+    const hardChecks = [];
 
     const sink = (e) => {
       const event = { ...e, at: new Date().toISOString(), step: currentStep, scenario: testInfo.title };
@@ -119,6 +142,42 @@ export const test = base.extend({
             const tagged = probe ? { ...f, synthetic: true } : f;
             findings.push(tagged);
             await store.appendFinding(tagged).catch(() => {});
+          }
+
+          /**
+           * چکِ همگانی، در همان مرزی که داور کار می‌کند.
+           *
+           * ── چرا اینجا و نه در مفسرِ سناریو ──
+           *
+           * `ub.step` تنها جایی است که **همهٔ** مسیرها از آن رد می‌شوند:
+           * سناریوی YAML، کاوش، خودآزما، و بعداً گشت. گذاشتنش در `run.js`
+           * یعنی کاوشِ آزاد — که بیشترین صفحهٔ ندیده را می‌بیند — بی‌چک
+           * بماند.
+           *
+           * ── چرا شکست اینجا پرتاب نمی‌شود ──
+           *
+           * این بلوک در `finally` است. پرتاب از داخلِ `finally` خطای اصلیِ
+           * قدم را می‌بلعد و گزارش می‌گوید «چک شکست» در حالی که واقعاً
+           * کلیک شکسته بود. پس چکِ `expect` هم فقط ثبت می‌شود و شکستنش کارِ
+           * دروازهٔ پایانِ تست است.
+           */
+          try {
+            const { findings: checked } = await runUniversalChecks({
+              page,
+              target: target.key || process.env.UB_TARGET || '',
+              config: checksConfig,
+              step: name,
+              device,
+              synthetic: probe,
+            });
+            for (const f of checked) {
+              findings.push(f);
+              checkHits.add(f.checkId);
+              if (f.detail?.mode === 'expect') hardChecks.push(f);
+              await store.appendFinding(f).catch(() => {});
+            }
+          } catch {
+            // نبودِ چک، شکستِ قدم نیست
           }
 
           await store.appendEvent({
@@ -280,12 +339,27 @@ export const test = base.extend({
 
     await use(ub);
 
+    // شمارندهٔ سروصدا. حلقهٔ یادگیری بدون این نمی‌تواند چکِ پرسروصدا را پیدا
+    // کند، و شمارنده‌ای که بعداً اضافه شود از صفر شروع می‌کند.
+    if (!probe && checkHits.size) countHits(target.key || process.env.UB_TARGET || '', [...checkHits]);
+
     // داورِ پایانی: هر یافتهٔ واقعی تست را نرم می‌شکند. خودآزمایی‌ها را فقط
     // گزارش می‌کنیم، نمی‌شکنیم — چون هدفشان اثباتِ کارکرد رصدگر بود.
     const realFindings = findings.filter((f) => !f.synthetic);
     expect
       .soft(realFindings.map((f) => `[${f.source}] ${f.step} — ${f.message}`), 'خطاهای رصدشده حین اجرا')
       .toEqual([]);
+
+    /**
+     * چکِ `expect` سخت می‌شکند، نه نرم.
+     *
+     * ── چرا این تفاوت لازم است، وقتی یافته از قبل تست را قرمز می‌کند ──
+     *
+     * `watch` می‌گوید «این را دیدم، خودت قضاوت کن». `expect` را **آدم** ترفیع
+     * داده و یعنی «این قاعده است». اگر هر دو نرم می‌شکستند، ترفیع دادن هیچ
+     * معنایی نداشت و کسی زحمتش را نمی‌کشید.
+     */
+    if (!probe && hardChecks.length) throw new Error(hardFailureMessage(hardChecks));
   },
 });
 

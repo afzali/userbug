@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "checks": {
+    "null-text": {
+      "mode": "watch",
+      "why": "",
+      "noise": 0,
+      "hits": 0
+    }
+  }
+}

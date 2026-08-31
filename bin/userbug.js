@@ -29,6 +29,8 @@ import { digestSource } from '../src/knowledge/digest.js';
 import { answerQuestion, mergeIntoDossier } from '../src/knowledge/merge.js';
 import { readHistory } from '../src/knowledge/history.js';
 import { renderDossier } from '../src/knowledge/render.js';
+import { DEFAULT_MODE, readChecksConfig, setCheckMode } from '../src/checks/config.js';
+import { UNIVERSAL, UNIVERSAL_IDS } from '../src/checks/universal.js';
 import { runDir } from '../src/store/run-store.js';
 import { dedupe } from '../src/observe/oracle.js';
 
@@ -83,6 +85,11 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --history [n]               تاریخچهٔ تغییرِ شناخت، تازه‌ترین اول
       --questions                 پرسش‌های بی‌جواب، شماره‌دار
       --answer <شماره> --as <متن> ثبت جواب؛ تنها راهی که چیزی by:user می‌شود
+
+  userbug checks <هدف>            چکِ همگانی: حالت، برخورد، و سروصدا
+      --off <شناسه> --why <متن>   خاموش کردن؛ دلیل اجباری است
+      --watch <شناسه>             یافته ثبت کن، ولی نشکن (پیش‌فرض)
+      --expect <شناسه>            سخت بشکن — یعنی «این قاعده است»
 
   userbug models [--free]         فهرست زندهٔ مدل‌های OpenRouter
   userbug repro <runId> [اثرانگشت]
@@ -548,6 +555,55 @@ async function cmdLearn({ flags, positional }) {
 }
 
 /**
+ * چک‌ها — دیدن و تنظیم کردن.
+ *
+ * ── چرا `--off` دلیل می‌خواهد ──
+ *
+ * چکی که روی یک پروژه همیشه قلابی است باید بشود خاموشش کرد؛ وگرنه کاربر کلِ
+ * گزارش را نادیده می‌گیرد و آن بدتر است. ولی خاموشیِ بی‌دلیل همان
+ * `allowlist`ِ بلندی می‌شود که README دربارهٔ آن نوشته «یعنی داریم مشکل را
+ * زیر فرش می‌کنیم».
+ */
+function cmdChecks({ flags, positional }) {
+  const target = positional[0];
+  if (!target) throw new Error('نام هدف لازم است: userbug checks <هدف>');
+
+  for (const [flag, mode] of [
+    ['off', 'off'],
+    ['watch', 'watch'],
+    ['expect', 'expect'],
+  ]) {
+    if (flags[flag] === undefined) continue;
+    const id = String(flags[flag]);
+    if (!UNIVERSAL_IDS.includes(id)) {
+      throw new Error(`چکی به نام «${id}» نیست. موجودها:\n    ${UNIVERSAL_IDS.join('\n    ')}`);
+    }
+    const entry = setCheckMode(target, id, mode, String(flags.why ?? ''));
+    console.log(`\n  ${id} → ${entry.mode}${entry.why ? `  («${entry.why}»)` : ''}\n`);
+    return;
+  }
+
+  const config = readChecksConfig(target);
+  console.log('');
+  console.log('  چک                      حالت     برخورد  قلابی  دلیلِ خاموشی');
+  console.log('  ' + '─'.repeat(74));
+  for (const check of UNIVERSAL) {
+    const entry = config.checks[check.id] || {};
+    console.log(
+      '  ' +
+        [
+          check.id.padEnd(23),
+          (entry.mode || DEFAULT_MODE).padEnd(8),
+          String(entry.hits ?? 0).padStart(6),
+          String(entry.noise ?? 0).padStart(6),
+          entry.why || (check.risky ? '(پرخطر — احتمال قلابی بیشتر)' : ''),
+        ].join(' ')
+    );
+  }
+  console.log('\n  watch: یافته ثبت می‌کند · expect: سخت می‌شکند · off: اصلاً اجرا نمی‌شود\n');
+}
+
+/**
  * شناختِ یک پروژه.
  *
  * سه خروجی از یک منبع: متنِ خواندنی (پیش‌فرض)، JSON خام برای ابزارِ دیگر، و
@@ -814,6 +870,9 @@ try {
       break;
     case 'knowledge':
       await cmdKnowledge(parsed);
+      break;
+    case 'checks':
+      cmdChecks(parsed);
       break;
     case 'learn':
       await cmdLearn(parsed);

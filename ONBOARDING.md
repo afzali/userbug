@@ -135,16 +135,16 @@ knowledge/<پروژه>/
 
 ## کارها
 
-- [ ] `src/knowledge/store.js` — خواندن/نوشتن/اعتبارسنجیِ پرونده. محصور به
+- [x] `src/knowledge/store.js` — خواندن/نوشتن/اعتبارسنجیِ پرونده. محصور به
       `knowledge/`، همان الگوی `ui/src/lib/server/paths.js`.
-- [ ] `src/knowledge/schema.js` — شکلِ بالا، با `assertDossier()`. پروندهٔ
+- [x] `src/knowledge/schema.js` — شکلِ بالا، با `assertDossier()`. پروندهٔ
       خراب باید همان لحظه بشکند نه وقتی مدل چیز عجیبی تحویل داد.
-- [ ] `src/knowledge/render.js` — `dossier.json` → `dossier.md` برای خواندن.
+- [x] `src/knowledge/render.js` — `dossier.json` → `dossier.md` برای خواندن.
 - [ ] رابط: `/projects/<کلید>/knowledge` — نمایش، ویرایشِ دستی، نشانِ `by`،
       فهرست تعارض‌ها، و پاسخ به `openQuestions`.
-- [ ] `userbug knowledge <پروژه> [--json|--md]` در CLI. قاعدهٔ پروژه: هر کاری
+- [x] `userbug knowledge <پروژه>` در CLI (`--json`، `--history`، `--questions`، `--answer`). قاعدهٔ پروژه: هر کاری
       که رابط می‌کند از CLI هم بشود.
-- [ ] `knowledge/*/credentials.json` و `knowledge/*/tours/` به `.gitignore`.
+- [x] `knowledge/*/credentials.json` و `knowledge/*/tours/` به `.gitignore`.
 
 ---
 
@@ -185,11 +185,11 @@ knowledge/<پروژه>/
 
 ## کارها
 
-- [ ] `src/knowledge/digest.js` — پیمایش، تشخیص استک، کشفِ روت.
-- [ ] `src/knowledge/routes/` — یک آشکارساز به ازای هر فریم‌ورک، هرکدام یک
+- [x] `src/knowledge/digest.js` — پیمایش، تشخیص استک، کشفِ روت.
+- [x] `src/knowledge/routes.js` — شش آشکارساز، هرکدام با تست، هرکدام یک
       تابعِ خالص با تست در `scenarios/_selftest/`.
-- [ ] `src/knowledge/interview.js` — تولید و ثبتِ پرسش‌ها.
-- [ ] `userbug learn <پروژه> --source` و `POST /api/knowledge/digest`.
+- [x] پرسش و پاسخ — در `digest.js` و `merge.js` (`answerQuestion`)
+- [x] `userbug learn <پروژه>` با `--dry`  ·  [ ] `POST /api/knowledge/digest`
 - [ ] رابط: کارتِ «سؤال‌های بی‌جواب» در صفحهٔ پروژه، با شمارنده.
 
 ---
@@ -563,14 +563,14 @@ const text = await fs.readFile(await download.path(), 'utf8');
 
 ## کارها
 
-- [ ] `src/checks/universal.js` — لایهٔ ۱، توابع خالص روی `page` + snapshot.
-- [ ] `src/checks/run.js` — اجراگر: کدام لایه کِی، و تبدیل به یافته.
-- [ ] وصل به `fixtures.js` (بعد از هر `ub.step`) و به گشت و کاوش.
+- [x] `src/checks/universal.js` — یک `evaluate`، ده چک، همه با تستِ دوسویه
+- [x] `src/checks/run.js` — اجراگر و تبدیل به یافته
+- [x] وصل به `fixtures.js` — همهٔ مسیرها از `ub.step` رد می‌شوند، پس کاوش هم پوشش دارد
 - [ ] `src/checks/contract.js` — ساخت قرارداد از snapshot، سنجش، ارتقای
       پیشنهادی.
 - [ ] `src/checks/invariant.js` + `src/knowledge/schema-mine.js` — استخراج از
       SQL و فایل‌های اعتبارسنجی.
-- [ ] `knowledge/<کلید>/checks.json` با `mode` و `why`.
+- [x] `knowledge/<کلید>/checks.json` با `mode` و `why` و شمارندهٔ سروصدا · `userbug checks`
 - [ ] رابط: صفحهٔ چک‌ها — روشن/خاموش، `watch`→`expect`، و آمارِ سروصدا.
 - [ ] خودآزما: صفحه‌ای که عمداً سفید است، صفحه‌ای با `[object Object]`، و
       دکمه‌ای بی‌اثر. هر سه باید گرفته شوند و روی نپی هیچ‌کدام قلابی ندهند.
