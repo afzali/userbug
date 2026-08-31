@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "target": "userbug-ui",
+  "updatedAt": "2026-08-31T13:49:05.933Z",
+  "summary": "",
+  "stack": {
+    "framework": "",
+    "language": "",
+    "backend": "",
+    "db": "",
+    "by": "model"
+  },
+  "auth": {
+    "kind": "unknown",
+    "loginPath": "",
+    "signupOpen": null,
+    "logoutLabel": "",
+    "sessionStore": "",
+    "by": "model"
+  },
+  "routes": [
+    {
+      "path": "/",
+      "title": "userbug · رابط آزمون کاربر",
+      "purpose": "فهرست پروژه‌های userbug",
+      "requiresAuth": null,
+      "sourceFile": "",
+      "by": "user"
+    },
+    {
+      "path": "/projects/nepi",
+      "title": "userbug · رابط آزمون کاربر",
+      "purpose": "داشبورد اجرای پروژه",
+      "requiresAuth": null,
+      "sourceFile": "",
+      "by": "user"
+    }
+  ],
+  "glossary": [],
+  "entities": [],
+  "flows": [],
+  "files": {
+    "uploads": [],
+    "downloads": []
+  },
+  "risks": [],
+  "openQuestions": [],
+  "sources": [
+    {
+      "kind": "tour",
+      "id": "2026-08-31T13-49-00_userbug-ui_5a858ff9",
+      "at": "2026-08-31T13:49:05.932Z",
+      "note": "0 قدم"
+    }
+  ]
+}

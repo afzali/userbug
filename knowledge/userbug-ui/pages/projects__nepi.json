@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "path": "/projects/nepi",
+  "title": "userbug · رابط آزمون کاربر",
+  "purpose": "داشبورد اجرای پروژه",
+  "domSignature": "",
+  "stale": false,
+  "shot": "shots/03--projects-nepi.png",
+  "contract": {
+    "mode": "watch",
+    "must": [
+      {
+        "role": "button",
+        "name": "تغییر پوسته",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "label": "سناریو",
+        "visible": true
+      },
+      {
+        "label": "دستگاه",
+        "visible": true
+      },
+      {
+        "label": "تکرار",
+        "visible": true
+      },
+      {
+        "label": "رفتار کاربر",
+        "visible": true
+      },
+      {
+        "label": "مدل هوش مصنوعی",
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "فهرست",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "label": "مرورگر دیده شود",
+        "visible": true
+      },
+      {
+        "label": "ساخت پیش‌نویس کاوش",
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "شروع اجرا",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "افزودن",
+        "exact": true,
+        "visible": true
+      }
+    ],
+    "seenIn": 1,
+    "lastSeen": "2026-08-31T13:49:05.930Z",
+    "approvedBy": null
+  },
+  "by": "user"
+}

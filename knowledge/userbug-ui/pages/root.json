@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "path": "/",
+  "title": "userbug · رابط آزمون کاربر",
+  "purpose": "فهرست پروژه‌های userbug",
+  "domSignature": "",
+  "stale": false,
+  "shot": "shots/02--.png",
+  "contract": {
+    "mode": "watch",
+    "must": [
+      {
+        "role": "button",
+        "name": "تغییر پوسته",
+        "exact": true,
+        "visible": true
+      }
+    ],
+    "seenIn": 1,
+    "lastSeen": "2026-08-31T13:49:05.927Z",
+    "approvedBy": null
+  },
+  "by": "user"
+}
