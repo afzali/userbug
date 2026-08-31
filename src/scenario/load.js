@@ -7,12 +7,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
-import { ROOT } from '../target.js';
+import { rootDir } from '../target.js';
 
 const REQUIRED = ['name', 'steps'];
 
+/**
+ * پوشهٔ سناریوهای یک هدف.
+ *
+ * ریشه هر بار حساب می‌شود چون اینجا فقط خوانده نمی‌شود: `_drafts/` و
+ * `_learned/` در همین پوشه نوشته می‌شوند، و مسیرِ نوشتنیِ غلط بی‌صدا فایلِ
+ * پروژهٔ دیگری را می‌سازد.
+ */
 export function scenarioDir(targetName) {
-  return path.join(ROOT, 'scenarios', targetName);
+  return path.join(rootDir(), 'scenarios', targetName);
 }
 
 export function loadScenarios(targetName) {

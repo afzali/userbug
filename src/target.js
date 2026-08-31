@@ -40,9 +40,27 @@ function findRoot() {
 
 export const ROOT = findRoot();
 
+/**
+ * ریشه، هر بار حساب‌شده.
+ *
+ * ── چرا در کنارِ `ROOT` و نه به‌جایش ──
+ *
+ * `ROOT` لحظهٔ import ثابت می‌شود. برای CLI و رابط درست است و ده‌ها جا از آن
+ * استفاده می‌کنند. ولی یعنی `USERBUG_ROOT`ی که **بعد از** import تنظیم شود
+ * بی‌اثر است — و همین یک بار در انبارِ شناخت به‌سختی معلوم شد: خودآزما ریشهٔ
+ * موقت گذاشت و ابزار در پوشهٔ واقعیِ مخزن نوشت، بی‌آنکه چیزی بشکند.
+ *
+ * پس هر مسیری که **نوشتنی** است باید از این تابع بیاید، نه از ثابت. مسیرِ
+ * خواندنیِ غلط یک خطای روشن می‌دهد؛ مسیرِ نوشتنیِ غلط، فایلِ کاربر را
+ * خراب می‌کند.
+ */
+export function rootDir() {
+  return process.env.USERBUG_ROOT ? path.resolve(process.env.USERBUG_ROOT) : ROOT;
+}
+
 /** کانفیگ یک هدف را بخوان و پیش‌فرض‌های نبود را پر کن. */
 export async function loadTarget(name) {
-  const file = path.join(ROOT, 'targets', `${name}.config.js`);
+  const file = path.join(rootDir(), 'targets', `${name}.config.js`);
   const mod = await import(pathToFileURL(file).href);
   const t = mod.default;
 

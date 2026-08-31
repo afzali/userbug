@@ -11,10 +11,17 @@ import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { ROOT } from '../target.js';
+import { rootDir } from '../target.js';
 
-const RUNS_DIR = path.join(ROOT, 'runs');
-const CURRENT = path.join(RUNS_DIR, '.current');
+/**
+ * پوشهٔ اجراها و نشانگرِ «آخرین اجرا».
+ *
+ * هر دو نوشتنی‌اند، پس ریشه هر بار حساب می‌شود نه یک بار هنگام import —
+ * همان درسی که انبارِ شناخت داد: مسیرِ نوشتنیِ ثابت، `USERBUG_ROOT`ِ
+ * دیررسیده را بی‌صدا نادیده می‌گیرد و در پوشهٔ اشتباه می‌نویسد.
+ */
+const RUNS_DIR = () => path.join(rootDir(), 'runs');
+const CURRENT = () => path.join(RUNS_DIR(), '.current');
 
 export const GUI_RUN_MARKER = '@@USERBUG_GUI_RUN@@';
 
@@ -34,7 +41,7 @@ export function newRunId(targetName) {
 
 export function runDir(runId) {
   const safe = assertRunId(runId);
-  const root = path.resolve(RUNS_DIR);
+  const root = path.resolve(RUNS_DIR());
   const candidate = path.resolve(root, safe);
   if (!candidate.startsWith(root + path.sep)) throw new Error('شناسهٔ اجرا بیرون از runs است');
   return candidate;
@@ -47,11 +54,11 @@ export function runDir(runId) {
 export function setCurrentRun(runId) {
   const safe = assertRunId(runId);
   process.env.UB_RUN_ID = safe;
-  fs.mkdirSync(RUNS_DIR, { recursive: true });
-  const temporary = `${CURRENT}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
+  fs.mkdirSync(RUNS_DIR(), { recursive: true });
+  const temporary = `${CURRENT()}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
   try {
     fs.writeFileSync(temporary, safe, 'utf8');
-    fs.renameSync(temporary, CURRENT);
+    fs.renameSync(temporary, CURRENT());
   } finally {
     try {
       fs.rmSync(temporary, { force: true });
@@ -63,7 +70,7 @@ export function setCurrentRun(runId) {
 
 export function getCurrentRun() {
   if (process.env.UB_RUN_ID) return assertRunId(process.env.UB_RUN_ID);
-  return assertRunId(fs.readFileSync(CURRENT, 'utf8'));
+  return assertRunId(fs.readFileSync(CURRENT(), 'utf8'));
 }
 
 export class RunStore {
@@ -76,7 +83,7 @@ export class RunStore {
   async init(meta) {
     // parent در checkout تازه وجود ندارد؛ فقط leaf باید برای تشخیص collision
     // بهصورت انحصاری ساخته شود.
-    await fsp.mkdir(RUNS_DIR, { recursive: true });
+    await fsp.mkdir(RUNS_DIR(), { recursive: true });
     try {
       await fsp.mkdir(this.dir);
     } catch (cause) {

@@ -86,6 +86,10 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --questions                 پرسش‌های بی‌جواب، شماره‌دار
       --answer <شماره> --as <متن> ثبت جواب؛ تنها راهی که چیزی by:user می‌شود
 
+  userbug tour <هدف> [--device <نام>] [--name <عنوان>]
+                                  گشتِ زنده: مرورگر باز می‌شود، شما کار
+                                  می‌کنید، و ابزار ضبط و شناخت می‌سازد
+
   userbug checks <هدف>            چکِ همگانی: حالت، برخورد، و سروصدا
       --off <شناسه> --why <متن>   خاموش کردن؛ دلیل اجباری است
       --watch <شناسه>             یافته ثبت کن، ولی نشکن (پیش‌فرض)
@@ -555,6 +559,87 @@ async function cmdLearn({ flags, positional }) {
 }
 
 /**
+ * گشتِ زنده از خط فرمان.
+ *
+ * ── چرا اینجا هم هست، وقتی جای اصلی‌اش رابط است ──
+ *
+ * قاعدهٔ پروژه: هر کاری که رابط می‌کند از CLI هم بشود. ولی تفاوتشان واقعی
+ * است و پنهان نمی‌شود: رابط پنلِ زنده دارد و اینجا فقط ترمینال. پس توضیحِ
+ * صفحه از stdin گرفته می‌شود و قدم‌ها همان‌طور که ضبط می‌شوند چاپ می‌شوند.
+ */
+async function cmdTour({ flags, positional }) {
+  const name = positional[0];
+  if (!name) throw new Error('نام هدف لازم است: userbug tour <هدف>');
+
+  const { TourSession } = await import('../src/tour/session.js');
+  const { emitTour } = await import('../src/tour/emit.js');
+
+  const session = new TourSession({ target: name, device: flags.device });
+
+  session.on('event', (event) => {
+    if (event.type === 'step') console.log(`  ● ${event.step.label || event.step.action}`);
+    else if (event.type === 'finding') console.log(`  ⚠ ${event.finding.message}`);
+    else if (event.type === 'navigated') console.log(`  → ${event.url}`);
+    else if (event.type === 'warning') console.log(`  ! ${event.message}`);
+  });
+
+  await session.start();
+  console.log(`\n  گشت آغاز شد: ${session.runId}`);
+  console.log('  مرورگر باز است. کار کنید؛ هرچه می‌کنید ضبط می‌شود.\n');
+  console.log('  فرمان‌ها (در همین ترمینال):');
+  console.log('    <متن>   توضیحِ صفحهٔ فعلی را ثبت کن');
+  console.log('    p       صفحهٔ فعلی را بی‌توضیح ثبت کن');
+  console.log('    n <متن> یادداشت/ایراد ثبت کن');
+  console.log('    r       ضبطِ قدم‌ها را روشن/خاموش کن');
+  console.log('    q       پایان و نوشتنِ خروجی\n');
+
+  /**
+   * خواندنِ خط‌به‌خطِ ترمینال.
+   *
+   * `readline` به‌جای حلقهٔ دستی، چون کاربر فارسی می‌نویسد و شکستنِ درستِ
+   * چندبایتی کارِ خودش است.
+   */
+  const readline = await import('node:readline');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: 'گشت> ' });
+  rl.prompt();
+
+  await new Promise((resolve) => {
+    session.on('event', (event) => {
+      if (event.type === 'stopped') {
+        rl.close();
+        resolve();
+      }
+    });
+
+    rl.on('line', async (line) => {
+      const text = line.trim();
+      try {
+        if (text === 'q') return void (await session.stop('پایان از ترمینال'));
+        if (text === 'p') await session.notePage({});
+        else if (text === 'r') session.setRecording(!session.recording);
+        else if (text.startsWith('n ')) await session.note(text.slice(2));
+        else if (text) await session.notePage({ purpose: text });
+      } catch (cause) {
+        console.error(`  خطا: ${cause.message}`);
+      }
+      rl.prompt();
+    });
+
+    rl.on('close', () => session.stop('ترمینال بسته شد').then(resolve, resolve));
+  });
+
+  const state = session.snapshotState();
+  const landing = !flags.name && state.pages.length > 0;
+  const written = await emitTour({ target: name, state, name: flags.name, landing });
+
+  console.log(`\n  گشت تمام شد: ${state.steps.length} قدم · ${state.pages.length} صفحه · ${state.findings.length} یافته`);
+  console.log(`  صفحه‌های ثبت‌شده: ${written.pages}  ·  کشِ آموخته: ${written.cached} مدخل`);
+  if (written.scenario) console.log(`  پیش‌نویس: scenarios/${name}/${written.scenario}`);
+  console.log(`  پرونده: ${written.dossier.replaced} تازه · ${written.dossier.conflicts} تعارض`);
+  console.log('\n  پیش‌نویس را بازبینی و اجرا کنید؛ تا اجرا نشده، سناریو نیست.\n');
+}
+
+/**
  * چک‌ها — دیدن و تنظیم کردن.
  *
  * ── چرا `--off` دلیل می‌خواهد ──
@@ -870,6 +955,9 @@ try {
       break;
     case 'knowledge':
       await cmdKnowledge(parsed);
+      break;
+    case 'tour':
+      await cmdTour(parsed);
       break;
     case 'checks':
       cmdChecks(parsed);
