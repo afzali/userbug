@@ -29,6 +29,7 @@ import { digestSource } from '../src/knowledge/digest.js';
 import { answerQuestion, mergeIntoDossier } from '../src/knowledge/merge.js';
 import { listAccounts, removeAccount, saveAccount } from '../src/knowledge/credentials.js';
 import { addUserInvariant, listInvariants, mergeInvariants, setInvariantMode } from '../src/knowledge/invariants.js';
+import { fetchDoc, listDocs, removeDoc } from '../src/knowledge/docs.js';
 import { readHistory } from '../src/knowledge/history.js';
 import { renderDossier } from '../src/knowledge/render.js';
 import { DEFAULT_MODE, readChecksConfig, setCheckMode } from '../src/checks/config.js';
@@ -87,6 +88,10 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --history [n]               تاریخچهٔ تغییرِ شناخت، تازه‌ترین اول
       --questions                 پرسش‌های بی‌جواب، شماره‌دار
       --answer <شماره> --as <متن> ثبت جواب؛ تنها راهی که چیزی by:user می‌شود
+
+  userbug docs <هدف>              مستنداتِ بیرونیِ این پروژه
+      --add <آدرس> [--note <چرا>] واکشی و ذخیره؛ by: docs، نه by: user
+      --remove <نام فایل>         حذف
 
   userbug invariants <هدف>        قاعده‌هایی که نباید بشکنند (باگ منطقی)
       --off <شناسه> --why <متن>   خاموش کردن؛ دلیل اجباری
@@ -582,6 +587,52 @@ async function cmdLearn({ flags, positional }) {
 
   if (budget) console.log(`\n  مدل: ${models.model}  ·  ${budget.calls} فراخوانی  ·  ${budget.spent.toFixed(4)}$`);
   else if (!usedModel) console.log('\n  بی‌مدل اجرا شد؛ فقط ساختار.');
+  console.log('');
+}
+
+/**
+ * مستنداتِ بیرونی.
+ *
+ * ── چرا `--add` صریح لازم است و کشفِ خودکار نداریم ──
+ *
+ * این تنها جای ابزار است که به شبکه وصل می‌شود و محتوای یک صفحهٔ وب را وارد
+ * شناخت می‌کند. ابزاری که خودش تصمیم بگیرد کجا وصل شود، ابزارِ دیگری است.
+ */
+async function cmdDocs({ flags, positional }) {
+  const name = positional[0];
+  if (!name) throw new Error('نام هدف لازم است: userbug docs <هدف>');
+
+  if (flags.remove) {
+    await removeDoc(name, String(flags.remove));
+    console.log('');
+    console.log(`  حذف شد: ${flags.remove}`);
+    console.log('');
+    return;
+  }
+
+  if (flags.add) {
+    const saved = await fetchDoc({ target: name, url: String(flags.add), note: String(flags.note ?? '') });
+    console.log('');
+    console.log(`  واکشی شد: ${saved.relative}  (${saved.bytes} نویسه)`);
+    if (saved.title) console.log(`  عنوان: ${saved.title}`);
+    console.log(`  منبع: ${saved.url}`);
+    console.log('');
+    console.log('  این متن `by: docs` است — داده، نه دستور. در ساختِ سناریو و هضم سورس دیده می‌شود.');
+    console.log('');
+    return;
+  }
+
+  const docs = await listDocs(name);
+  if (!docs.length) {
+    console.log('');
+    console.log('  مستندی ذخیره نشده.');
+    console.log('  افزودن: userbug docs <هدف> --add <آدرس> [--note <چرا>]');
+    console.log('');
+    return;
+  }
+
+  console.log('');
+  for (const doc of docs) console.log(`  ${doc.relative.padEnd(50)} ${doc.bytes} بایت`);
   console.log('');
 }
 
@@ -1102,6 +1153,9 @@ try {
       break;
     case 'knowledge':
       await cmdKnowledge(parsed);
+      break;
+    case 'docs':
+      await cmdDocs(parsed);
       break;
     case 'invariants':
       cmdInvariants(parsed);

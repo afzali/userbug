@@ -37,7 +37,11 @@
   // svelte-ignore state_referenced_locally
   let accounts = $state(data.accounts || []);
 
+  // svelte-ignore state_referenced_locally
+  let docs = $state(data.docs || []);
+
   let newAccount = $state({ id: '', email: '', passwordEnv: '', note: '' });
+  let newDoc = $state({ url: '', note: '' });
 
   let busy = $state('');
   let feedback = $state('');
@@ -89,6 +93,15 @@
     history = payload.history || [];
     fixtures = payload.fixtures || [];
     accounts = payload.accounts || [];
+    docs = payload.docs || [];
+  }
+
+  async function addDoc() {
+    const payload = await send({ action: 'doc-add', ...newDoc });
+    if (!payload) return;
+    absorb(payload);
+    feedback = `واکشی شد: ${payload.saved.relative} — این متن by: docs است، نه by: user.`;
+    newDoc = { url: '', note: '' };
   }
 
   async function saveAccount() {
@@ -344,6 +357,42 @@
     </ul>
   </section>
 {/if}
+
+<section class="mb-6 rounded-xl border p-4">
+  <h2 class="mb-1 text-sm font-bold">مستنداتِ بیرونی</h2>
+  <p class="mb-3 text-xs leading-6 text-muted-foreground">
+    آدرسِ مستندِ پروژه را بدهید تا واکشی و در شناخت ذخیره شود. این متن
+    <code>by: docs</code> می‌گیرد و <strong>هرگز</strong> به <code>by: user</code> ترفیع نمی‌شود — متنِ یک
+    صفحهٔ وب داده است، نه دستور. اعتمادش هم پایین‌تر از سورس است: کد آنچه <em>هست</em> را می‌گوید،
+    مستند آنچه <em>قرار بود باشد</em>.
+    <br />
+    آدرسِ محلی و شبکهٔ خصوصی واکشی نمی‌شوند.
+  </p>
+
+  {#if docs.length}
+    <ul class="mb-4 flex flex-col gap-1 text-sm">
+      {#each docs as doc (doc.relative)}
+        <li class="flex items-center gap-2 rounded-lg border px-3 py-1.5">
+          <code class="min-w-0 flex-1 truncate">{doc.relative}</code>
+          <span class="text-xs text-muted-foreground">{kb(doc.bytes)}</span>
+          <button
+            class="text-xs text-muted-foreground hover:text-destructive"
+            disabled={Boolean(busy)}
+            onclick={() => send({ action: 'doc-remove', relative: doc.relative }).then(absorb)}>حذف</button
+          >
+        </li>
+      {/each}
+    </ul>
+  {/if}
+
+  <div class="grid gap-2 sm:grid-cols-3">
+    <Input bind:value={newDoc.url} placeholder="https://…" disabled={Boolean(busy)} />
+    <Input bind:value={newDoc.note} placeholder="چرا این سند؟ (اختیاری)" disabled={Boolean(busy)} />
+    <Button variant="outline" disabled={Boolean(busy) || !newDoc.url.trim()} onclick={addDoc}>
+      {busy === 'doc-add' ? 'در حال واکشی…' : 'واکشی و ذخیره'}
+    </Button>
+  </div>
+</section>
 
 <section class="mb-6 rounded-xl border p-4">
   <h2 class="mb-1 text-sm font-bold">حساب‌های ذخیره‌شده</h2>

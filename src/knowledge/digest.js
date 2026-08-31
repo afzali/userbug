@@ -24,6 +24,7 @@ import { askJson } from '../models/provider.js';
 import { listSourceFiles, readSourceFile, resolveSourceRoot } from '../source-access.js';
 import { detectStack, discoverRoutes } from './routes.js';
 import { mineInvariants } from './schema-mine.js';
+import { readDocs } from './docs.js';
 
 /** سقفِ متنی که از مستندات به مدل می‌رود. بلندتر از این، فصل است نه معرفی. */
 const DOC_BUDGET = 6000;
@@ -98,6 +99,7 @@ export async function scanSource(target) {
 
   return {
     root,
+    target: target?.key || '',
     files,
     stack,
     routes: discovered.routes,
@@ -139,6 +141,16 @@ async function buildUser({ scan, read }) {
     used += slice.length;
   }
   if (heads.length) lines.push('', 'مستندات پروژه:', ...heads);
+
+  /**
+   * مستنداتِ بیرونی، پس از مستنداتِ مخزن.
+   *
+   * ترتیب معنا دارد: README مالِ خودِ پروژه است و از هر صفحهٔ وبی معتبرتر.
+   * چیزی که از URL آمده `by: docs` است — پایین‌تر از `source`، چون کد آنچه
+   * **هست** را می‌گوید و مستند آنچه **قرار بود باشد**.
+   */
+  const external = await readDocs(scan.target || '', { budget: 4000 }).catch(() => '');
+  if (external) lines.push('', 'مستنداتِ بیرونی (واکشی‌شده از آدرسی که کاربر داده):', external);
 
   /**
    * سرِ فایلِ چند روت، تا برچسب‌های واقعی دیده شوند.

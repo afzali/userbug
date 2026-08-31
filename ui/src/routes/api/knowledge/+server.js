@@ -6,6 +6,7 @@ import { answerQuestion, mergeIntoDossier } from '../../../../../src/knowledge/m
 import { knowledgeDir, listPages, readDossier, writeDossier } from '../../../../../src/knowledge/store.js';
 import { listFixtures } from '../../../../../src/knowledge/fixtures.js';
 import { listAccounts, removeAccount, saveAccount } from '../../../../../src/knowledge/credentials.js';
+import { fetchDoc, listDocs, removeDoc } from '../../../../../src/knowledge/docs.js';
 import { readChecksConfig, setCheckMode } from '../../../../../src/checks/config.js';
 import { assertModelSlug, loadGlobalConfig, resolveModel } from '../../../../../src/models/config.js';
 import { Budget } from '../../../../../src/models/provider.js';
@@ -52,6 +53,7 @@ async function snapshot(target) {
     fixtures: await listFixtures(target).catch(() => []),
     // بدون رمز — فقط «تنظیم شده / نشده»
     accounts: listAccounts(target),
+    docs: await listDocs(target).catch(() => []),
   };
 }
 
@@ -93,6 +95,23 @@ export async function POST(event) {
         allowPlain: Boolean(body.allowPlain),
         allowProduction: Boolean(body.allowProduction),
       });
+      return json(await snapshot(project.key));
+    }
+
+    if (action === 'doc-add') {
+      /**
+       * تنها کنشی در این فایل که به **شبکه** می‌رود.
+       *
+       * آدرس را کاربر داده و `assertDocUrl` مقصدهای محلی و شبکهٔ خصوصی را
+       * رد می‌کند — وگرنه رابطی که روی loopback نشسته، به هر سرویسی روی
+       * همین ماشین وصل می‌شد.
+       */
+      const saved = await fetchDoc({ target: project.key, url: body.url, note: body.note });
+      return json({ ...(await snapshot(project.key)), saved });
+    }
+
+    if (action === 'doc-remove') {
+      await removeDoc(project.key, String(body?.relative));
       return json(await snapshot(project.key));
     }
 
