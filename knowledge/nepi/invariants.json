@@ -1,0 +1,2421 @@
+{
+  "version": 1,
+  "invariants": [
+    {
+      "id": "users-email_hash-unique",
+      "kind": "unique",
+      "statement": "دو ردیف در «users» نمی‌توانند «email_hash» یکسان داشته باشند",
+      "table": "users",
+      "columns": [
+        "email_hash"
+      ],
+      "from": "server/src/Database.php:247",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT email_hash, COUNT(*) AS ub_count FROM users GROUP BY email_hash HAVING COUNT(*) > 1",
+      "expect": "empty",
+      "why": "این دیتابیس «email_hash» را ندارد — احتمالاً قاعده مالِ دیتابیسِ دیگری است",
+      "noise": 0
+    },
+    {
+      "id": "users-email_hash-not-null",
+      "kind": "not-null",
+      "statement": "ستون «email_hash» در «users» نباید خالی بماند",
+      "table": "users",
+      "columns": [
+        "email_hash"
+      ],
+      "from": "server/src/Database.php:247",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM users WHERE email_hash IS NULL OR TRIM(email_hash) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "users-verifier_hash-not-null",
+      "kind": "not-null",
+      "statement": "ستون «verifier_hash» در «users» نباید خالی بماند",
+      "table": "users",
+      "columns": [
+        "verifier_hash"
+      ],
+      "from": "server/src/Database.php:247",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM users WHERE verifier_hash IS NULL OR TRIM(verifier_hash) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "users-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «users» نباید خالی بماند",
+      "table": "users",
+      "columns": [
+        "created_at"
+      ],
+      "from": "server/src/Database.php:247",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM users WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "users-last_login_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «last_login_at» در «users» نباید خالی بماند",
+      "table": "users",
+      "columns": [
+        "last_login_at"
+      ],
+      "from": "server/src/Database.php:247",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM users WHERE last_login_at IS NULL OR TRIM(last_login_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "changes-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «changes» نباید خالی بماند",
+      "table": "changes",
+      "columns": [
+        "user_id"
+      ],
+      "from": "server/src/Database.php:277",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM changes WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "changes-entity-not-null",
+      "kind": "not-null",
+      "statement": "ستون «entity» در «changes» نباید خالی بماند",
+      "table": "changes",
+      "columns": [
+        "entity"
+      ],
+      "from": "server/src/Database.php:277",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM changes WHERE entity IS NULL OR TRIM(entity) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "changes-entity_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «entity_id» در «changes» نباید خالی بماند",
+      "table": "changes",
+      "columns": [
+        "entity_id"
+      ],
+      "from": "server/src/Database.php:277",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM changes WHERE entity_id IS NULL OR TRIM(entity_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "changes-op-not-null",
+      "kind": "not-null",
+      "statement": "ستون «op» در «changes» نباید خالی بماند",
+      "table": "changes",
+      "columns": [
+        "op"
+      ],
+      "from": "server/src/Database.php:277",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM changes WHERE op IS NULL OR TRIM(op) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "changes-hlc-not-null",
+      "kind": "not-null",
+      "statement": "ستون «hlc» در «changes» نباید خالی بماند",
+      "table": "changes",
+      "columns": [
+        "hlc"
+      ],
+      "from": "server/src/Database.php:277",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM changes WHERE hlc IS NULL OR TRIM(hlc) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "changes-updated_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «updated_at» در «changes» نباید خالی بماند",
+      "table": "changes",
+      "columns": [
+        "updated_at"
+      ],
+      "from": "server/src/Database.php:277",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM changes WHERE updated_at IS NULL OR TRIM(updated_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "changes-user_id-entity-entity_id-unique",
+      "kind": "unique",
+      "statement": "دو ردیف در «changes» نمی‌توانند «user_id، entity، entity_id» یکسان داشته باشند",
+      "table": "changes",
+      "columns": [
+        "user_id",
+        "entity",
+        "entity_id"
+      ],
+      "from": "server/src/Database.php:277",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT user_id, entity, entity_id, COUNT(*) AS ub_count FROM changes GROUP BY user_id, entity, entity_id HAVING COUNT(*) > 1",
+      "expect": "empty",
+      "why": "این دیتابیس «changes» را ندارد — احتمالاً قاعده مالِ دیتابیسِ دیگری است",
+      "noise": 0
+    },
+    {
+      "id": "backups-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «backups» نباید خالی بماند",
+      "table": "backups",
+      "columns": [
+        "user_id"
+      ],
+      "from": "server/src/Database.php:317",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM backups WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "backups-generation-not-null",
+      "kind": "not-null",
+      "statement": "ستون «generation» در «backups» نباید خالی بماند",
+      "table": "backups",
+      "columns": [
+        "generation"
+      ],
+      "from": "server/src/Database.php:317",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM backups WHERE generation IS NULL OR TRIM(generation) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "backups-chunk_index-not-null",
+      "kind": "not-null",
+      "statement": "ستون «chunk_index» در «backups» نباید خالی بماند",
+      "table": "backups",
+      "columns": [
+        "chunk_index"
+      ],
+      "from": "server/src/Database.php:317",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM backups WHERE chunk_index IS NULL OR TRIM(chunk_index) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "backups-chunk_count-not-null",
+      "kind": "not-null",
+      "statement": "ستون «chunk_count» در «backups» نباید خالی بماند",
+      "table": "backups",
+      "columns": [
+        "chunk_count"
+      ],
+      "from": "server/src/Database.php:317",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM backups WHERE chunk_count IS NULL OR TRIM(chunk_count) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "backups-data-not-null",
+      "kind": "not-null",
+      "statement": "ستون «data» در «backups» نباید خالی بماند",
+      "table": "backups",
+      "columns": [
+        "data"
+      ],
+      "from": "server/src/Database.php:317",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM backups WHERE data IS NULL OR TRIM(data) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "backups-byte_size-not-null",
+      "kind": "not-null",
+      "statement": "ستون «byte_size» در «backups» نباید خالی بماند",
+      "table": "backups",
+      "columns": [
+        "byte_size"
+      ],
+      "from": "server/src/Database.php:317",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM backups WHERE byte_size IS NULL OR TRIM(byte_size) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "backups-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «backups» نباید خالی بماند",
+      "table": "backups",
+      "columns": [
+        "created_at"
+      ],
+      "from": "server/src/Database.php:317",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM backups WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "backups-user_id-generation-chunk_index-unique",
+      "kind": "unique",
+      "statement": "دو ردیف در «backups» نمی‌توانند «user_id، generation، chunk_index» یکسان داشته باشند",
+      "table": "backups",
+      "columns": [
+        "user_id",
+        "generation",
+        "chunk_index"
+      ],
+      "from": "server/src/Database.php:317",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT user_id, generation, chunk_index, COUNT(*) AS ub_count FROM backups GROUP BY user_id, generation, chunk_index HAVING COUNT(*) > 1",
+      "expect": "empty",
+      "why": "این دیتابیس «backups» را ندارد — احتمالاً قاعده مالِ دیتابیسِ دیگری است",
+      "noise": 0
+    },
+    {
+      "id": "sessions-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «sessions» نباید خالی بماند",
+      "table": "sessions",
+      "columns": [
+        "user_id"
+      ],
+      "from": "server/src/Database.php:333",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM sessions WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "sessions-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «sessions» نباید خالی بماند",
+      "table": "sessions",
+      "columns": [
+        "created_at"
+      ],
+      "from": "server/src/Database.php:333",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM sessions WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "sessions-expires_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «expires_at» در «sessions» نباید خالی بماند",
+      "table": "sessions",
+      "columns": [
+        "expires_at"
+      ],
+      "from": "server/src/Database.php:333",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM sessions WHERE expires_at IS NULL OR TRIM(expires_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "users-email-unique",
+      "kind": "unique",
+      "statement": "دو ردیف در «users» نمی‌توانند «email» یکسان داشته باشند",
+      "table": "users",
+      "columns": [
+        "email"
+      ],
+      "from": "src/lib/db/database.js:743",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT email, COUNT(*) AS ub_count FROM users GROUP BY email HAVING COUNT(*) > 1",
+      "expect": "empty",
+      "why": "پرس‌وجو اجرا نشد: page.evaluate: TypeError: Failed to resolve module specifier '/src/lib/db/database.js'",
+      "noise": 0
+    },
+    {
+      "id": "users-email-not-null",
+      "kind": "not-null",
+      "statement": "ستون «email» در «users» نباید خالی بماند",
+      "table": "users",
+      "columns": [
+        "email"
+      ],
+      "from": "src/lib/db/database.js:743",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM users WHERE email IS NULL OR TRIM(email) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "users-updated_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «updated_at» در «users» نباید خالی بماند",
+      "table": "users",
+      "columns": [
+        "updated_at"
+      ],
+      "from": "src/lib/db/database.js:743",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM users WHERE updated_at IS NULL OR TRIM(updated_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "books-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «books» نباید خالی بماند",
+      "table": "books",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:765",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM books WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "books-title-not-null",
+      "kind": "not-null",
+      "statement": "ستون «title» در «books» نباید خالی بماند",
+      "table": "books",
+      "columns": [
+        "title"
+      ],
+      "from": "src/lib/db/database.js:765",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM books WHERE title IS NULL OR TRIM(title) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "books-is_reference-not-null",
+      "kind": "not-null",
+      "statement": "ستون «is_reference» در «books» نباید خالی بماند",
+      "table": "books",
+      "columns": [
+        "is_reference"
+      ],
+      "from": "src/lib/db/database.js:765",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM books WHERE is_reference IS NULL OR TRIM(is_reference) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "books-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «books» نباید خالی بماند",
+      "table": "books",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:765",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM books WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "books-updated_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «updated_at» در «books» نباید خالی بماند",
+      "table": "books",
+      "columns": [
+        "updated_at"
+      ],
+      "from": "src/lib/db/database.js:765",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM books WHERE updated_at IS NULL OR TRIM(updated_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "book_toc-book_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «book_id» در «book_toc» نباید خالی بماند",
+      "table": "book_toc",
+      "columns": [
+        "book_id"
+      ],
+      "from": "src/lib/db/database.js:790",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM book_toc WHERE book_id IS NULL OR TRIM(book_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "book_toc-label-not-null",
+      "kind": "not-null",
+      "statement": "ستون «label» در «book_toc» نباید خالی بماند",
+      "table": "book_toc",
+      "columns": [
+        "label"
+      ],
+      "from": "src/lib/db/database.js:790",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM book_toc WHERE label IS NULL OR TRIM(label) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "book_toc-sort_order-not-null",
+      "kind": "not-null",
+      "statement": "ستون «sort_order» در «book_toc» نباید خالی بماند",
+      "table": "book_toc",
+      "columns": [
+        "sort_order"
+      ],
+      "from": "src/lib/db/database.js:790",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM book_toc WHERE sort_order IS NULL OR TRIM(sort_order) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraphs-book_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «book_id» در «paragraphs» نباید خالی بماند",
+      "table": "paragraphs",
+      "columns": [
+        "book_id"
+      ],
+      "from": "src/lib/db/database.js:802",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraphs WHERE book_id IS NULL OR TRIM(book_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraphs-content-not-null",
+      "kind": "not-null",
+      "statement": "ستون «content» در «paragraphs» نباید خالی بماند",
+      "table": "paragraphs",
+      "columns": [
+        "content"
+      ],
+      "from": "src/lib/db/database.js:802",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraphs WHERE content IS NULL OR TRIM(content) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraphs-sort_order-not-null",
+      "kind": "not-null",
+      "statement": "ستون «sort_order» در «paragraphs» نباید خالی بماند",
+      "table": "paragraphs",
+      "columns": [
+        "sort_order"
+      ],
+      "from": "src/lib/db/database.js:802",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraphs WHERE sort_order IS NULL OR TRIM(sort_order) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraphs-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «paragraphs» نباید خالی بماند",
+      "table": "paragraphs",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:802",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraphs WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraphs-is_reader_added-not-null",
+      "kind": "not-null",
+      "statement": "ستون «is_reader_added» در «paragraphs» نباید خالی بماند",
+      "table": "paragraphs",
+      "columns": [
+        "is_reader_added"
+      ],
+      "from": "src/lib/db/database.js:802",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraphs WHERE is_reader_added IS NULL OR TRIM(is_reader_added) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "tags-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «tags» نباید خالی بماند",
+      "table": "tags",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:821",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM tags WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "tags-name-not-null",
+      "kind": "not-null",
+      "statement": "ستون «name» در «tags» نباید خالی بماند",
+      "table": "tags",
+      "columns": [
+        "name"
+      ],
+      "from": "src/lib/db/database.js:821",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM tags WHERE name IS NULL OR TRIM(name) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "tags-user_id-name-unique",
+      "kind": "unique",
+      "statement": "دو ردیف در «tags» نمی‌توانند «user_id، name» یکسان داشته باشند",
+      "table": "tags",
+      "columns": [
+        "user_id",
+        "name"
+      ],
+      "from": "src/lib/db/database.js:821",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT user_id, name, COUNT(*) AS ub_count FROM tags GROUP BY user_id, name HAVING COUNT(*) > 1",
+      "expect": "empty",
+      "why": "پرس‌وجو اجرا نشد: page.evaluate: TypeError: Failed to resolve module specifier '/src/lib/db/database.js'",
+      "noise": 0
+    },
+    {
+      "id": "book_tags-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «book_tags» نباید خالی بماند",
+      "table": "book_tags",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:830",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM book_tags WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "book_tags-book_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «book_id» در «book_tags» نباید خالی بماند",
+      "table": "book_tags",
+      "columns": [
+        "book_id"
+      ],
+      "from": "src/lib/db/database.js:830",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM book_tags WHERE book_id IS NULL OR TRIM(book_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "book_tags-tag_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «tag_id» در «book_tags» نباید خالی بماند",
+      "table": "book_tags",
+      "columns": [
+        "tag_id"
+      ],
+      "from": "src/lib/db/database.js:830",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM book_tags WHERE tag_id IS NULL OR TRIM(tag_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "book_tags-user_id-book_id-tag_id-unique",
+      "kind": "unique",
+      "statement": "دو ردیف در «book_tags» نمی‌توانند «user_id، book_id، tag_id» یکسان داشته باشند",
+      "table": "book_tags",
+      "columns": [
+        "user_id",
+        "book_id",
+        "tag_id"
+      ],
+      "from": "src/lib/db/database.js:830",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT user_id, book_id, tag_id, COUNT(*) AS ub_count FROM book_tags GROUP BY user_id, book_id, tag_id HAVING COUNT(*) > 1",
+      "expect": "empty",
+      "why": "پرس‌وجو اجرا نشد: page.evaluate: TypeError: Failed to resolve module specifier '/src/lib/db/database.js'",
+      "noise": 0
+    },
+    {
+      "id": "reading_sessions-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «reading_sessions» نباید خالی بماند",
+      "table": "reading_sessions",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:843",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM reading_sessions WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "reading_sessions-book_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «book_id» در «reading_sessions» نباید خالی بماند",
+      "table": "reading_sessions",
+      "columns": [
+        "book_id"
+      ],
+      "from": "src/lib/db/database.js:843",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM reading_sessions WHERE book_id IS NULL OR TRIM(book_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "reading_sessions-opened_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «opened_at» در «reading_sessions» نباید خالی بماند",
+      "table": "reading_sessions",
+      "columns": [
+        "opened_at"
+      ],
+      "from": "src/lib/db/database.js:843",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM reading_sessions WHERE opened_at IS NULL OR TRIM(opened_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "reading_progress-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «reading_progress» نباید خالی بماند",
+      "table": "reading_progress",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:857",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM reading_progress WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "reading_progress-book_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «book_id» در «reading_progress» نباید خالی بماند",
+      "table": "reading_progress",
+      "columns": [
+        "book_id"
+      ],
+      "from": "src/lib/db/database.js:857",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM reading_progress WHERE book_id IS NULL OR TRIM(book_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "reading_progress-updated_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «updated_at» در «reading_progress» نباید خالی بماند",
+      "table": "reading_progress",
+      "columns": [
+        "updated_at"
+      ],
+      "from": "src/lib/db/database.js:857",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM reading_progress WHERE updated_at IS NULL OR TRIM(updated_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "reading_progress-user_id-book_id-unique",
+      "kind": "unique",
+      "statement": "دو ردیف در «reading_progress» نمی‌توانند «user_id، book_id» یکسان داشته باشند",
+      "table": "reading_progress",
+      "columns": [
+        "user_id",
+        "book_id"
+      ],
+      "from": "src/lib/db/database.js:857",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT user_id, book_id, COUNT(*) AS ub_count FROM reading_progress GROUP BY user_id, book_id HAVING COUNT(*) > 1",
+      "expect": "empty",
+      "why": "پرس‌وجو اجرا نشد: page.evaluate: TypeError: Failed to resolve module specifier '/src/lib/db/database.js'",
+      "noise": 0
+    },
+    {
+      "id": "bookmarks-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «bookmarks» نباید خالی بماند",
+      "table": "bookmarks",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:879",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM bookmarks WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "bookmarks-book_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «book_id» در «bookmarks» نباید خالی بماند",
+      "table": "bookmarks",
+      "columns": [
+        "book_id"
+      ],
+      "from": "src/lib/db/database.js:879",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM bookmarks WHERE book_id IS NULL OR TRIM(book_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "bookmarks-paragraph_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «paragraph_id» در «bookmarks» نباید خالی بماند",
+      "table": "bookmarks",
+      "columns": [
+        "paragraph_id"
+      ],
+      "from": "src/lib/db/database.js:879",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM bookmarks WHERE paragraph_id IS NULL OR TRIM(paragraph_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "bookmarks-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «bookmarks» نباید خالی بماند",
+      "table": "bookmarks",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:879",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM bookmarks WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "word_definitions-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «word_definitions» نباید خالی بماند",
+      "table": "word_definitions",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:895",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM word_definitions WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "word_definitions-word-not-null",
+      "kind": "not-null",
+      "statement": "ستون «word» در «word_definitions» نباید خالی بماند",
+      "table": "word_definitions",
+      "columns": [
+        "word"
+      ],
+      "from": "src/lib/db/database.js:895",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM word_definitions WHERE word IS NULL OR TRIM(word) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "word_definitions-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «word_definitions» نباید خالی بماند",
+      "table": "word_definitions",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:895",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM word_definitions WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_questions-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «paragraph_questions» نباید خالی بماند",
+      "table": "paragraph_questions",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:907",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_questions WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_questions-paragraph_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «paragraph_id» در «paragraph_questions» نباید خالی بماند",
+      "table": "paragraph_questions",
+      "columns": [
+        "paragraph_id"
+      ],
+      "from": "src/lib/db/database.js:907",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_questions WHERE paragraph_id IS NULL OR TRIM(paragraph_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_questions-question-not-null",
+      "kind": "not-null",
+      "statement": "ستون «question» در «paragraph_questions» نباید خالی بماند",
+      "table": "paragraph_questions",
+      "columns": [
+        "question"
+      ],
+      "from": "src/lib/db/database.js:907",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_questions WHERE question IS NULL OR TRIM(question) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_questions-is_answered-not-null",
+      "kind": "not-null",
+      "statement": "ستون «is_answered» در «paragraph_questions» نباید خالی بماند",
+      "table": "paragraph_questions",
+      "columns": [
+        "is_answered"
+      ],
+      "from": "src/lib/db/database.js:907",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_questions WHERE is_answered IS NULL OR TRIM(is_answered) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_questions-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «paragraph_questions» نباید خالی بماند",
+      "table": "paragraph_questions",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:907",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_questions WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_comments-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «paragraph_comments» نباید خالی بماند",
+      "table": "paragraph_comments",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:923",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_comments WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_comments-paragraph_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «paragraph_id» در «paragraph_comments» نباید خالی بماند",
+      "table": "paragraph_comments",
+      "columns": [
+        "paragraph_id"
+      ],
+      "from": "src/lib/db/database.js:923",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_comments WHERE paragraph_id IS NULL OR TRIM(paragraph_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_comments-comment-not-null",
+      "kind": "not-null",
+      "statement": "ستون «comment» در «paragraph_comments» نباید خالی بماند",
+      "table": "paragraph_comments",
+      "columns": [
+        "comment"
+      ],
+      "from": "src/lib/db/database.js:923",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_comments WHERE comment IS NULL OR TRIM(comment) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_comments-highlight_color-not-null",
+      "kind": "not-null",
+      "statement": "ستون «highlight_color» در «paragraph_comments» نباید خالی بماند",
+      "table": "paragraph_comments",
+      "columns": [
+        "highlight_color"
+      ],
+      "from": "src/lib/db/database.js:923",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_comments WHERE highlight_color IS NULL OR TRIM(highlight_color) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_comments-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «paragraph_comments» نباید خالی بماند",
+      "table": "paragraph_comments",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:923",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_comments WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_references-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «paragraph_references» نباید خالی بماند",
+      "table": "paragraph_references",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:936",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_references WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_references-paragraph_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «paragraph_id» در «paragraph_references» نباید خالی بماند",
+      "table": "paragraph_references",
+      "columns": [
+        "paragraph_id"
+      ],
+      "from": "src/lib/db/database.js:936",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_references WHERE paragraph_id IS NULL OR TRIM(paragraph_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_references-source_text-not-null",
+      "kind": "not-null",
+      "statement": "ستون «source_text» در «paragraph_references» نباید خالی بماند",
+      "table": "paragraph_references",
+      "columns": [
+        "source_text"
+      ],
+      "from": "src/lib/db/database.js:936",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_references WHERE source_text IS NULL OR TRIM(source_text) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_references-target_type-not-null",
+      "kind": "not-null",
+      "statement": "ستون «target_type» در «paragraph_references» نباید خالی بماند",
+      "table": "paragraph_references",
+      "columns": [
+        "target_type"
+      ],
+      "from": "src/lib/db/database.js:936",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_references WHERE target_type IS NULL OR TRIM(target_type) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_references-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «paragraph_references» نباید خالی بماند",
+      "table": "paragraph_references",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:936",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_references WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "book_versions-book_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «book_id» در «book_versions» نباید خالی بماند",
+      "table": "book_versions",
+      "columns": [
+        "book_id"
+      ],
+      "from": "src/lib/db/database.js:953",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM book_versions WHERE book_id IS NULL OR TRIM(book_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "book_versions-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «book_versions» نباید خالی بماند",
+      "table": "book_versions",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:953",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM book_versions WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "book_versions-name-not-null",
+      "kind": "not-null",
+      "statement": "ستون «name» در «book_versions» نباید خالی بماند",
+      "table": "book_versions",
+      "columns": [
+        "name"
+      ],
+      "from": "src/lib/db/database.js:953",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM book_versions WHERE name IS NULL OR TRIM(name) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "book_versions-snapshot_json-not-null",
+      "kind": "not-null",
+      "statement": "ستون «snapshot_json» در «book_versions» نباید خالی بماند",
+      "table": "book_versions",
+      "columns": [
+        "snapshot_json"
+      ],
+      "from": "src/lib/db/database.js:953",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM book_versions WHERE snapshot_json IS NULL OR TRIM(snapshot_json) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "book_versions-is_active-not-null",
+      "kind": "not-null",
+      "statement": "ستون «is_active» در «book_versions» نباید خالی بماند",
+      "table": "book_versions",
+      "columns": [
+        "is_active"
+      ],
+      "from": "src/lib/db/database.js:953",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM book_versions WHERE is_active IS NULL OR TRIM(is_active) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "book_versions-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «book_versions» نباید خالی بماند",
+      "table": "book_versions",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:953",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM book_versions WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "book_versions-updated_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «updated_at» در «book_versions» نباید خالی بماند",
+      "table": "book_versions",
+      "columns": [
+        "updated_at"
+      ],
+      "from": "src/lib/db/database.js:953",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM book_versions WHERE updated_at IS NULL OR TRIM(updated_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "autocorrect_lexicon-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «autocorrect_lexicon» نباید خالی بماند",
+      "table": "autocorrect_lexicon",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:964",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM autocorrect_lexicon WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "autocorrect_lexicon-normalized-not-null",
+      "kind": "not-null",
+      "statement": "ستون «normalized» در «autocorrect_lexicon» نباید خالی بماند",
+      "table": "autocorrect_lexicon",
+      "columns": [
+        "normalized"
+      ],
+      "from": "src/lib/db/database.js:964",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM autocorrect_lexicon WHERE normalized IS NULL OR TRIM(normalized) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "autocorrect_lexicon-word-not-null",
+      "kind": "not-null",
+      "statement": "ستون «word» در «autocorrect_lexicon» نباید خالی بماند",
+      "table": "autocorrect_lexicon",
+      "columns": [
+        "word"
+      ],
+      "from": "src/lib/db/database.js:964",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM autocorrect_lexicon WHERE word IS NULL OR TRIM(word) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "autocorrect_lexicon-count-not-null",
+      "kind": "not-null",
+      "statement": "ستون «count» در «autocorrect_lexicon» نباید خالی بماند",
+      "table": "autocorrect_lexicon",
+      "columns": [
+        "count"
+      ],
+      "from": "src/lib/db/database.js:964",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM autocorrect_lexicon WHERE count IS NULL OR TRIM(count) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "autocorrect_lexicon-pinned-not-null",
+      "kind": "not-null",
+      "statement": "ستون «pinned» در «autocorrect_lexicon» نباید خالی بماند",
+      "table": "autocorrect_lexicon",
+      "columns": [
+        "pinned"
+      ],
+      "from": "src/lib/db/database.js:964",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM autocorrect_lexicon WHERE pinned IS NULL OR TRIM(pinned) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "autocorrect_lexicon-updated_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «updated_at» در «autocorrect_lexicon» نباید خالی بماند",
+      "table": "autocorrect_lexicon",
+      "columns": [
+        "updated_at"
+      ],
+      "from": "src/lib/db/database.js:964",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM autocorrect_lexicon WHERE updated_at IS NULL OR TRIM(updated_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "autocorrect_exceptions-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «autocorrect_exceptions» نباید خالی بماند",
+      "table": "autocorrect_exceptions",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:974",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM autocorrect_exceptions WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "autocorrect_exceptions-original-not-null",
+      "kind": "not-null",
+      "statement": "ستون «original» در «autocorrect_exceptions» نباید خالی بماند",
+      "table": "autocorrect_exceptions",
+      "columns": [
+        "original"
+      ],
+      "from": "src/lib/db/database.js:974",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM autocorrect_exceptions WHERE original IS NULL OR TRIM(original) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "autocorrect_exceptions-target-not-null",
+      "kind": "not-null",
+      "statement": "ستون «target» در «autocorrect_exceptions» نباید خالی بماند",
+      "table": "autocorrect_exceptions",
+      "columns": [
+        "target"
+      ],
+      "from": "src/lib/db/database.js:974",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM autocorrect_exceptions WHERE target IS NULL OR TRIM(target) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "autocorrect_exceptions-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «autocorrect_exceptions» نباید خالی بماند",
+      "table": "autocorrect_exceptions",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:974",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM autocorrect_exceptions WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "diagrams-book_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «book_id» در «diagrams» نباید خالی بماند",
+      "table": "diagrams",
+      "columns": [
+        "book_id"
+      ],
+      "from": "src/lib/db/database.js:984",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM diagrams WHERE book_id IS NULL OR TRIM(book_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "diagrams-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «diagrams» نباید خالی بماند",
+      "table": "diagrams",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:984",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM diagrams WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "diagrams-name-not-null",
+      "kind": "not-null",
+      "statement": "ستون «name» در «diagrams» نباید خالی بماند",
+      "table": "diagrams",
+      "columns": [
+        "name"
+      ],
+      "from": "src/lib/db/database.js:984",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM diagrams WHERE name IS NULL OR TRIM(name) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "diagrams-scene_json-not-null",
+      "kind": "not-null",
+      "statement": "ستون «scene_json» در «diagrams» نباید خالی بماند",
+      "table": "diagrams",
+      "columns": [
+        "scene_json"
+      ],
+      "from": "src/lib/db/database.js:984",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM diagrams WHERE scene_json IS NULL OR TRIM(scene_json) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "diagrams-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «diagrams» نباید خالی بماند",
+      "table": "diagrams",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:984",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM diagrams WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "diagrams-updated_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «updated_at» در «diagrams» نباید خالی بماند",
+      "table": "diagrams",
+      "columns": [
+        "updated_at"
+      ],
+      "from": "src/lib/db/database.js:984",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM diagrams WHERE updated_at IS NULL OR TRIM(updated_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "diagram_links-diagram_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «diagram_id» در «diagram_links» نباید خالی بماند",
+      "table": "diagram_links",
+      "columns": [
+        "diagram_id"
+      ],
+      "from": "src/lib/db/database.js:997",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM diagram_links WHERE diagram_id IS NULL OR TRIM(diagram_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "diagram_links-target_type-not-null",
+      "kind": "not-null",
+      "statement": "ستون «target_type» در «diagram_links» نباید خالی بماند",
+      "table": "diagram_links",
+      "columns": [
+        "target_type"
+      ],
+      "from": "src/lib/db/database.js:997",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM diagram_links WHERE target_type IS NULL OR TRIM(target_type) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "diagram_links-target_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «target_id» در «diagram_links» نباید خالی بماند",
+      "table": "diagram_links",
+      "columns": [
+        "target_id"
+      ],
+      "from": "src/lib/db/database.js:997",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM diagram_links WHERE target_id IS NULL OR TRIM(target_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "diagram_links-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «diagram_links» نباید خالی بماند",
+      "table": "diagram_links",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:997",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM diagram_links WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "folders-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «folders» نباید خالی بماند",
+      "table": "folders",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:1277",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM folders WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "folders-name-not-null",
+      "kind": "not-null",
+      "statement": "ستون «name» در «folders» نباید خالی بماند",
+      "table": "folders",
+      "columns": [
+        "name"
+      ],
+      "from": "src/lib/db/database.js:1277",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM folders WHERE name IS NULL OR TRIM(name) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "folders-sort_order-not-null",
+      "kind": "not-null",
+      "statement": "ستون «sort_order» در «folders» نباید خالی بماند",
+      "table": "folders",
+      "columns": [
+        "sort_order"
+      ],
+      "from": "src/lib/db/database.js:1277",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM folders WHERE sort_order IS NULL OR TRIM(sort_order) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "folders-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «folders» نباید خالی بماند",
+      "table": "folders",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:1277",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM folders WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "folders-updated_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «updated_at» در «folders» نباید خالی بماند",
+      "table": "folders",
+      "columns": [
+        "updated_at"
+      ],
+      "from": "src/lib/db/database.js:1277",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM folders WHERE updated_at IS NULL OR TRIM(updated_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "folders-user_id-parent_id-name-unique",
+      "kind": "unique",
+      "statement": "دو ردیف در «folders» نمی‌توانند «user_id، parent_id، name» یکسان داشته باشند",
+      "table": "folders",
+      "columns": [
+        "user_id",
+        "parent_id",
+        "name"
+      ],
+      "from": "src/lib/db/database.js:1277",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT user_id, parent_id, name, COUNT(*) AS ub_count FROM folders GROUP BY user_id, parent_id, name HAVING COUNT(*) > 1",
+      "expect": "empty",
+      "why": "پرس‌وجو اجرا نشد: page.evaluate: TypeError: Failed to resolve module specifier '/src/lib/db/database.js'",
+      "noise": 0
+    },
+    {
+      "id": "ai_settings-user_id-unique",
+      "kind": "unique",
+      "statement": "دو ردیف در «ai_settings» نمی‌توانند «user_id» یکسان داشته باشند",
+      "table": "ai_settings",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:1364",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT user_id, COUNT(*) AS ub_count FROM ai_settings GROUP BY user_id HAVING COUNT(*) > 1",
+      "expect": "empty",
+      "why": "پرس‌وجو اجرا نشد: page.evaluate: TypeError: Failed to resolve module specifier '/src/lib/db/database.js'",
+      "noise": 0
+    },
+    {
+      "id": "ai_settings-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «ai_settings» نباید خالی بماند",
+      "table": "ai_settings",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:1364",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM ai_settings WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "ai_settings-provider-not-null",
+      "kind": "not-null",
+      "statement": "ستون «provider» در «ai_settings» نباید خالی بماند",
+      "table": "ai_settings",
+      "columns": [
+        "provider"
+      ],
+      "from": "src/lib/db/database.js:1364",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM ai_settings WHERE provider IS NULL OR TRIM(provider) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "ai_settings-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «ai_settings» نباید خالی بماند",
+      "table": "ai_settings",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:1364",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM ai_settings WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "ai_settings-updated_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «updated_at» در «ai_settings» نباید خالی بماند",
+      "table": "ai_settings",
+      "columns": [
+        "updated_at"
+      ],
+      "from": "src/lib/db/database.js:1364",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM ai_settings WHERE updated_at IS NULL OR TRIM(updated_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "ai_chats-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «ai_chats» نباید خالی بماند",
+      "table": "ai_chats",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:1379",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM ai_chats WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "ai_chats-title-not-null",
+      "kind": "not-null",
+      "statement": "ستون «title» در «ai_chats» نباید خالی بماند",
+      "table": "ai_chats",
+      "columns": [
+        "title"
+      ],
+      "from": "src/lib/db/database.js:1379",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM ai_chats WHERE title IS NULL OR TRIM(title) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "ai_chats-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «ai_chats» نباید خالی بماند",
+      "table": "ai_chats",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:1379",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM ai_chats WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "ai_chats-updated_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «updated_at» در «ai_chats» نباید خالی بماند",
+      "table": "ai_chats",
+      "columns": [
+        "updated_at"
+      ],
+      "from": "src/lib/db/database.js:1379",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM ai_chats WHERE updated_at IS NULL OR TRIM(updated_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "ai_messages-chat_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «chat_id» در «ai_messages» نباید خالی بماند",
+      "table": "ai_messages",
+      "columns": [
+        "chat_id"
+      ],
+      "from": "src/lib/db/database.js:1395",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM ai_messages WHERE chat_id IS NULL OR TRIM(chat_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "ai_messages-role-not-null",
+      "kind": "not-null",
+      "statement": "ستون «role» در «ai_messages» نباید خالی بماند",
+      "table": "ai_messages",
+      "columns": [
+        "role"
+      ],
+      "from": "src/lib/db/database.js:1395",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM ai_messages WHERE role IS NULL OR TRIM(role) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "ai_messages-content-not-null",
+      "kind": "not-null",
+      "statement": "ستون «content» در «ai_messages» نباید خالی بماند",
+      "table": "ai_messages",
+      "columns": [
+        "content"
+      ],
+      "from": "src/lib/db/database.js:1395",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM ai_messages WHERE content IS NULL OR TRIM(content) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "ai_messages-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «ai_messages» نباید خالی بماند",
+      "table": "ai_messages",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:1395",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM ai_messages WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_diagrams-book_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «book_id» در «paragraph_diagrams» نباید خالی بماند",
+      "table": "paragraph_diagrams",
+      "columns": [
+        "book_id"
+      ],
+      "from": "src/lib/db/database.js:1730",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_diagrams WHERE book_id IS NULL OR TRIM(book_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_diagrams-name-not-null",
+      "kind": "not-null",
+      "statement": "ستون «name» در «paragraph_diagrams» نباید خالی بماند",
+      "table": "paragraph_diagrams",
+      "columns": [
+        "name"
+      ],
+      "from": "src/lib/db/database.js:1730",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_diagrams WHERE name IS NULL OR TRIM(name) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_diagrams-scene_json-not-null",
+      "kind": "not-null",
+      "statement": "ستون «scene_json» در «paragraph_diagrams» نباید خالی بماند",
+      "table": "paragraph_diagrams",
+      "columns": [
+        "scene_json"
+      ],
+      "from": "src/lib/db/database.js:1730",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_diagrams WHERE scene_json IS NULL OR TRIM(scene_json) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_diagrams-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «paragraph_diagrams» نباید خالی بماند",
+      "table": "paragraph_diagrams",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:1730",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_diagrams WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_diagrams-updated_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «updated_at» در «paragraph_diagrams» نباید خالی بماند",
+      "table": "paragraph_diagrams",
+      "columns": [
+        "updated_at"
+      ],
+      "from": "src/lib/db/database.js:1730",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_diagrams WHERE updated_at IS NULL OR TRIM(updated_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_diagram_links-diagram_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «diagram_id» در «paragraph_diagram_links» نباید خالی بماند",
+      "table": "paragraph_diagram_links",
+      "columns": [
+        "diagram_id"
+      ],
+      "from": "src/lib/db/database.js:1731",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_diagram_links WHERE diagram_id IS NULL OR TRIM(diagram_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "paragraph_diagram_links-paragraph_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «paragraph_id» در «paragraph_diagram_links» نباید خالی بماند",
+      "table": "paragraph_diagram_links",
+      "columns": [
+        "paragraph_id"
+      ],
+      "from": "src/lib/db/database.js:1731",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM paragraph_diagram_links WHERE paragraph_id IS NULL OR TRIM(paragraph_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "change_log-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «change_log» نباید خالی بماند",
+      "table": "change_log",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:1948",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM change_log WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "change_log-entity-not-null",
+      "kind": "not-null",
+      "statement": "ستون «entity» در «change_log» نباید خالی بماند",
+      "table": "change_log",
+      "columns": [
+        "entity"
+      ],
+      "from": "src/lib/db/database.js:1948",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM change_log WHERE entity IS NULL OR TRIM(entity) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "change_log-entity_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «entity_id» در «change_log» نباید خالی بماند",
+      "table": "change_log",
+      "columns": [
+        "entity_id"
+      ],
+      "from": "src/lib/db/database.js:1948",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM change_log WHERE entity_id IS NULL OR TRIM(entity_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "change_log-op-not-null",
+      "kind": "not-null",
+      "statement": "ستون «op» در «change_log» نباید خالی بماند",
+      "table": "change_log",
+      "columns": [
+        "op"
+      ],
+      "from": "src/lib/db/database.js:1948",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM change_log WHERE op IS NULL OR TRIM(op) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "change_log-hlc-not-null",
+      "kind": "not-null",
+      "statement": "ستون «hlc» در «change_log» نباید خالی بماند",
+      "table": "change_log",
+      "columns": [
+        "hlc"
+      ],
+      "from": "src/lib/db/database.js:1948",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM change_log WHERE hlc IS NULL OR TRIM(hlc) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "change_log-synced-not-null",
+      "kind": "not-null",
+      "statement": "ستون «synced» در «change_log» نباید خالی بماند",
+      "table": "change_log",
+      "columns": [
+        "synced"
+      ],
+      "from": "src/lib/db/database.js:1948",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM change_log WHERE synced IS NULL OR TRIM(synced) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "change_log-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «change_log» نباید خالی بماند",
+      "table": "change_log",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:1948",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM change_log WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "shared_documents-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «shared_documents» نباید خالی بماند",
+      "table": "shared_documents",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:1990",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM shared_documents WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "shared_documents-document_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «document_id» در «shared_documents» نباید خالی بماند",
+      "table": "shared_documents",
+      "columns": [
+        "document_id"
+      ],
+      "from": "src/lib/db/database.js:1990",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM shared_documents WHERE document_id IS NULL OR TRIM(document_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "shared_documents-owner_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «owner_id» در «shared_documents» نباید خالی بماند",
+      "table": "shared_documents",
+      "columns": [
+        "owner_id"
+      ],
+      "from": "src/lib/db/database.js:1990",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM shared_documents WHERE owner_id IS NULL OR TRIM(owner_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "shared_documents-permission-not-null",
+      "kind": "not-null",
+      "statement": "ستون «permission» در «shared_documents» نباید خالی بماند",
+      "table": "shared_documents",
+      "columns": [
+        "permission"
+      ],
+      "from": "src/lib/db/database.js:1990",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM shared_documents WHERE permission IS NULL OR TRIM(permission) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "shared_documents-user_id-document_id-unique",
+      "kind": "unique",
+      "statement": "دو ردیف در «shared_documents» نمی‌توانند «user_id، document_id» یکسان داشته باشند",
+      "table": "shared_documents",
+      "columns": [
+        "user_id",
+        "document_id"
+      ],
+      "from": "src/lib/db/database.js:1990",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT user_id, document_id, COUNT(*) AS ub_count FROM shared_documents GROUP BY user_id, document_id HAVING COUNT(*) > 1",
+      "expect": "empty",
+      "why": "پرس‌وجو اجرا نشد: page.evaluate: TypeError: Failed to resolve module specifier '/src/lib/db/database.js'",
+      "noise": 0
+    },
+    {
+      "id": "share_grantees-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «share_grantees» نباید خالی بماند",
+      "table": "share_grantees",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:2006",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM share_grantees WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "share_grantees-document_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «document_id» در «share_grantees» نباید خالی بماند",
+      "table": "share_grantees",
+      "columns": [
+        "document_id"
+      ],
+      "from": "src/lib/db/database.js:2006",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM share_grantees WHERE document_id IS NULL OR TRIM(document_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "share_grantees-grantee_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «grantee_id» در «share_grantees» نباید خالی بماند",
+      "table": "share_grantees",
+      "columns": [
+        "grantee_id"
+      ],
+      "from": "src/lib/db/database.js:2006",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM share_grantees WHERE grantee_id IS NULL OR TRIM(grantee_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "share_grantees-user_id-document_id-grantee_id-unique",
+      "kind": "unique",
+      "statement": "دو ردیف در «share_grantees» نمی‌توانند «user_id، document_id، grantee_id» یکسان داشته باشند",
+      "table": "share_grantees",
+      "columns": [
+        "user_id",
+        "document_id",
+        "grantee_id"
+      ],
+      "from": "src/lib/db/database.js:2006",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT user_id, document_id, grantee_id, COUNT(*) AS ub_count FROM share_grantees GROUP BY user_id, document_id, grantee_id HAVING COUNT(*) > 1",
+      "expect": "empty",
+      "why": "پرس‌وجو اجرا نشد: page.evaluate: TypeError: Failed to resolve module specifier '/src/lib/db/database.js'",
+      "noise": 0
+    },
+    {
+      "id": "document_keys-user_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «user_id» در «document_keys» نباید خالی بماند",
+      "table": "document_keys",
+      "columns": [
+        "user_id"
+      ],
+      "from": "src/lib/db/database.js:2035",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM document_keys WHERE user_id IS NULL OR TRIM(user_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "document_keys-document_id-not-null",
+      "kind": "not-null",
+      "statement": "ستون «document_id» در «document_keys» نباید خالی بماند",
+      "table": "document_keys",
+      "columns": [
+        "document_id"
+      ],
+      "from": "src/lib/db/database.js:2035",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM document_keys WHERE document_id IS NULL OR TRIM(document_id) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "document_keys-wrapped_key-not-null",
+      "kind": "not-null",
+      "statement": "ستون «wrapped_key» در «document_keys» نباید خالی بماند",
+      "table": "document_keys",
+      "columns": [
+        "wrapped_key"
+      ],
+      "from": "src/lib/db/database.js:2035",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM document_keys WHERE wrapped_key IS NULL OR TRIM(wrapped_key) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "document_keys-created_at-not-null",
+      "kind": "not-null",
+      "statement": "ستون «created_at» در «document_keys» نباید خالی بماند",
+      "table": "document_keys",
+      "columns": [
+        "created_at"
+      ],
+      "from": "src/lib/db/database.js:2035",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT COUNT(*) AS ub_count FROM document_keys WHERE created_at IS NULL OR TRIM(created_at) = ''",
+      "expect": "zero",
+      "why": "",
+      "noise": 0
+    },
+    {
+      "id": "document_keys-user_id-document_id-unique",
+      "kind": "unique",
+      "statement": "دو ردیف در «document_keys» نمی‌توانند «user_id، document_id» یکسان داشته باشند",
+      "table": "document_keys",
+      "columns": [
+        "user_id",
+        "document_id"
+      ],
+      "from": "src/lib/db/database.js:2035",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT user_id, document_id, COUNT(*) AS ub_count FROM document_keys GROUP BY user_id, document_id HAVING COUNT(*) > 1",
+      "expect": "empty",
+      "why": "پرس‌وجو اجرا نشد: page.evaluate: TypeError: Failed to resolve module specifier '/src/lib/db/database.js'",
+      "noise": 0
+    },
+    {
+      "id": "change_log-user_id-entity-entity_id-unique",
+      "kind": "unique",
+      "statement": "دو ردیف در «change_log» نمی‌توانند «user_id، entity، entity_id» یکسان داشته باشند",
+      "table": "change_log",
+      "columns": [
+        "user_id",
+        "entity",
+        "entity_id"
+      ],
+      "from": "src/lib/db/database.js:2219",
+      "by": "source",
+      "mode": "off",
+      "query": "SELECT user_id, entity, entity_id, COUNT(*) AS ub_count FROM change_log GROUP BY user_id, entity, entity_id HAVING COUNT(*) > 1",
+      "expect": "empty",
+      "why": "پرس‌وجو اجرا نشد: page.evaluate: TypeError: Failed to resolve module specifier '/src/lib/db/database.js'",
+      "noise": 0
+    }
+  ]
+}

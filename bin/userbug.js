@@ -28,6 +28,7 @@ import { knowledgeDir, readDossier, writeDossier } from '../src/knowledge/store.
 import { digestSource } from '../src/knowledge/digest.js';
 import { answerQuestion, mergeIntoDossier } from '../src/knowledge/merge.js';
 import { listAccounts, removeAccount, saveAccount } from '../src/knowledge/credentials.js';
+import { addUserInvariant, listInvariants, mergeInvariants, setInvariantMode } from '../src/knowledge/invariants.js';
 import { readHistory } from '../src/knowledge/history.js';
 import { renderDossier } from '../src/knowledge/render.js';
 import { DEFAULT_MODE, readChecksConfig, setCheckMode } from '../src/checks/config.js';
@@ -86,6 +87,12 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --history [n]               تاریخچهٔ تغییرِ شناخت، تازه‌ترین اول
       --questions                 پرسش‌های بی‌جواب، شماره‌دار
       --answer <شماره> --as <متن> ثبت جواب؛ تنها راهی که چیزی by:user می‌شود
+
+  userbug invariants <هدف>        قاعده‌هایی که نباید بشکنند (باگ منطقی)
+      --off <شناسه> --why <متن>   خاموش کردن؛ دلیل اجباری
+      --watch/--expect <شناسه>    تغییر حالت
+      --add <شناسه> --statement <جمله> --query <SQL>
+                                  ناوردای دستی؛ by: user
 
   userbug accounts <هدف>          حساب‌های ذخیره‌شدهٔ این پروژه
       --add <شناسه> --email <ایمیل> --password-env <NAME>
@@ -540,10 +547,23 @@ async function cmdLearn({ flags, positional }) {
   if (detectors.length) console.log(`  آشکارساز: ${detectors.map(([k, v]) => `${k} ${v}`).join(' · ')}`);
   if (note) console.log(`  ${note}`);
 
+  if (scan.invariants?.length) {
+    console.log(`  ${scan.invariants.length} ناوردا از schema استخراج شد`);
+  }
+
   if (flags.dry) {
     for (const route of scan.routes) console.log(`    ${route.path}`);
     console.log('\n  «--dry» بود؛ چیزی ذخیره نشد.\n');
     return;
+  }
+
+  /**
+   * ناوردا جدا از پرونده ذخیره می‌شود، ولی همین‌جا — چون از همان پیمایش
+   * درآمده و دو بار خواندنِ سورس بی‌دلیل است.
+   */
+  if (scan.invariants?.length) {
+    const merged = mergeInvariants(name, scan.invariants);
+    console.log(`  ناوردا: ${merged.added} تازه · ${merged.kept} با حالتِ قبلی حفظ شد`);
   }
 
   const current = readDossier(name);
@@ -562,6 +582,65 @@ async function cmdLearn({ flags, positional }) {
 
   if (budget) console.log(`\n  مدل: ${models.model}  ·  ${budget.calls} فراخوانی  ·  ${budget.spent.toFixed(4)}$`);
   else if (!usedModel) console.log('\n  بی‌مدل اجرا شد؛ فقط ساختار.');
+  console.log('');
+}
+
+/**
+ * ناوردا — قاعده‌هایی که هرگز نباید بشکنند.
+ *
+ * ── چرا اینجا فقط نمایش و تنظیم است ──
+ *
+ * استخراج کارِ `learn` است، چون از همان پیمایشِ سورس درمی‌آید. اینجا فقط
+ * دیدن، خاموش کردن، و افزودنِ دستی.
+ */
+function cmdInvariants({ flags, positional }) {
+  const name = positional[0];
+  if (!name) throw new Error('نام هدف لازم است: userbug invariants <هدف>');
+
+  for (const [flag, mode] of [
+    ['off', 'off'],
+    ['watch', 'watch'],
+    ['expect', 'expect'],
+  ]) {
+    if (flags[flag] === undefined) continue;
+    const saved = setInvariantMode(name, String(flags[flag]), mode, String(flags.why ?? ''));
+    console.log('');
+    console.log(`  ${saved.id} → ${saved.mode}${saved.why ? `  («${saved.why}»)` : ''}`);
+    console.log('');
+    return;
+  }
+
+  if (flags.add) {
+    const saved = addUserInvariant(name, {
+      id: String(flags.add),
+      statement: String(flags.statement ?? ''),
+      query: String(flags.query ?? ''),
+      expect: String(flags.expect ?? 'empty'),
+    });
+    console.log('');
+    console.log(`  ثبت شد (by: user): ${saved.id} — ${saved.statement}`);
+    console.log('');
+    return;
+  }
+
+  const invariants = listInvariants(name);
+  if (!invariants.length) {
+    console.log('');
+    console.log('  ناوردایی ثبت نشده.');
+    console.log('  استخراج از schema: userbug learn <هدف>');
+    console.log('  افزودن دستی: userbug invariants <هدف> --add <شناسه> --statement <جمله> --query <SQL>');
+    console.log('');
+    return;
+  }
+
+  console.log('');
+  for (const item of invariants) {
+    console.log(`  [${item.mode.padEnd(6)}] ${item.id}`);
+    console.log(`            ${item.statement}`);
+    console.log(`            منبع: ${item.by}${item.from ? ` · ${item.from}` : ''}${item.why ? ` · «${item.why}»` : ''}`);
+  }
+  console.log('');
+  console.log('  اجرا: در پایان هر سناریو، اگر هدف state.sql داشته باشد.');
   console.log('');
 }
 
@@ -1023,6 +1102,9 @@ try {
       break;
     case 'knowledge':
       await cmdKnowledge(parsed);
+      break;
+    case 'invariants':
+      cmdInvariants(parsed);
       break;
     case 'accounts':
       await cmdAccounts(parsed);

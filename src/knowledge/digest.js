@@ -23,6 +23,7 @@ import path from 'node:path';
 import { askJson } from '../models/provider.js';
 import { listSourceFiles, readSourceFile, resolveSourceRoot } from '../source-access.js';
 import { detectStack, discoverRoutes } from './routes.js';
+import { mineInvariants } from './schema-mine.js';
 
 /** سقفِ متنی که از مستندات به مدل می‌رود. بلندتر از این، فصل است نه معرفی. */
 const DOC_BUDGET = 6000;
@@ -88,13 +89,19 @@ export async function scanSource(target) {
   const files = await listSourceFiles(root);
   const read = readerFor(root);
 
-  const [stack, discovered] = await Promise.all([detectStack({ files, read }), discoverRoutes({ files, read })]);
+  const [stack, discovered, invariants] = await Promise.all([
+    detectStack({ files, read }),
+    discoverRoutes({ files, read }),
+    // ناوردا هم فکت است، نه معنا: `UNIQUE(email)` نحوِ ثابت دارد
+    mineInvariants({ files, read }),
+  ]);
 
   return {
     root,
     files,
     stack,
     routes: discovered.routes,
+    invariants,
     byDetector: discovered.byDetector,
     docs: documentationFiles(files),
   };

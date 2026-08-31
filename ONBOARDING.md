@@ -566,8 +566,9 @@ const text = await fs.readFile(await download.path(), 'utf8');
 - [x] وصل به `fixtures.js` — همهٔ مسیرها از `ub.step` رد می‌شوند، پس کاوش هم پوشش دارد
 - [ ] `src/checks/contract.js` — ساخت قرارداد از snapshot، سنجش، ارتقای
       پیشنهادی.
-- [ ] `src/checks/invariant.js` + `src/knowledge/schema-mine.js` — استخراج از
-      SQL و فایل‌های اعتبارسنجی.
+- [x] `src/checks/invariant.js` + `src/knowledge/schema-mine.js` — استخراج
+      `UNIQUE`/`NOT NULL` از SQL، چه در `.sql` چه داخل js/php · اجرا در پایان
+      هر سناریو · ناوردای غیرقابل‌اجرا خودش خاموش می‌شود
 - [x] `knowledge/<کلید>/checks.json` با `mode` و `why` و شمارندهٔ سروصدا · `userbug checks`
 - [ ] رابط: صفحهٔ چک‌ها — روشن/خاموش، `watch`→`expect`، و آمارِ سروصدا.
 - [ ] خودآزما: صفحه‌ای که عمداً سفید است، صفحه‌ای با `[object Object]`، و

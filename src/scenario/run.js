@@ -30,6 +30,7 @@ import { resolveDo, performAction } from '../steps/do.js';
 import { explore } from '../steps/explore.js';
 import { resolveFixture } from '../knowledge/fixtures.js';
 import { accountsFor } from '../knowledge/credentials.js';
+import { runInvariants } from '../checks/invariant.js';
 import { getCurrentRun } from '../store/run-store.js';
 import { writeRepros } from '../repro.js';
 
@@ -110,6 +111,27 @@ export async function runScenario({ page, ub, identity, scenario }) {
       });
     }
   } finally {
+    /**
+     * ناوردا در پایانِ سناریو، نه در `finalizeRun`.
+     *
+     * `state.sql` در **مرورگر** اجرا می‌شود. `finalizeRun` بعد از بسته شدن
+     * مرورگر است، پس آنجا صفحه‌ای نمانده که پرس‌وجو روی آن اجرا شود.
+     *
+     * در `finally` است تا سناریویی که وسط راه شکسته هم سنجیده شود: وضعیتِ
+     * نیمه‌کارهٔ دیتابیس دقیقاً همان‌جایی است که قاعده می‌شکند.
+     */
+    try {
+      const { findings } = await runInvariants({
+        page,
+        target: ub.target,
+        step: `ناوردا پس از «${scenario.name}»`,
+        device: process.env.UB_DEVICE || ub.target.device,
+      });
+      for (const finding of findings) await ub.note({ ...finding, source: 'invariant' });
+    } catch {
+      // نبودِ سنجشِ ناوردا نباید نتیجهٔ سناریو را ببرد
+    }
+
     if (ctx.cacheDirty) saveCache(ub.target.key, scenario.id, ctx.cache);
 
     // «یافته بدون بازتولید، یافته نیست» — قانون سوم پروژه. تا امروز فقط شعار
