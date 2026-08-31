@@ -1,7 +1,8 @@
 /**
  * جای‌گذاری متغیر در متن سناریو.
  *
- *   {{identity.email}}            هویتِ همین اجرا
+ *   {{identity.email}}            هویتِ همین اجرا — کاربرِ تازه، هر بار
+ *   {{account.admin.email}}       حسابِ ذخیره‌شده — همان کاربر، با دادهٔ خودش
  *   {{identity.email | upper}}    با فیلتر
  *   {{nasty.zwnj}}                دادهٔ بدخیم فارسی
  *   {{vars.recoveryCode}}         چیزی که قدم `set` گرفته

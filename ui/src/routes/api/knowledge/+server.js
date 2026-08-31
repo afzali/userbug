@@ -5,6 +5,7 @@ import { readHistory } from '../../../../../src/knowledge/history.js';
 import { answerQuestion, mergeIntoDossier } from '../../../../../src/knowledge/merge.js';
 import { knowledgeDir, listPages, readDossier, writeDossier } from '../../../../../src/knowledge/store.js';
 import { listFixtures } from '../../../../../src/knowledge/fixtures.js';
+import { listAccounts, removeAccount, saveAccount } from '../../../../../src/knowledge/credentials.js';
 import { readChecksConfig, setCheckMode } from '../../../../../src/checks/config.js';
 import { assertModelSlug, loadGlobalConfig, resolveModel } from '../../../../../src/models/config.js';
 import { Budget } from '../../../../../src/models/provider.js';
@@ -49,6 +50,8 @@ async function snapshot(target) {
     checks: readChecksConfig(target),
     history: readHistory(knowledgeDir(target), { limit: 60 }),
     fixtures: await listFixtures(target).catch(() => []),
+    // بدون رمز — فقط «تنظیم شده / نشده»
+    accounts: listAccounts(target),
   };
 }
 
@@ -74,6 +77,27 @@ export async function POST(event) {
     if (action === 'answer') {
       const next = answerQuestion(readDossier(project.key), String(body?.question), String(body?.answer));
       await writeDossier(project.key, next, { by: 'user', why: 'پاسخ از رابط' });
+      return json(await snapshot(project.key));
+    }
+
+    if (action === 'account-save') {
+      saveAccount({
+        target: project.key,
+        environment: project.environment,
+        id: body.id,
+        email: body.email,
+        username: body.username,
+        passwordEnv: body.passwordEnv,
+        password: body.password,
+        note: body.note,
+        allowPlain: Boolean(body.allowPlain),
+        allowProduction: Boolean(body.allowProduction),
+      });
+      return json(await snapshot(project.key));
+    }
+
+    if (action === 'account-remove') {
+      removeAccount(project.key, String(body?.id));
       return json(await snapshot(project.key));
     }
 

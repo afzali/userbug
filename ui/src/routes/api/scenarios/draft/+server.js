@@ -5,6 +5,7 @@ import { assertModelSlug, loadGlobalConfig, resolveModel } from '../../../../../
 import { listProjects } from '$lib/server/projects.js';
 import { knowledgeFor } from '../../../../../../src/knowledge/select.js';
 import { listFixtures } from '../../../../../../src/knowledge/fixtures.js';
+import { listAccounts } from '../../../../../../src/knowledge/credentials.js';
 import { jsonError } from '$lib/server/http.js';
 import { assertMutationRequest } from '$lib/server/security.js';
 
@@ -80,6 +81,8 @@ export async function POST(event) {
       // بدون این، مدل نامِ فایلِ آپلود را اختراع می‌کند و سناریو در اجرا
       // با «فایل پیدا نشد» می‌شکند
       fixtures: await listFixtures(target).catch(() => []),
+      // فقط شناسه‌ها؛ ایمیل و رمز دادهٔ کاربرند و به مدل کاری ندارند
+      accounts: listAccounts(target).map((item) => item.id),
     });
 
     const draft = await scenarioFromText({

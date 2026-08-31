@@ -42,6 +42,7 @@ import { redactDeep, secretsOf } from '../models/redact.js';
 import { askJson } from '../models/provider.js';
 import { writeDraft } from './author.js';
 import { avoidFrom, knowledgeFor, purposeOfPage } from '../knowledge/select.js';
+import { accountSecrets } from '../knowledge/credentials.js';
 
 const SYSTEM = `تو یک تسترِ انسانی را شبیه‌سازی می‌کنی که با یک اپ کار می‌کند.
 
@@ -108,7 +109,7 @@ export async function explore({ page, ub, ctx, goal, maxSteps = 12, author = fal
       break;
     }
 
-    const safe = redactDeep({ ...snapshot, items }, secretsOf(ctx.identity));
+    const safe = redactDeep({ ...snapshot, items }, secretsOf(ctx.identity, accountSecrets(targetKey)));
 
     /**
      * هدفِ همین صفحه، از پرونده — یک بار در هر قدم، نه دو بار در prompt.

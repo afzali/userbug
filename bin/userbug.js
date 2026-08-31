@@ -27,6 +27,7 @@ import { renderJUnit } from '../src/report/junit.js';
 import { knowledgeDir, readDossier, writeDossier } from '../src/knowledge/store.js';
 import { digestSource } from '../src/knowledge/digest.js';
 import { answerQuestion, mergeIntoDossier } from '../src/knowledge/merge.js';
+import { listAccounts, removeAccount, saveAccount } from '../src/knowledge/credentials.js';
 import { readHistory } from '../src/knowledge/history.js';
 import { renderDossier } from '../src/knowledge/render.js';
 import { DEFAULT_MODE, readChecksConfig, setCheckMode } from '../src/checks/config.js';
@@ -85,6 +86,12 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --history [n]               تاریخچهٔ تغییرِ شناخت، تازه‌ترین اول
       --questions                 پرسش‌های بی‌جواب، شماره‌دار
       --answer <شماره> --as <متن> ثبت جواب؛ تنها راهی که چیزی by:user می‌شود
+
+  userbug accounts <هدف>          حساب‌های ذخیره‌شدهٔ این پروژه
+      --add <شناسه> --email <ایمیل> --password-env <NAME>
+                                  افزودن؛ رمز از متغیر محیطی خوانده می‌شود
+      --remove <شناسه>            حذف
+      --allow-production          تأییدِ جدا برای هدفِ تولیدی
 
   userbug tour <هدف> [--device <نام>] [--name <عنوان>]
                                   گشتِ زنده: مرورگر باز می‌شود، شما کار
@@ -559,6 +566,67 @@ async function cmdLearn({ flags, positional }) {
 }
 
 /**
+ * حساب‌های ذخیره‌شده.
+ *
+ * ── چرا رمز از آرگومان گرفته نمی‌شود ──
+ *
+ * `--password` در خط فرمان یعنی رمز در تاریخچهٔ shell و در فهرست پروسه‌ها
+ * می‌نشیند. پس فقط `--password-env` هست: نامِ متغیری که رمز در آن است.
+ * برای رمزِ متنی باید از رابط رفت، جایی که هشدارش دیده می‌شود.
+ */
+async function cmdAccounts({ flags, positional }) {
+  const name = positional[0];
+  if (!name) throw new Error('نام هدف لازم است: userbug accounts <هدف>');
+
+  if (flags.remove) {
+    const removed = removeAccount(name, String(flags.remove));
+    console.log(removed ? `\n  حسابِ «${flags.remove}» حذف شد.\n` : `\n  حسابی به نام «${flags.remove}» نبود.\n`);
+    return;
+  }
+
+  if (flags.add) {
+    const target = await loadTarget(name);
+    const saved = saveAccount({
+      target: name,
+      environment: target.environment,
+      id: String(flags.add),
+      email: String(flags.email ?? ''),
+      username: String(flags.username ?? ''),
+      passwordEnv: String(flags['password-env'] ?? ''),
+      note: String(flags.note ?? ''),
+      allowProduction: flags['allow-production'] === true,
+    });
+    console.log(`\n  ثبت شد: ${saved.id} · ${saved.email || saved.username} · رمز از ${saved.passwordEnv}`);
+    if (!saved.hasPassword) console.log(`  ⚠ متغیر ${saved.passwordEnv} هنوز تنظیم نشده.`);
+    console.log(`\n  در سناریو: {{account.${saved.id}.email}} و {{account.${saved.id}.password}}\n`);
+    return;
+  }
+
+  const accounts = listAccounts(name);
+  if (!accounts.length) {
+    console.log('\n  حسابی ثبت نشده.');
+    console.log('  افزودن: userbug accounts <هدف> --add <شناسه> --email <ایمیل> --password-env <NAME>\n');
+    return;
+  }
+
+  console.log('');
+  console.log('  شناسه            ایمیل/کاربر                منبع رمز        وضعیت');
+  console.log('  ' + '─'.repeat(74));
+  for (const account of accounts) {
+    console.log(
+      '  ' +
+        [
+          account.id.padEnd(16),
+          (account.email || account.username).padEnd(26),
+          (account.passwordEnv || (account.source === 'plain' ? '(متنی)' : '—')).padEnd(15),
+          account.hasPassword ? 'آماده' : 'رمز در دسترس نیست',
+        ].join(' ')
+    );
+  }
+  console.log('');
+}
+
+/**
  * گشتِ زنده از خط فرمان.
  *
  * ── چرا اینجا هم هست، وقتی جای اصلی‌اش رابط است ──
@@ -955,6 +1023,9 @@ try {
       break;
     case 'knowledge':
       await cmdKnowledge(parsed);
+      break;
+    case 'accounts':
+      await cmdAccounts(parsed);
       break;
     case 'tour':
       await cmdTour(parsed);

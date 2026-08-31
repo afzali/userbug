@@ -121,9 +121,10 @@ function trim(text, max) {
  * @param {string} [o.url] آدرس صفحهٔ فعلی
  * @param {number} [o.budget] سقفِ نویسه
  * @param {{relative: string}[]} [o.fixtures] فایل‌های آمادهٔ آپلود، از `listFixtures()`
+ * @param {string[]} [o.accounts] شناسهٔ حساب‌های ذخیره‌شده — بدون ایمیل و رمز
  * @returns {string} خالی اگر شناختی نباشد
  */
-export function knowledgeFor({ target, dossier, text = '', url = '', budget = DEFAULT_BUDGET, fixtures } = {}) {
+export function knowledgeFor({ target, dossier, text = '', url = '', budget = DEFAULT_BUDGET, fixtures, accounts } = {}) {
   let data = dossier;
   if (!data) {
     try {
@@ -199,6 +200,15 @@ export function knowledgeFor({ target, dossier, text = '', url = '', budget = DE
       if (!push(`  ${item.term}: ${trim(item.meaning, 90)}`)) break;
     }
   }
+
+  /**
+   * حساب‌های ذخیره‌شده — فقط **شناسه**شان، نه ایمیل و نه رمز.
+   *
+   * مدل باید بداند `{{account.admin.…}}` وجود دارد تا بتواند سناریویی بنویسد
+   * که از حسابِ واقعی استفاده کند. ولی خودِ ایمیل هم دادهٔ کاربر است و دلیلی
+   * ندارد به مدل برود: سناریو با **متغیر** نوشته می‌شود، نه با مقدار.
+   */
+  if (accounts?.length) push(`حساب‌های ذخیره‌شده: ${accounts.slice(0, 8).join('، ')}`);
 
   /**
    * فایل‌هایی که برای آپلود آماده‌اند.

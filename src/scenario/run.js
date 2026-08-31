@@ -29,6 +29,7 @@ import { KNOWN_VERBS, stepVerb } from './verbs.js';
 import { resolveDo, performAction } from '../steps/do.js';
 import { explore } from '../steps/explore.js';
 import { resolveFixture } from '../knowledge/fixtures.js';
+import { accountsFor } from '../knowledge/credentials.js';
 import { getCurrentRun } from '../store/run-store.js';
 import { writeRepros } from '../repro.js';
 
@@ -50,8 +51,24 @@ export async function runScenario({ page, ub, identity, scenario }) {
     model: process.env.UB_MODEL || undefined,
   });
 
+  /**
+   * حساب‌های ذخیره‌شده، در کنارِ هویتِ تازه.
+   *
+   * `identity` هر اجرا یک کاربرِ نو است؛ `account` حسابی است که کاربر یک بار
+   * ثبت کرده و داده دارد. سناریو با `{{account.admin.email}}` به آن می‌رسد.
+   *
+   * متغیر محیطیِ تنظیم‌نشده اینجا **هشدار** است نه شکست: سناریو ممکن است
+   * اصلاً سراغ آن حساب نرود، و شکستنِ کلِ اجرا برای حسابی که استفاده نمی‌شود
+   * بی‌دلیل است. اگر استفاده شود، `fill` با رمزِ خالی خودش می‌شکند.
+   */
+  const { accounts, missing } = accountsFor(ub.target.key);
+  for (const item of missing) {
+    console.warn(`  حسابِ «${item.id}»: متغیر محیطیِ ${item.env} تنظیم نشده`);
+  }
+
   const ctx = {
     identity: { ...identity, local: identity.email.split('@')[0] },
+    account: accounts,
     nasty: NASTY,
     vars: {},
     persona,

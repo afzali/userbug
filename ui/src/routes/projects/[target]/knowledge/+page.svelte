@@ -34,6 +34,10 @@
   let history = $state(data.history || []);
   // svelte-ignore state_referenced_locally
   let fixtures = $state(data.fixtures || []);
+  // svelte-ignore state_referenced_locally
+  let accounts = $state(data.accounts || []);
+
+  let newAccount = $state({ id: '', email: '', passwordEnv: '', note: '' });
 
   let busy = $state('');
   let feedback = $state('');
@@ -84,6 +88,15 @@
     checksConfig = payload.checks || { checks: {} };
     history = payload.history || [];
     fixtures = payload.fixtures || [];
+    accounts = payload.accounts || [];
+  }
+
+  async function saveAccount() {
+    const payload = await send({ action: 'account-save', ...newAccount });
+    if (!payload) return;
+    absorb(payload);
+    newAccount = { id: '', email: '', passwordEnv: '', note: '' };
+    feedback = 'حساب ثبت شد. رمز از متغیر محیطی خوانده می‌شود، نه از این فایل.';
   }
 
   const kb = (bytes) => (bytes < 1024 ? `${bytes} B` : `${Math.round(bytes / 1024)} KB`);
@@ -331,6 +344,49 @@
     </ul>
   </section>
 {/if}
+
+<section class="mb-6 rounded-xl border p-4">
+  <h2 class="mb-1 text-sm font-bold">حساب‌های ذخیره‌شده</h2>
+  <p class="mb-3 text-xs leading-6 text-muted-foreground">
+    <code>{'{{identity}}'}</code> هر اجرا یک کاربرِ تازه می‌سازد. برای اپی که ثبت‌نامش باز نیست، یا
+    برای حسابی که <strong>داده دارد</strong>، اینجا حساب ثبت کنید و در سناریو با
+    <code>{'{{account.<شناسه>.email}}'}</code> استفاده‌اش کنید.
+    <br />
+    <strong>رمز اینجا ذخیره نمی‌شود</strong> — فقط نامِ متغیر محیطی که رمز در آن است. این پروژه
+    حاضر نیست <code>.env</code> را بخواند تا به مدل بدهد؛ نوشتنِ رمزِ متنی روی دیسک با همان موضع
+    نمی‌خواند.
+  </p>
+
+  {#if accounts.length}
+    <ul class="mb-4 flex flex-col gap-1 text-sm">
+      {#each accounts as account (account.id)}
+        <li class="flex items-center gap-2 rounded-lg border px-3 py-1.5">
+          <code>{account.id}</code>
+          <span class="min-w-0 flex-1 truncate text-muted-foreground">
+            {account.email || account.username}
+            {#if account.passwordEnv}<span class="text-xs"> · رمز از <code>{account.passwordEnv}</code></span>{/if}
+            {#if account.source === 'plain'}<span class="text-xs text-amber-600"> · رمزِ متنی روی دیسک</span>{/if}
+          </span>
+          <Badge variant={account.hasPassword ? 'secondary' : 'outline'}>
+            {account.hasPassword ? 'آماده' : 'رمز در دسترس نیست'}
+          </Badge>
+          <button
+            class="text-xs text-muted-foreground hover:text-destructive"
+            disabled={Boolean(busy)}
+            onclick={() => send({ action: 'account-remove', id: account.id }).then(absorb)}>حذف</button
+          >
+        </li>
+      {/each}
+    </ul>
+  {/if}
+
+  <div class="grid gap-2 sm:grid-cols-4">
+    <Input bind:value={newAccount.id} placeholder="شناسه (مثلاً admin)" disabled={Boolean(busy)} />
+    <Input bind:value={newAccount.email} placeholder="ایمیل یا نام کاربری" disabled={Boolean(busy)} />
+    <Input bind:value={newAccount.passwordEnv} placeholder="نام متغیر محیطی" disabled={Boolean(busy)} />
+    <Button variant="outline" disabled={Boolean(busy) || !newAccount.id.trim()} onclick={saveAccount}>افزودن</Button>
+  </div>
+</section>
 
 <section class="mb-6 rounded-xl border p-4">
   <h2 class="mb-1 text-sm font-bold">فایل‌های آپلود</h2>

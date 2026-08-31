@@ -45,7 +45,22 @@ export function redactDeep(value, secrets = []) {
   return value;
 }
 
-/** مقادیری که در هر اجرا حساس‌اند. */
-export function secretsOf(identity) {
-  return [identity?.password, identity?.email].filter(Boolean);
+/**
+ * مقادیری که در هر اجرا حساس‌اند.
+ *
+ * ── چرا حساب‌های ذخیره‌شده هم باید بیایند ──
+ *
+ * تا امروز فقط `identity` وجود داشت: یک کاربرِ تصادفی که خودمان ساخته بودیم.
+ * حالا کاربر می‌تواند حسابِ **واقعیِ خودش** را ثبت کند، و آن رمز اگر ماسک
+ * نشود در نخستین snapshot به مدل می‌رود و در transcript ارائه‌دهنده می‌ماند —
+ * جایی که دیگر پس گرفتنش ممکن نیست.
+ *
+ * فراخوانی با یک آرایهٔ دوم انجام می‌شود نه با خواندنِ مستقیم از دیسک: این
+ * ماژول باید خالص بماند و در هر بستری (از جمله خودآزما) قابل استفاده باشد.
+ *
+ * @param {object} identity هویتِ همین اجرا
+ * @param {string[]} [extra] رازهای دیگر — مثلاً خروجی `accountSecrets()`
+ */
+export function secretsOf(identity, extra = []) {
+  return [identity?.password, identity?.email, ...extra].filter(Boolean);
 }

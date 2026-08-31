@@ -369,11 +369,11 @@ SSE زنده است:
 
 ## کارها
 
-- [ ] `src/knowledge/credentials.js` — خواندن، حلِ `passwordEnv`، دروازهٔ محیط.
-- [ ] `interpolate.js`: فضای‌نامِ `account`.
-- [ ] `redact.js`: `secretsOf` گسترده شود.
-- [ ] رابط: مدیریتِ حساب‌ها در صفحهٔ شناخت. رمزِ متنی هرگز به کلاینت برنگردد —
-      فقط «تنظیم شده / نشده».
+- [x] `src/knowledge/credentials.js` — خواندن، حلِ `passwordEnv`، دروازهٔ محیط
+- [x] `interpolate.js`: فضای‌نامِ `account`
+- [x] `redact.js`: `secretsOf(identity, extra)` — و هر دو مصرف‌کننده وصل شدند
+- [x] رابط: مدیریتِ حساب‌ها در صفحهٔ شناخت؛ رمز هرگز به کلاینت برنمی‌گردد ·
+      `userbug accounts` در CLI
 
 ---
 

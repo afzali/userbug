@@ -2,6 +2,7 @@ import { coverageOf } from '../../../../../../src/knowledge/coverage.js';
 import { readHistory } from '../../../../../../src/knowledge/history.js';
 import { knowledgeDir, listPages, readDossier } from '../../../../../../src/knowledge/store.js';
 import { fixturesDir, listFixtures } from '../../../../../../src/knowledge/fixtures.js';
+import { listAccounts } from '../../../../../../src/knowledge/credentials.js';
 import { readChecksConfig } from '../../../../../../src/checks/config.js';
 import { UNIVERSAL } from '../../../../../../src/checks/universal.js';
 
@@ -38,5 +39,6 @@ export async function load({ params }) {
     fixtures: await listFixtures(target).catch(() => []),
     // مسیر نشان داده می‌شود چون کاربر باید بداند فایل را کجا بگذارد
     fixturesPath: safely(() => fixturesDir(target), ''),
+    accounts: safely(() => listAccounts(target), []),
   };
 }

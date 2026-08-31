@@ -17,6 +17,7 @@ import { snapshotPage, descriptorFor } from './snapshot.js';
 import { redactDeep, secretsOf } from '../models/redact.js';
 import { askJson } from '../models/provider.js';
 import { knowledgeFor } from '../knowledge/select.js';
+import { accountSecrets } from '../knowledge/credentials.js';
 
 const SYSTEM = `تو یک دستیارِ تستِ رابط کاربری هستی.
 
@@ -128,7 +129,13 @@ async function tryCached(page, entry) {
 
 async function askModel({ page, intent, models, budget, identity, rejected = null }) {
   const snapshot = await snapshotPage(page);
-  const safe = redactDeep(snapshot, secretsOf(identity));
+  /**
+   * رازهای حساب‌های ذخیره‌شده هم ماسک می‌شوند، نه فقط هویتِ ساختگیِ اجرا.
+   *
+   * کاربر می‌تواند حسابِ واقعیِ خودش را ثبت کرده باشد؛ رمزش اگر در فیلدی
+   * نشسته باشد، در همین snapshot می‌آید.
+   */
+  const safe = redactDeep(snapshot, secretsOf(identity, accountSecrets(process.env.UB_TARGET || '')));
 
   // بازخوردِ تلاش قبلی، اگر بوده. بدون آن، تلاش دوم فقط یک نمونه‌برداریِ
   // دیگر از همان توزیع است.
