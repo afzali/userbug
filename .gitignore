@@ -13,3 +13,5 @@ scenarios/*/_drafts/
 # دارد و لاگ هم تاریخِ محلی است.
 schedules/*.cmd
 schedules/*.log
+knowledge/*/credentials.json
+knowledge/*/tours/

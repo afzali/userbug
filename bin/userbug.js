@@ -22,6 +22,9 @@ import {
   scheduleArgs,
 } from '../src/schedule.js';
 import { renderJUnit } from '../src/report/junit.js';
+import { knowledgeDir, readDossier } from '../src/knowledge/store.js';
+import { readHistory } from '../src/knowledge/history.js';
+import { renderDossier } from '../src/knowledge/render.js';
 import { runDir } from '../src/store/run-store.js';
 import { dedupe } from '../src/observe/oracle.js';
 
@@ -65,6 +68,11 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
                                   همان پرچم‌های run
   userbug schedule remove <کلید>  حذف تسک و فایل‌هایش (لاگ می‌ماند)
   userbug schedule run <کلید>     اجرای دستیِ همان تسک، برای آزمودن
+
+  userbug knowledge <هدف> [گزینه‌ها]
+                                  شناختی که از این پروژه داریم
+      --json                      پروندهٔ خام، برای ابزارهای دیگر
+      --history [n]               تاریخچهٔ تغییرِ شناخت، تازه‌ترین اول
 
   userbug models [--free]         فهرست زندهٔ مدل‌های OpenRouter
   userbug repro <runId> [اثرانگشت]
@@ -462,6 +470,34 @@ function cmdList({ flags }) {
   console.log('');
 }
 
+/**
+ * شناختِ یک پروژه.
+ *
+ * سه خروجی از یک منبع: متنِ خواندنی (پیش‌فرض)، JSON خام برای ابزارِ دیگر، و
+ * تاریخچه. هیچ‌کدام چیزی نمی‌نویسد — این فرمان فقط می‌خواند، تا بشود بی‌ترس
+ * صدایش زد.
+ */
+function cmdKnowledge({ flags, positional }) {
+  const target = positional[0];
+  if (!target) throw new Error('نام هدف لازم است: userbug knowledge <هدف>');
+
+  if (flags.history) {
+    const limit = flags.history === true ? 40 : Number(flags.history) || 40;
+    const rows = readHistory(knowledgeDir(target), { limit });
+    if (!rows.length) return console.log('\n  تاریخچه‌ای ثبت نشده.\n');
+
+    console.log('');
+    for (const row of rows) {
+      console.log(`  ${row.at}  ${String(row.op).padEnd(8)} ${String(row.by).padEnd(7)} ${row.path}${row.why ? `  — ${row.why}` : ''}`);
+    }
+    console.log('');
+    return;
+  }
+
+  if (flags.json) return console.log(JSON.stringify(readDossier(target), null, 2));
+  console.log('\n' + renderDossier(target));
+}
+
 async function cmdReport({ flags, positional }) {
   const runId = resolveRunId(positional[0]);
   printSummary(await finalizeRun(runId, { junitPath: junitPathFor(flags.junit, null, false) }));
@@ -665,6 +701,9 @@ try {
       break;
     case 'list':
       cmdList(parsed);
+      break;
+    case 'knowledge':
+      cmdKnowledge(parsed);
       break;
     case 'report':
       await cmdReport(parsed);
