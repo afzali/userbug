@@ -1,0 +1,544 @@
+{
+  "version": 1,
+  "target": "nepi",
+  "updatedAt": "2026-08-31T09:19:14.811Z",
+  "summary": "نپی یک اپلیکیشن وب برای مدیریت کتاب‌ها و محتوای دیجیتال است که با پشتیبانی کامل راست‌به‌چپ برای کاربران فارسی‌زبان طراحی شده. کاربران می‌توانند کتاب‌ها را آپلود کنند، آن‌ها را سازماندهی کنند، یادداشت‌برداری و علامت‌گذاری انجام دهند، از هوش مصنوعی برای تحلیل متن استفاده کنند، و داده‌های خود را همگام‌سازی کنند. دیتابیس SQLite در مرورگر (WebAssembly) یا سمت سرور ذخیره می‌شود.",
+  "stack": {
+    "framework": "sveltekit",
+    "language": "ts",
+    "backend": "php",
+    "db": "sqlite",
+    "by": "source"
+  },
+  "auth": {
+    "kind": "form",
+    "loginPath": "/login",
+    "signupOpen": null,
+    "logoutLabel": "",
+    "sessionStore": "vaultSession (رمزگذاری‌شده)",
+    "by": "model"
+  },
+  "routes": [
+    {
+      "path": "/",
+      "title": "",
+      "purpose": "صفحهٔ ریشه که فوری به /contents تغییر مسیر می‌دهد",
+      "requiresAuth": null,
+      "sourceFile": "src/routes/+page.svelte",
+      "by": "model"
+    },
+    {
+      "path": "/ai-chat",
+      "title": "",
+      "purpose": "رابط چت با هوش مصنوعی برای تحلیل و پرسش درباره کتاب‌های پیوست",
+      "requiresAuth": true,
+      "sourceFile": "src/routes/ai-chat/+page.js",
+      "by": "model"
+    },
+    {
+      "path": "/content/[id_book]",
+      "title": "",
+      "purpose": "نمایش و ویرایش محتوای یک کتاب با ادیتور Tiptap، یادداشت‌برداری، علامت‌گذاری و جستجو",
+      "requiresAuth": true,
+      "sourceFile": "src/routes/content/[id_book]/+page.svelte",
+      "by": "model"
+    },
+    {
+      "path": "/content",
+      "title": "",
+      "purpose": "صفحهٔ تغییر‌مسیر به /contents",
+      "requiresAuth": null,
+      "sourceFile": "src/routes/content/+page.svelte",
+      "by": "model"
+    },
+    {
+      "path": "/contents",
+      "title": "",
+      "purpose": "صفحهٔ اصلی: فهرست کتاب‌ها، پوشه‌ها، اشتراک‌گذاری‌ها و مدیریت کتاب",
+      "requiresAuth": true,
+      "sourceFile": "src/routes/contents/+page.svelte",
+      "by": "model"
+    },
+    {
+      "path": "/features",
+      "title": "",
+      "purpose": "صفحهٔ تنظیمات قابلیت‌ها و پلاگین‌های اختیاری",
+      "requiresAuth": true,
+      "sourceFile": "src/routes/features/+page.svelte",
+      "by": "model"
+    },
+    {
+      "path": "/help",
+      "title": "",
+      "purpose": "صفحهٔ راهنمای جامع با بخش‌های آکاردیونی درباره تمام امکانات",
+      "requiresAuth": false,
+      "sourceFile": "src/routes/help/+page.svelte",
+      "by": "model"
+    },
+    {
+      "path": "/list",
+      "title": "",
+      "purpose": "نمایش لیستی از تمام مطالب با حالت‌های مطالعهٔ مختلف و جستجو",
+      "requiresAuth": true,
+      "sourceFile": "src/routes/list/+page.svelte",
+      "by": "model"
+    },
+    {
+      "path": "/lock",
+      "title": "",
+      "purpose": "صفحهٔ ورود و باز کردن حساب رمزگذاری‌شده با رمز عبور",
+      "requiresAuth": false,
+      "sourceFile": "src/routes/lock/+page.svelte",
+      "by": "model"
+    },
+    {
+      "path": "/login",
+      "title": "",
+      "purpose": "صفحهٔ ورود و ثبت‌نام کاربران",
+      "requiresAuth": false,
+      "sourceFile": "src/routes/login/+page.svelte",
+      "by": "model"
+    },
+    {
+      "path": "/sqlite",
+      "title": "",
+      "purpose": "کنسول SQL توسعه‌دهنده — پشت devMode، کاربر عادی نباید برود",
+      "requiresAuth": null,
+      "sourceFile": "src/routes/sqlite/+page.svelte",
+      "by": "user",
+      "conflict": [
+        {
+          "by": "model",
+          "note": "path: /sqlite · purpose: صفحهٔ مدیریت دیتابیس SQLite (احتمالاً برای توسعه‌دهندگان) · sourceFile: src/routes/sqlite/+page.svelte",
+          "at": "2026-08-31T09:19:14.810Z"
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Vault",
+      "meaning": "حساب رمزگذاری‌شدهٔ کاربر برای ذخیره‌سازی امن",
+      "by": "model"
+    },
+    {
+      "term": "Sync",
+      "meaning": "همگام‌سازی داده‌ها بین دستگاه‌ها و سرور با رمزگذاری",
+      "by": "model"
+    },
+    {
+      "term": "RTL",
+      "meaning": "راست‌به‌چپ؛ جهت نوشتار فارسی و عربی",
+      "by": "model"
+    },
+    {
+      "term": "Tiptap",
+      "meaning": "ادیتور WYSIWYG برای نمایش و ویرایش محتوای Notion‌مانند",
+      "by": "model"
+    },
+    {
+      "term": "wa-sqlite",
+      "meaning": "SQLite در مرورگر با WebAssembly؛ ذخیره‌سازی داده‌ها سمت کلاینت",
+      "by": "model"
+    },
+    {
+      "term": "Fractional Indexing",
+      "meaning": "روش مرتب‌سازی پایدار پاراگراف‌ها بدون تضاد",
+      "by": "model"
+    },
+    {
+      "term": "Workspace",
+      "meaning": "محیط کاری چندتب داخل برنامه برای کار همزمان روی چند فایل",
+      "by": "model"
+    },
+    {
+      "term": "Split View",
+      "meaning": "نمایش دو تب متنی کنار هم با امکان تغییر جهت و اندازه",
+      "by": "model"
+    },
+    {
+      "term": "PiP",
+      "meaning": "پنجرهٔ شناور داخلی (Picture-in-Picture) برای مرجع سریع",
+      "by": "model"
+    },
+    {
+      "term": "Auto Correct",
+      "meaning": "تصحیح خودکار فارسی با پیشنهاد و یادگیری",
+      "by": "model"
+    },
+    {
+      "term": "Reading Versions",
+      "meaning": "نسخه‌های مختلف مطالعهٔ یک کتاب برای ردیابی پیشرفت",
+      "by": "model"
+    },
+    {
+      "term": "Annotation Mode",
+      "meaning": "حالت جداگانهٔ حاشیه‌نویسی که یادداشت‌ها از متن اصلی جدا ذخیره می‌شوند",
+      "by": "model"
+    },
+    {
+      "term": "نپی",
+      "meaning": "نام اپلیکیشن؛ مدیریت‌کنندهٔ کتاب و محتوای دیجیتال",
+      "by": "model"
+    },
+    {
+      "term": "حاشیه‌نویسی",
+      "meaning": "حالت مستقل برای نوشتن یادداشت‌های کاربر جدا از متن نویسنده",
+      "by": "model"
+    },
+    {
+      "term": "Snapshot",
+      "meaning": "نسخهٔ ذخیره‌شدهٔ مطالعه برای نگه‌داری چند دور مطالعه",
+      "by": "model"
+    },
+    {
+      "term": "fractional-indexing",
+      "meaning": "روش مرتب‌سازی پایدار پاراگراف‌ها با کلیدهای متنی بدون تضاد",
+      "by": "model"
+    },
+    {
+      "term": "Capacitor",
+      "meaning": "پلتفرم برای ساخت اپلیکیشن‌های نیتیو (اندروید، iOS، دسکتاپ)",
+      "by": "model"
+    }
+  ],
+  "entities": [
+    {
+      "name": "books",
+      "label": "کتاب",
+      "where": "جدول اصلی؛ هر کتاب دارای عنوان، نویسنده، پوشه و متادیتا است",
+      "by": "model"
+    },
+    {
+      "name": "paragraphs",
+      "label": "پاراگراف",
+      "where": "محتوای متنی هر کتاب؛ هر پاراگراف دارای ترتیب، محتوای HTML و علامت‌گذاری است",
+      "by": "model"
+    },
+    {
+      "name": "ai_chats",
+      "label": "چت هوش مصنوعی",
+      "where": "گفتگوهای کاربر با AI (migration ۲۳)",
+      "by": "model"
+    },
+    {
+      "name": "ai_messages",
+      "label": "پیام AI",
+      "where": "پیام‌های درون هر چت (migration ۲۳)",
+      "by": "model"
+    },
+    {
+      "name": "highlights",
+      "label": "علامت‌گذاری",
+      "where": "بخش‌های برجسته‌شدهٔ متن با رنگ و یادداشت",
+      "by": "model"
+    },
+    {
+      "name": "annotations",
+      "label": "یادداشت",
+      "where": "یادداشت‌های کاربر درون‌متنی یا حاشیه‌ای",
+      "by": "model"
+    },
+    {
+      "name": "questions",
+      "label": "سؤال",
+      "where": "سؤالات کاربر درباره متن",
+      "by": "model"
+    },
+    {
+      "name": "shares",
+      "label": "اشتراک‌گذاری",
+      "where": "کتاب‌های اشتراک‌گذاری‌شده با کاربران دیگر",
+      "by": "model"
+    },
+    {
+      "name": "folders",
+      "label": "پوشه",
+      "where": "سازماندهی سلسله‌مراتبی کتاب‌ها",
+      "by": "model"
+    },
+    {
+      "name": "users",
+      "label": "کاربر",
+      "where": "حساب‌های کاربری با ایمیل و رمز عبور رمزگذاری‌شده",
+      "by": "model"
+    }
+  ],
+  "flows": [],
+  "files": {
+    "uploads": [],
+    "downloads": []
+  },
+  "risks": [
+    {
+      "label": "حذف کتاب",
+      "why": "کتاب و تمام پاراگراف‌ها، یادداشت‌ها و علامت‌گذاری‌های آن برای همیشه حذف می‌شوند",
+      "by": "model"
+    },
+    {
+      "label": "خروج از حساب",
+      "why": "جلسهٔ کاربر پایان می‌یابد و باید دوباره وارد شود",
+      "by": "model"
+    },
+    {
+      "label": "پاک‌سازی تب",
+      "why": "تب باز در Workspace بسته می‌شود و محتوای آن از حافظهٔ موقت حذف می‌شود",
+      "by": "model"
+    },
+    {
+      "label": "ریست دیتابیس",
+      "why": "",
+      "by": "model"
+    },
+    {
+      "label": "حذف اشتراک",
+      "why": "دسترسی کاربر دیگر به کتاب مشترک برداشته می‌شود",
+      "by": "model"
+    },
+    {
+      "label": "حذف حساب",
+      "why": "حساب کاربری و تمام داده‌های مرتبط برای همیشه حذف می‌شوند",
+      "by": "model"
+    }
+  ],
+  "openQuestions": [
+    {
+      "q": "آیا سرور PHP برای چه کارهایی استفاده می‌شود؟ (همگام‌سازی، احراز هویت، ذخیرهٔ رمزگذاری‌شده؟)",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:16:07.047Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "مکانیزم احراز هویت دقیقاً چگونه کار می‌کند؟ (توکن، session، JWT؟)",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:16:07.047Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "آیا کاربران بدون حساب می‌توانند از اپ استفاده کنند یا حتماً باید ثبت‌نام کنند؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:16:07.047Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "صفحهٔ /sqlite برای چه منظوری است؟ (تست، مدیریت، توسعه؟)",
+      "answer": "کنسول توسعه‌دهنده است، پشت devMode، و کاربر عادی نباید آنجا برود",
+      "field": "",
+      "askedAt": "2026-08-31T09:16:07.047Z",
+      "answeredAt": "2026-08-31T09:16:59.032Z",
+      "asked": 1
+    },
+    {
+      "q": "آیا قابلیت‌های AI (چت، تحلیل) نیاز به اتصال به سرور دارند یا کاملاً محلی هستند؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:16:07.047Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "مسئلهٔ بازیابی AI (AI-1 در مستندات) چگونه حل شده است؟ آیا هنوز کل کتاب در پرامپت می‌رود؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:16:07.047Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "آیا چت‌های AI همگام‌سازی می‌شوند و رمزگذاری می‌شوند؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:16:07.047Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "فهرست مدل‌های AI کجا به‌روز می‌شود؟ (هاردکد، API، تنظیمات کاربر؟)",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:16:07.047Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "آیا logging و console.log در تولید غیرفعال است؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:16:07.047Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "صفحهٔ /help برای کاربران بدون احراز هویت قابل دسترسی است؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:16:07.047Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "آیا اپ برای کار آفلاین طراحی شده است؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:16:07.047Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "حد اندازهٔ کتاب‌های قابل آپلود چقدر است؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:16:07.047Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "آیا ویژگی‌های موبایل (Capacitor) در وب نیز کار می‌کنند؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:16:07.047Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "آیا سیستم احراز هویت فعلی فقط فرم‌پایه است یا OAuth یا magic-link هم پشتیبانی می‌کند؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "صفحهٔ /sqlite برای چه منظوری است و آیا فقط در حالت توسعه دسترسی‌پذیر است؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "چگونه کاربران می‌توانند کتاب‌ها را آپلود کنند؟ آیا فرمت‌های خاصی پشتیبانی می‌شوند (PDF، EPUB، متن ساده)؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "سرور PHP کجا میزبانی می‌شود و آیا برای همگام‌سازی و اشتراک‌گذاری ضروری است؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "آیا داده‌های کاربر در سرور ذخیره می‌شوند یا فقط محلی (wa-sqlite) است؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "مدل‌های AI کدام‌ها هستند و از کدام سرویس (OpenAI، Anthropic، OpenRouter) استفاده می‌شود؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "آیا بخش AI فعلاً کار می‌کند یا هنوز در حالت توسعه است (با توجه به مستندات AI-DESIGN.md)؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "چگونه رمزگذاری داده‌ها در Vault کار می‌کند و کلید اصلی کجا ذخیره می‌شود؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "آیا صفحهٔ /help برای کاربران عام قابل دسترسی است یا فقط برای کاربران وارد‌شده؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "آیا اپلیکیشن‌های موبایل (اندروید/iOS) و دسکتاپ فعلاً منتشر شده‌اند؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "چگونه اشتراک‌گذاری کتاب‌ها با کاربران دیگر کار می‌کند و آیا رمزگذاری‌شده است؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "آیا سیستم backup خودکار وجود دارد و کاربران می‌توانند داده‌های خود را صادر کنند؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "صفحهٔ /lock برای چه منظوری است و چه تفاوتی با /login دارد؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "آیا migration ۲۳ برای جداول AI چت‌ها اعمال شده است یا هنوز در حالت توسعه است؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    },
+    {
+      "q": "چگونه logger.js کار می‌کند و آیا در تولید غیرفعال می‌شود؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-08-31T09:19:14.807Z",
+      "answeredAt": "",
+      "asked": 1
+    }
+  ],
+  "sources": [
+    {
+      "kind": "source",
+      "id": "nepi",
+      "at": "2026-08-31T09:15:39.951Z",
+      "note": "771 فایل"
+    },
+    {
+      "kind": "source",
+      "id": "nepi",
+      "at": "2026-08-31T09:18:41.098Z",
+      "note": "771 فایل"
+    }
+  ]
+}

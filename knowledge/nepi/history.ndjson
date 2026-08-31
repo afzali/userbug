@@ -1,0 +1,107 @@
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"summary","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"update","path":"stack","by":"source","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"update","path":"auth","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"routes[/]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"routes[/ai-chat]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"routes[/content/[id_book]]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"routes[/content]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"routes[/contents]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"routes[/features]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"routes[/help]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"routes[/list]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"routes[/lock]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"routes[/login]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"routes[/sqlite]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"glossary[Vault]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"glossary[Sync]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"glossary[RTL]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"glossary[Tiptap]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"glossary[wa-sqlite]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"glossary[Fractional Indexing]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"glossary[Workspace]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"glossary[Split View]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"glossary[PiP]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"glossary[Auto Correct]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"glossary[Reading Versions]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"glossary[Annotation Mode]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"entities[books]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"entities[paragraphs]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"entities[ai_chats]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"entities[ai_messages]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"entities[highlights]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"entities[annotations]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"entities[questions]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"entities[shares]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"entities[folders]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"risks[حذف کتاب]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"risks[خروج از حساب]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"risks[پاک‌سازی تب]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"risks[ریست دیتابیس]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"risks[حذف اشتراک]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"openQuestions[آیا سرور PHP برای چه کارهایی استفاده می‌شود؟ (همگام‌سازی، احراز هویت، ذخیرهٔ رمزگذاری‌شده؟)]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"openQuestions[مکانیزم احراز هویت دقیقاً چگونه کار می‌کند؟ (توکن، session، JWT؟)]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"openQuestions[آیا کاربران بدون حساب می‌توانند از اپ استفاده کنند یا حتماً باید ثبت‌نام کنند؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"openQuestions[صفحهٔ /sqlite برای چه منظوری است؟ (تست، مدیریت، توسعه؟)]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"openQuestions[آیا قابلیت‌های AI (چت، تحلیل) نیاز به اتصال به سرور دارند یا کاملاً محلی هستند؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"openQuestions[مسئلهٔ بازیابی AI (AI-1 در مستندات) چگونه حل شده است؟ آیا هنوز کل کتاب در پرامپت می‌رود؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"openQuestions[آیا چت‌های AI همگام‌سازی می‌شوند و رمزگذاری می‌شوند؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"openQuestions[فهرست مدل‌های AI کجا به‌روز می‌شود؟ (هاردکد، API، تنظیمات کاربر؟)]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"openQuestions[آیا logging و console.log در تولید غیرفعال است؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"openQuestions[صفحهٔ /help برای کاربران بدون احراز هویت قابل دسترسی است؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"openQuestions[آیا اپ برای کار آفلاین طراحی شده است؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"openQuestions[حد اندازهٔ کتاب‌های قابل آپلود چقدر است؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:07.062Z","op":"add","path":"openQuestions[آیا ویژگی‌های موبایل (Capacitor) در وب نیز کار می‌کنند؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:16:59.036Z","op":"update","path":"openQuestions[صفحهٔ /sqlite برای چه منظوری است؟ (تست، مدیریت، توسعه؟)]","by":"model","why":"پاسخ به پرسش"}
+{"at":"2026-08-31T09:17:09.308Z","op":"promote","path":"routes[/sqlite]","by":"user","why":"تصحیح دستی"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"routes[/]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"routes[/content/[id_book]]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"routes[/content]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"routes[/contents]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"routes[/features]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"routes[/help]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"routes[/list]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"routes[/lock]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"routes[/login]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"routes[/sqlite]","by":"user","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"glossary[Vault]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"glossary[Sync]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"glossary[RTL]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"glossary[Tiptap]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"glossary[wa-sqlite]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"glossary[Workspace]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"glossary[Split View]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"glossary[PiP]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"glossary[نپی]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"glossary[حاشیه‌نویسی]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"glossary[Snapshot]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"glossary[fractional-indexing]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"glossary[Capacitor]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"entities[books]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"entities[paragraphs]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"entities[ai_chats]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"entities[ai_messages]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"entities[highlights]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"entities[annotations]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"entities[shares]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"entities[folders]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"entities[users]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"risks[حذف کتاب]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"risks[خروج از حساب]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"risks[پاک‌سازی تب]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"update","path":"risks[ریست دیتابیس]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"risks[حذف حساب]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[آیا سیستم احراز هویت فعلی فقط فرم‌پایه است یا OAuth یا magic-link هم پشتیبانی می‌کند؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[صفحهٔ /sqlite برای چه منظوری است و آیا فقط در حالت توسعه دسترسی‌پذیر است؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[چگونه کاربران می‌توانند کتاب‌ها را آپلود کنند؟ آیا فرمت‌های خاصی پشتیبانی می‌شوند (PDF، EPUB، متن ساده)؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[سرور PHP کجا میزبانی می‌شود و آیا برای همگام‌سازی و اشتراک‌گذاری ضروری است؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[آیا داده‌های کاربر در سرور ذخیره می‌شوند یا فقط محلی (wa-sqlite) است؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[مدل‌های AI کدام‌ها هستند و از کدام سرویس (OpenAI، Anthropic، OpenRouter) استفاده می‌شود؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[آیا بخش AI فعلاً کار می‌کند یا هنوز در حالت توسعه است (با توجه به مستندات AI-DESIGN.md)؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[چگونه رمزگذاری داده‌ها در Vault کار می‌کند و کلید اصلی کجا ذخیره می‌شود؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[آیا صفحهٔ /help برای کاربران عام قابل دسترسی است یا فقط برای کاربران وارد‌شده؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[آیا اپلیکیشن‌های موبایل (اندروید/iOS) و دسکتاپ فعلاً منتشر شده‌اند؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[چگونه اشتراک‌گذاری کتاب‌ها با کاربران دیگر کار می‌کند و آیا رمزگذاری‌شده است؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[آیا سیستم backup خودکار وجود دارد و کاربران می‌توانند داده‌های خود را صادر کنند؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[صفحهٔ /lock برای چه منظوری است و چه تفاوتی با /login دارد؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[آیا migration ۲۳ برای جداول AI چت‌ها اعمال شده است یا هنوز در حالت توسعه است؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[چگونه logger.js کار می‌کند و آیا در تولید غیرفعال می‌شود؟]","by":"model","why":"userbug learn --source"}

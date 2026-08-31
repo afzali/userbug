@@ -12,7 +12,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { finalizeRun, printSummary } from '../src/finalize.js';
-import { assertModelSlug, listModels } from '../src/models/config.js';
+import { assertModelSlug, listModels, loadGlobalConfig, resolveModel } from '../src/models/config.js';
+import { Budget } from '../src/models/provider.js';
+import { loadTarget } from '../src/target.js';
 import { assertProjectKey, renderTargetConfig } from '../src/target-template.js';
 import {
   createSchedule,
@@ -22,7 +24,9 @@ import {
   scheduleArgs,
 } from '../src/schedule.js';
 import { renderJUnit } from '../src/report/junit.js';
-import { knowledgeDir, readDossier } from '../src/knowledge/store.js';
+import { knowledgeDir, readDossier, writeDossier } from '../src/knowledge/store.js';
+import { digestSource } from '../src/knowledge/digest.js';
+import { answerQuestion, mergeIntoDossier } from '../src/knowledge/merge.js';
 import { readHistory } from '../src/knowledge/history.js';
 import { renderDossier } from '../src/knowledge/render.js';
 import { runDir } from '../src/store/run-store.js';
@@ -69,10 +73,16 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
   userbug schedule remove <کلید>  حذف تسک و فایل‌هایش (لاگ می‌ماند)
   userbug schedule run <کلید>     اجرای دستیِ همان تسک، برای آزمودن
 
+  userbug learn <هدف> [گزینه‌ها]  خواندن سورس و ساختنِ شناخت
+      --dry                       فقط ساختار (روت و استک)؛ بی‌مدل و بی‌ذخیره
+      --model <اسلاگ>             مدل تحلیل؛ بر کانفیگ می‌چربد
+
   userbug knowledge <هدف> [گزینه‌ها]
                                   شناختی که از این پروژه داریم
       --json                      پروندهٔ خام، برای ابزارهای دیگر
       --history [n]               تاریخچهٔ تغییرِ شناخت، تازه‌ترین اول
+      --questions                 پرسش‌های بی‌جواب، شماره‌دار
+      --answer <شماره> --as <متن> ثبت جواب؛ تنها راهی که چیزی by:user می‌شود
 
   userbug models [--free]         فهرست زندهٔ مدل‌های OpenRouter
   userbug repro <runId> [اثرانگشت]
@@ -471,15 +481,115 @@ function cmdList({ flags }) {
 }
 
 /**
+ * هضمِ سورس → پروندهٔ شناخت.
+ *
+ * ── چرا `--dry` هست ──
+ *
+ * نیمهٔ اولِ این کار (روت و استک) قطعی و رایگان است؛ نیمهٔ دوم پول خرج
+ * می‌کند. `--dry` فقط نیمهٔ اول را نشان می‌دهد، تا بشود پیش از خرج کردن دید
+ * که آشکارساز چیزی پیدا کرده یا نه. روی پروژه‌ای که هیچ روتی پیدا نشود،
+ * فراخوانیِ مدل فقط پول سوزاندن است.
+ */
+async function cmdLearn({ flags, positional }) {
+  const name = positional[0];
+  if (!name) throw new Error('نام هدف لازم است: userbug learn <هدف>');
+
+  const target = await loadTarget(name);
+  const withModel = !flags.dry;
+
+  let models;
+  if (withModel) {
+    models = resolveModel({
+      global: await loadGlobalConfig(),
+      target,
+      role: 'analyze',
+      model: flags.model ? assertModelSlug(flags.model) : undefined,
+    });
+    if (!models.apiKey) {
+      throw new Error(
+        'کلید مدل نیست. یا `OPENROUTER_API_KEY` را بگذارید،\n' +
+          '  یا با `--dry` فقط ساختار را بخوانید (روت و استک، بی‌مدل).'
+      );
+    }
+  }
+
+  const budget = withModel ? new Budget(models.budgetPerRun) : undefined;
+  const { partial, scan, usedModel, note } = await digestSource({ target, models, budget });
+
+  console.log(`\n  سورس: ${scan.root}`);
+  console.log(`  ${scan.files.length} فایل خوانده شد  ·  ${scan.routes.length} روت پیدا شد`);
+  const detectors = Object.entries(scan.byDetector).filter(([, count]) => count);
+  if (detectors.length) console.log(`  آشکارساز: ${detectors.map(([k, v]) => `${k} ${v}`).join(' · ')}`);
+  if (note) console.log(`  ${note}`);
+
+  if (flags.dry) {
+    for (const route of scan.routes) console.log(`    ${route.path}`);
+    console.log('\n  «--dry» بود؛ چیزی ذخیره نشد.\n');
+    return;
+  }
+
+  const current = readDossier(name);
+  const { dossier, kept, replaced, conflicts } = mergeIntoDossier(current, partial);
+  const { changes } = await writeDossier(name, dossier, { by: 'source', why: 'userbug learn --source' });
+
+  console.log(`  ادغام: ${replaced} تازه یا جایگزین  ·  ${kept} دست‌نخورده  ·  ${conflicts} تعارض`);
+  if (conflicts) console.log('  تعارض یعنی حرفِ کاربر ماند و حرفِ تازه کنارش ثبت شد. در رابط ببینیدش.');
+  console.log(`  ${changes.length} تغییر در تاریخچه ثبت شد.`);
+
+  const open = dossier.openQuestions.filter((item) => !item.answer);
+  if (open.length) {
+    console.log(`\n  ${open.length} پرسشِ بی‌جواب — جوابشان از حدسِ مدل معتبرتر است:`);
+    for (const item of open.slice(0, 10)) console.log(`    · ${item.q}`);
+  }
+
+  if (budget) console.log(`\n  مدل: ${models.model}  ·  ${budget.calls} فراخوانی  ·  ${budget.spent.toFixed(4)}$`);
+  else if (!usedModel) console.log('\n  بی‌مدل اجرا شد؛ فقط ساختار.');
+  console.log('');
+}
+
+/**
  * شناختِ یک پروژه.
  *
  * سه خروجی از یک منبع: متنِ خواندنی (پیش‌فرض)، JSON خام برای ابزارِ دیگر، و
  * تاریخچه. هیچ‌کدام چیزی نمی‌نویسد — این فرمان فقط می‌خواند، تا بشود بی‌ترس
  * صدایش زد.
  */
-function cmdKnowledge({ flags, positional }) {
+async function cmdKnowledge({ flags, positional }) {
   const target = positional[0];
   if (!target) throw new Error('نام هدف لازم است: userbug knowledge <هدف>');
+
+  /**
+   * جواب دادن به یک پرسش — تنها راهی که چیزی `by: user` می‌شود.
+   *
+   * شماره پذیرفته می‌شود چون پرسش‌ها جملهٔ کامل فارسی‌اند و تایپِ دوباره‌شان
+   * در ترمینال یعنی این قابلیت عملاً استفاده نمی‌شود.
+   */
+  if (flags.answer !== undefined) {
+    const dossier = readDossier(target);
+    const open = dossier.openQuestions.filter((item) => !item.answer);
+    const text = String(flags.as ?? '').trim();
+    if (!text) throw new Error('جواب لازم است: --answer <شماره|متن> --as "<جواب>"');
+
+    const index = Number(flags.answer);
+    const question = Number.isInteger(index) && index >= 1 ? open[index - 1]?.q : String(flags.answer);
+    if (!question) throw new Error(`پرسشِ شمارهٔ ${flags.answer} وجود ندارد؛ ${open.length} پرسشِ باز هست`);
+
+    await writeDossier(target, answerQuestion(dossier, question, text), {
+      by: 'user',
+      why: 'پاسخ به پرسش',
+    });
+    console.log(`\n  ثبت شد (by: user):\n    ${question}\n    → ${text}\n`);
+    return;
+  }
+
+  if (flags.questions) {
+    const open = readDossier(target).openQuestions.filter((item) => !item.answer);
+    if (!open.length) return console.log('\n  پرسشِ بی‌جوابی نیست.\n');
+    console.log('');
+    open.forEach((item, i) => console.log(`  ${String(i + 1).padStart(2)}. ${item.q}`));
+    console.log('\n  جواب: userbug knowledge <هدف> --answer <شماره> --as "<جواب>"\n');
+    return;
+  }
 
   if (flags.history) {
     const limit = flags.history === true ? 40 : Number(flags.history) || 40;
@@ -703,7 +813,10 @@ try {
       cmdList(parsed);
       break;
     case 'knowledge':
-      cmdKnowledge(parsed);
+      await cmdKnowledge(parsed);
+      break;
+    case 'learn':
+      await cmdLearn(parsed);
       break;
     case 'report':
       await cmdReport(parsed);

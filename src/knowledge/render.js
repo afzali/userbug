@@ -16,7 +16,7 @@
 import { coverageOf } from './coverage.js';
 import { listPages, readDossier } from './store.js';
 
-const MARK = { user: 'کاربر', tour: 'گشت', source: 'سورس', docs: 'مستند', model: 'مدل' };
+const MARK = { user: 'کاربر', tour: 'گشت', source: 'سورس', run: 'اجرا', docs: 'مستند', model: 'مدل' };
 
 function tag(item) {
   return `_${MARK[item?.by] || MARK.model}_`;
