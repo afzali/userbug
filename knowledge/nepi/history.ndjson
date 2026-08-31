@@ -114,3 +114,19 @@
 {"at":"2026-08-31T12:52:24.691Z","op":"add","path":"openQuestions[صفحهٔ /blank برای چیست؟]","by":"model","why":"اجرای 2026-08-31T12-51-52_nepi_060b29d4","ref":"2026-08-31T12-51-52_nepi_060b29d4"}
 {"at":"2026-08-31T12:53:37.815Z","op":"remove","path":"routes[/blank]","by":"user","why":"روتِ ساختگیِ about:blank"}
 {"at":"2026-08-31T12:53:37.815Z","op":"remove","path":"openQuestions[صفحهٔ /blank برای چیست؟]","by":"user","why":"روتِ ساختگیِ about:blank"}
+{"at":"2026-08-31T13:40:55.467Z","op":"add","path":"pages[/login]","by":"user","why":"گشت 2026-08-31T13-40-51_nepi_f0291377"}
+{"at":"2026-08-31T13:40:55.482Z","op":"promote","path":"routes[/login]","by":"user","why":"گشت 2026-08-31T13-40-51_nepi_f0291377"}
+{"at":"2026-08-31T13:41:16.308Z","op":"update","path":"pages[/login]","by":"user","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-08-31T13:41:25.133Z","op":"update","path":"pages[/login]","by":"user","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-08-31T13:41:25.355Z","op":"update","path":"pages[/login]","by":"user","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-08-31T13:41:33.224Z","op":"update","path":"pages[/login]","by":"user","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-08-31T13:41:34.770Z","op":"update","path":"pages[/login]","by":"user","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-08-31T13:41:34.991Z","op":"update","path":"pages[/login]","by":"user","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-08-31T13:42:31.165Z","op":"add","path":"pages[/login]","by":"user","why":"گشت 2026-08-31T13-42-27_nepi_64e758d5"}
+{"at":"2026-08-31T13:42:40.181Z","op":"update","path":"pages[/login]","by":"user","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-08-31T13:42:49.928Z","op":"update","path":"pages[/login]","by":"user","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-08-31T13:42:59.446Z","op":"update","path":"pages[/login]","by":"user","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-08-31T13:43:52.744Z","op":"add","path":"pages[/login]","by":"user","why":"گشت 2026-08-31T13-43-48_nepi_d96bd8d9"}
+{"at":"2026-08-31T13:44:00.182Z","op":"update","path":"pages[/login]","by":"user","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-08-31T13:44:11.134Z","op":"update","path":"pages[/login]","by":"user","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-08-31T13:44:26.095Z","op":"update","path":"pages[/login]","by":"user","why":"تقویتِ قرارداد در اجرا"}

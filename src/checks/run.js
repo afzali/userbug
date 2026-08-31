@@ -19,6 +19,7 @@
 import { fingerprint, normalizeMessage } from '../observe/oracle.js';
 import { modeOf, readChecksConfig } from './config.js';
 import { UNIVERSAL, probePage } from './universal.js';
+import { snapshotPage } from '../steps/snapshot.js';
 
 /**
  * چک‌های همگانی را روی وضعیتِ فعلیِ صفحه اجرا کن.
@@ -84,6 +85,69 @@ export async function runUniversalChecks({ page, target, config, step = 'checks'
   }
 
   return { findings, hard, probe };
+}
+
+/**
+ * قراردادِ صفحهٔ فعلی را بسنج و تقویت کن.
+ *
+ * ── چرا سنجش و تقویت با هم ──
+ *
+ * قرارداد از رفتارِ اپ ساخته می‌شود و بدونِ تکرار نمی‌شود فهمید کدام بند
+ * «بخشِ اپ» است و کدام «دادهٔ کاربر». پس هر بازدید هم می‌سنجد هم یاد
+ * می‌گیرد — و در مرحلهٔ یادگیری، غیبت یعنی «داده بود»، نه «شکست».
+ *
+ * ── چرا نوشتن فقط وقتی چیزی عوض شده ──
+ *
+ * این در پایانِ هر قدم اجرا می‌شود. نوشتنِ بی‌قیدِ فایلِ صفحه در هر قدم،
+ * روی سناریوی چهل‌قدمی چهل بار نوشتن است برای چیزی که معمولاً عوض نشده.
+ *
+ * @returns {Promise<{findings: object[], page: object|null}>}
+ */
+export async function runContractCheck({ page, target, record, step = 'قرارداد', device, synthetic = false }) {
+  const nothing = { findings: [], page: null };
+  if (!record || record.contract?.mode === 'off') return nothing;
+
+  /**
+   * قراردادی که همهٔ بندهایش حذف شده، تمام است.
+   *
+   * یعنی هر نامزدی که ثبت شده بود، در بازدیدهای بعد غایب بود — پس همه‌شان
+   * دادهٔ کاربر بودند و این صفحه بخشِ ثابتِ قابلِ اتکایی ندارد. ادامه دادن
+   * یعنی یک `snapshot` در پایانِ هر قدم برای فهرستی که خالی است.
+   */
+  if (!record.contract?.must?.length && record.contract?.seenIn) return nothing;
+
+  const snapshot = await snapshotPage(page).catch(() => null);
+  if (!snapshot) return { findings: [], page: null };
+
+  const { verifyContract, reinforce, contractFrom, contractFinding, LEARNING_VISITS } = await import('./contract.js');
+
+  const { missing } = await verifyContract(page, record.contract);
+  const learning = (record.contract.seenIn || 0) < LEARNING_VISITS;
+
+  const findings = [];
+  if (missing.length && !learning) {
+    findings.push(
+      contractFinding({
+        path: record.path,
+        missing,
+        mode: record.contract.mode,
+        step,
+        device,
+        synthetic,
+      })
+    );
+  }
+
+  /**
+   * تقویت با نامزدهای همین بازدید.
+   *
+   * در مرحلهٔ یادگیری، بندی که غایب بود بی‌صدا حذف می‌شود — همان مکانیزمی
+   * که دادهٔ کاربر را از چیدمانِ ثابت جدا می‌کند.
+   */
+  const { contract, dropped } = reinforce(record.contract, contractFrom(snapshot));
+  const changed = dropped > 0 || contract.seenIn !== record.contract.seenIn;
+
+  return { findings, page: changed ? { ...record, contract } : null };
 }
 
 /**

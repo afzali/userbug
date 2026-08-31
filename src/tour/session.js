@@ -43,6 +43,7 @@ import { snapshotPage } from '../steps/snapshot.js';
 import { runUniversalChecks } from '../checks/run.js';
 import { readChecksConfig } from '../checks/config.js';
 import { routeOf } from '../observe/route.js';
+import { contractFrom } from '../checks/contract.js';
 import { BINDING, describe, recorderScript, toStep } from './recorder.js';
 
 /** بی‌فعالیتیِ بیشتر از این، گشت را می‌بندد. مرورگرِ فراموش‌شده بدترین حالت است. */
@@ -244,6 +245,8 @@ export class TourSession extends EventEmitter {
       purpose: String(purpose || '').trim(),
       headings: snapshot.headings,
       items: snapshot.items,
+      // نامزدهای قرارداد؛ هنوز قاعده نیستند — تقویتشان کارِ بازدیدهای بعدی است
+      mustHave: contractFrom(snapshot),
       by: purpose ? 'user' : 'tour',
       at: new Date().toISOString(),
     };

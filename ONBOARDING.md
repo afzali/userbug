@@ -567,8 +567,8 @@ const text = await fs.readFile(await download.path(), 'utf8');
 - [x] `src/checks/universal.js` — یک `evaluate`، ده چک، همه با تستِ دوسویه
 - [x] `src/checks/run.js` — اجراگر و تبدیل به یافته
 - [x] وصل به `fixtures.js` — همهٔ مسیرها از `ub.step` رد می‌شوند، پس کاوش هم پوشش دارد
-- [ ] `src/checks/contract.js` — ساخت قرارداد از snapshot، سنجش، ارتقای
-      پیشنهادی.
+- [x] `src/checks/contract.js` — نامزد از snapshot، **تقویت با تقاطع** در
+      بازدیدهای بعد، و سنجش پس از پنجرهٔ یادگیری · [ ] ارتقای پیشنهادی به `expect`
 - [x] `src/checks/invariant.js` + `src/knowledge/schema-mine.js` — استخراج
       `UNIQUE`/`NOT NULL` از SQL، چه در `.sql` چه داخل js/php · اجرا در پایان
       هر سناریو · ناوردای غیرقابل‌اجرا خودش خاموش می‌شود

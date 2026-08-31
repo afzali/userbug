@@ -17,7 +17,8 @@ import { routeOf } from './observe/route.js';
 import { RunStore, getCurrentRun } from './store/run-store.js';
 import { freshIdentity } from './data/persian.js';
 import { countHits, readChecksConfig } from './checks/config.js';
-import { hardFailureMessage, runUniversalChecks } from './checks/run.js';
+import { hardFailureMessage, runContractCheck, runUniversalChecks } from './checks/run.js';
+import { listPages, writePage } from './knowledge/store.js';
 
 export const test = base.extend({
   target: [
@@ -71,6 +72,44 @@ export const test = base.extend({
     } catch {
       // کلیدِ نامعتبر یا پوشهٔ نبوده — پیش‌فرض کار می‌کند
     }
+    /**
+     * قراردادهای صفحه، یک بار خوانده و در حافظه نگه داشته می‌شوند.
+     *
+     * خواندنِ پوشهٔ `pages/` در پایانِ هر قدم، روی سناریوی چهل‌قدمی چهل بار
+     * پیمایشِ دیسک است برای فایل‌هایی که وسط اجرا عوض نمی‌شوند — مگر خودمان
+     * عوضشان کنیم، که آن‌وقت همین نقشه را هم به‌روز می‌کنیم.
+     */
+    const contracts = new Map();
+    /**
+     * مسیرِ پایانِ قدمِ قبلی، و مسیرهایی که در همین تست تقویت شده‌اند.
+     *
+     * ── چرا هر دو لازم‌اند ──
+     *
+     * نخستین اجرای واقعی هر دو مسئله را با هم نشان داد: قراردادِ `/login`
+     * از ده بند به دو بند رسید و `seenIn` در یک سناریوی سه‌قدمی از ۱ به ۴
+     * پرید.
+     *
+     * **`seenIn` بازدید می‌شمرد، نه قدم.** سناریوی چهل‌قدمی روی یک صفحه،
+     * چهل «بازدید» می‌شد و پنجرهٔ یادگیری بی‌معنا.
+     *
+     * **و تقویت وسطِ گذار، چیدمانِ درست را حذف می‌کرد.** پایانِ قدمی که
+     * کاربر تازه «ورود» را زده، دقیقاً همان لحظه‌ای است که فرمِ ورود دارد
+     * می‌رود. فیلدهای ایمیل و رمز — که واقعاً بخشِ ثابتِ آن صفحه‌اند — در
+     * همان لحظه غایب دیده شدند و از قرارداد افتادند.
+     *
+     * پس تقویت فقط **نخستین بار** که در این تست به یک مسیر می‌رسیم — یعنی
+     * تازه رسیده‌ایم و هنوز کاری نکرده‌ایم. مرزِ بعدیِ همان مسیر معمولاً پس
+     * از کنشی است که صفحه را دارد عوض می‌کند.
+     */
+    const reinforced = new Set();
+    try {
+      for (const record of listPages(target.key || process.env.UB_TARGET || '')) {
+        contracts.set(record.path, record);
+      }
+    } catch {
+      // پروژه‌ای که هنوز گشت نشده قراردادی ندارد
+    }
+
     /** شناسهٔ چک‌هایی که در این تست یافته ساختند، برای شمارندهٔ سروصدا. */
     const checkHits = new Set();
     /** چک‌های `expect` که شکستند — بر خلاف بقیه، تست را سخت می‌شکنند. */
@@ -175,6 +214,32 @@ export const test = base.extend({
             }
           } catch {
             // نبودِ چک، شکستِ قدم نیست
+          }
+
+          // لایهٔ ۲: «چیزی که بود، هنوز هست»
+          try {
+            const record = route && !reinforced.has(route) ? contracts.get(route) : null;
+            if (record) {
+              reinforced.add(route);
+              const result = await runContractCheck({
+                page,
+                target: target.key || process.env.UB_TARGET || '',
+                record,
+                step: name,
+                device,
+                synthetic: probe,
+              });
+              for (const finding of result.findings) {
+                findings.push(finding);
+                await store.appendFinding(finding).catch(() => {});
+              }
+              if (result.page) {
+                contracts.set(result.page.path, result.page);
+                if (!probe) await writePage(target.key, result.page, { why: 'تقویتِ قرارداد در اجرا' }).catch(() => {});
+              }
+            }
+          } catch {
+            // قرارداد نباید قدم را بشکند
           }
 
           await store.appendEvent({

@@ -171,6 +171,7 @@ export async function emitTour({ target, state, name, landing = false }) {
           // وگرنه باگِ امروز رسمی می‌شد. ارتقا کارِ آدم است.
           mode: 'watch',
           must: (page.mustHave || []).slice(0, 20),
+          // یک بازدید هنوز قاعده نمی‌سازد؛ `LEARNING_VISITS` تصمیم می‌گیرد
           seenIn: 1,
           lastSeen: new Date().toISOString(),
         },

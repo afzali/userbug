@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "path": "/login",
+  "title": "",
+  "purpose": "صفحهٔ ورود و ثبت‌نام نپی",
+  "domSignature": "",
+  "stale": false,
+  "shot": "shots/01--login.png",
+  "contract": {
+    "mode": "watch",
+    "must": [
+      {
+        "role": "button",
+        "name": "نپی",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "فراموشی رمز عبور؟",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "آفلاین",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "label": "ایمیل",
+        "visible": true
+      },
+      {
+        "label": "رمز عبور",
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "ورود / ثبت‌نام",
+        "exact": true,
+        "visible": true
+      }
+    ],
+    "seenIn": 4,
+    "lastSeen": "2026-08-31T13:44:26.087Z",
+    "approvedBy": null
+  },
+  "by": "user"
+}
