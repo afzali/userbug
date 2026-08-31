@@ -42,6 +42,7 @@ import { RunStore, newRunId, setCurrentRun } from '../store/run-store.js';
 import { snapshotPage } from '../steps/snapshot.js';
 import { runUniversalChecks } from '../checks/run.js';
 import { readChecksConfig } from '../checks/config.js';
+import { routeOf } from '../observe/route.js';
 import { BINDING, describe, recorderScript, toStep } from './recorder.js';
 
 /** بی‌فعالیتیِ بیشتر از این، گشت را می‌بندد. مرورگرِ فراموش‌شده بدترین حالت است. */
@@ -400,11 +401,7 @@ export class TourSession extends EventEmitter {
   }
 }
 
-/** مسیرِ نسبی از یک آدرس. آدرسِ نامعتبر رشتهٔ خالی می‌دهد، نه استثنا. */
+/** مسیرِ نسبی، یا رشتهٔ خالی. `routeOf` طرح‌هایی مثل about: را رد می‌کند. */
 function safePath(url) {
-  try {
-    return new URL(url).pathname;
-  } catch {
-    return '';
-  }
+  return routeOf(url) || '';
 }

@@ -95,12 +95,23 @@
       const response = await fetch(`/api/triage/${encodeURIComponent(data.target)}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ fingerprint: item.fingerprint, status: item.triage.status, note: item.triage.note }),
+        body: JSON.stringify({
+          fingerprint: item.fingerprint,
+          status: item.triage.status,
+          note: item.triage.note,
+          verdict: item.triage.verdict || undefined,
+        }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'ذخیره نشد');
       item.triage = payload.triage;
-      item.feedback = 'ذخیره شد';
+      /**
+       * آنچه برچسب در شناخت تغییر داد، همان‌جا گفته می‌شود.
+       *
+       * بدون این، حلقه نامرئی است: کاربر «قلابی» می‌زند و هیچ نشانه‌ای
+       * نمی‌بیند که چکِ پرسروصدا دارد خاموش می‌شود.
+       */
+      item.feedback = payload.learned?.applied?.length ? payload.learned.applied.join(' · ') : 'ذخیره شد';
     } catch (cause) {
       item.feedback = cause.message;
     } finally {
@@ -149,6 +160,7 @@
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><span>{formatNumber(item.runs.length)} اجرا · {formatNumber(item.count)} رخداد</span><span>آخرین: {formatDate(item.lastSeen)}</span></div>
       <div class="grid gap-3 sm:grid-cols-[11rem_minmax(0,1fr)_auto]">
         <select class="app-select" bind:value={item.triage.status}><option value="open">باز</option><option value="acknowledged">بررسی‌شده</option><option value="resolved">رفع‌شده</option><option value="ignored">نادیده‌گرفته</option></select>
+        <select class="app-select" bind:value={item.triage.verdict} title="این برچسب به شناخت برمی‌گردد: «قلابی» چکِ پرسروصدا را خاموش می‌کند، «باگ واقعی» به خطرها می‌رود."><option value="">قضاوت؟</option><option value="false-positive">قلابی</option><option value="real-bug">باگ واقعی</option><option value="by-design">رفتار درست است</option><option value="later">بعداً</option></select>
         <Input bind:value={item.triage.note} placeholder="یادداشت تریاژ…" />
         <Button size="sm" onclick={() => save(item)} disabled={item.saving}>{item.saving ? '…' : 'ذخیره'}</Button>
       </div>

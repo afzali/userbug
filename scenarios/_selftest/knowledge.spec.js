@@ -90,6 +90,21 @@ test('مسیر نرمال می‌شود تا یک صفحه دو بار ثبت ن
   expect(normalizeRoutePath('/')).toBe('/');
 });
 
+test('آدرسی که صفحهٔ اپ نیست، روت نمی‌شود', () => {
+  /**
+   * نخستین اجرای واقعیِ حلقهٔ یادگیری `/blank` را به شناخت اضافه کرد: مرورگر
+   * پیش از نخستین ناوبری روی `about:blank` است و pathnameاش «blank» است.
+   * یک روتِ ساختگی، به‌علاوهٔ یک پرسشِ بی‌جواب که آدم باید وقت بگذارد.
+   */
+  expect(normalizeRoutePath('about:blank')).toBe('');
+  expect(normalizeRoutePath('chrome-error://chromewebdata/')).toBe('');
+  expect(normalizeRoutePath('data:text/html,<p>x</p>')).toBe('');
+  expect(normalizeRoutePath('blob:http://x/abc')).toBe('');
+
+  // ولی آدرسِ واقعیِ اپ باید سالم بماند
+  expect(normalizeRoutePath('http://localhost:5173/library')).toBe('/library');
+});
+
 test('slug صفحه، مسیرهای متفاوت را قاطی نمی‌کند', () => {
   expect(pageSlug('/a/b')).not.toBe(pageSlug('/a-b'));
   expect(pageSlug('/')).toBe('root');

@@ -640,13 +640,12 @@ const text = await fs.readFile(await download.path(), 'utf8');
 
 ## کارها
 
-- [ ] `src/knowledge/history.js` — نوشتن و خواندنِ `history.ndjson`.
-- [ ] `src/knowledge/absorb.js` — «این اجرا چه چیزی به شناخت اضافه می‌کند؟»
-      در `finalize.js` صدا زده می‌شود.
-- [ ] وصل تریاژ به شناخت: چهار برچسبِ جدول بالا.
-- [ ] مصرف‌کنندهٔ `healCount` → `stale`.
-- [ ] `src/knowledge/coverage.js` + کارتِ سنجه در صفحهٔ پروژه.
-- [ ] `userbug knowledge <پروژه> --history`.
+- [x] `src/knowledge/history.js` — نوشتن و خواندنِ `history.ndjson`
+- [x] `src/knowledge/absorb.js` — در `finalize.js` صدا زده می‌شود
+- [x] وصل تریاژ به شناخت: `src/knowledge/feedback.js` و کشویی «قضاوت» در تریاژ
+- [x] `healCount` بالای آستانه در خلاصهٔ اجرا گزارش می‌شود · [ ] کهنگیِ خودکارِ صفحه (نیازمند ثبتِ امضای صفحه در اجرا)
+- [x] `src/knowledge/coverage.js` + کارتِ سنجه در صفحهٔ شناخت
+- [x] `userbug knowledge <پروژه> --history`
 
 ---
 

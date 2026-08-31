@@ -13,6 +13,7 @@ import { loadTarget } from './target.js';
 import { attachClientObservers, INIT_SCRIPT } from './observe/client.js';
 import { createServerCollectors, startAll, drainAll } from './observe/server.js';
 import { judge, fingerprint, normalizeMessage } from './observe/oracle.js';
+import { routeOf } from './observe/route.js';
 import { RunStore, getCurrentRun } from './store/run-store.js';
 import { freshIdentity } from './data/persian.js';
 import { countHits, readChecksConfig } from './checks/config.js';
@@ -124,12 +125,8 @@ export const test = base.extend({
           // مسیرِ پایانِ قدم. هم داور لازمش دارد و هم خطِ زمانی: بدون آن
           // «کاربر کجا بود» فقط از عکس درمی‌آمد، و یک بار همین باعث شد سه قدم
           // را با هم اشتباه بگیریم.
-          let route = null;
-          try {
-            route = new URL(page.url()).pathname;
-          } catch {
-            // صفحه‌ای که هنوز جایی نرفته یا بسته شده، آدرس قابل تجزیه ندارد
-          }
+          // `about:blank` مسیر ندارد؛ `routeOf` این را می‌داند
+          const route = routeOf(page.url());
 
           const slice = events.slice(from);
           const { findings: found } = judge(slice, {
@@ -213,13 +210,13 @@ export const test = base.extend({
       /** یافته‌ای که خودِ سناریو تشخیص می‌دهد، نه داورِ خطاها. */
       async note({ source = 'scenario', severity = 'error', message, detail = null, synthetic = false }) {
         const f = {
-          fingerprint: fingerprint({ source, message, route: new URL(page.url()).pathname, step: currentStep }),
+          fingerprint: fingerprint({ source, message, route: routeOf(page.url()), step: currentStep }),
           source,
           severity,
           message,
           normalized: normalizeMessage(message),
           step: currentStep,
-          route: new URL(page.url()).pathname,
+          route: routeOf(page.url()),
           device,
           at: new Date().toISOString(),
           detail,

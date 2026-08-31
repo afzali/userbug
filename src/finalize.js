@@ -14,6 +14,7 @@
  * این دو اهمیتی ندارد.
  */
 import nodeFs from 'node:fs';
+import { absorbRun } from './knowledge/absorb.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { RunStore, getCurrentRun, runDir } from './store/run-store.js';
@@ -110,6 +111,22 @@ export async function finalizeRun(runId = getCurrentRun(), { status, junitPath }
     ai: summarizeAi(events),
   });
 
+  /**
+   * شناخت از همین اجرا تغذیه می‌شود.
+   *
+   * ── چرا اینجا و چرا با catch ──
+   *
+   * اینجا، چون تنها نقطه‌ای است که همهٔ مسیرها از آن رد می‌شوند: CLI،
+   * زمان‌بندی، و `userbug report`. با catch، چون گزارش و JUnit از قبل ساخته
+   * شده‌اند و شکستنِ اجرا به‌خاطر نتوانستنِ نوشتنِ یک افزودهٔ شناخت، نتیجه‌ای
+   * را که واقعاً گرفته شده از دست می‌دهد.
+   */
+  const absorbed = await absorbRun({
+    target: before.target || process.env.UB_TARGET || '',
+    events,
+    runId,
+  }).catch(() => null);
+
   const run = await store.readJson('run.json');
   const file = path.join(store.dir, 'report.html');
   await fs.writeFile(file, renderReport({ run, steps, findings: real, synthetic, events }), 'utf8');
@@ -133,11 +150,11 @@ export async function finalizeRun(runId = getCurrentRun(), { status, junitPath }
     await fs.writeFile(junitCopy, junitXml, 'utf8');
   }
 
-  return { run, store, steps, unique, synthetic, file, junit, junitCopy };
+  return { run, store, steps, unique, synthetic, file, junit, junitCopy, absorbed };
 }
 
 /** خلاصهٔ کنسولی — همان چیزی که آدم بعد از اجرا می‌خواهد ببیند. */
-export function printSummary({ run, steps, unique, file, junitCopy }) {
+export function printSummary({ run, steps, unique, file, junitCopy, absorbed }) {
   console.log(`\n  گزارش: ${file}`);
   if (junitCopy) console.log(`  JUnit: ${junitCopy}`);
   console.log(
@@ -153,6 +170,24 @@ export function printSummary({ run, steps, unique, file, junitCopy }) {
         `
 `
     );
+  }
+
+  /**
+   * آنچه این اجرا به شناخت اضافه کرد.
+   *
+   * چاپش لازم است، وگرنه «به مرور بهتر می‌شود» یک ادعای نامرئی می‌ماند:
+   * کاربر باید ببیند که اجرای امروز چیزی یاد داد.
+   */
+  if (absorbed && (absorbed.routes || absorbed.stale || absorbed.unstable?.length)) {
+    const parts = [];
+    if (absorbed.routes) parts.push(`${absorbed.routes} مسیر تازه`);
+    if (absorbed.stale) parts.push(`${absorbed.stale} صفحهٔ کهنه`);
+    if (absorbed.unstable?.length) parts.push(`${absorbed.unstable.length} قدمِ ناپایدار`);
+    console.log(`  شناخت: ${parts.join(' · ')}`);
+    for (const item of absorbed.unstable || []) {
+      console.log(`    ناپایدار (${item.healCount}× heal): «${item.intent}» در ${item.scenario}`);
+    }
+    console.log('');
   }
 
   if (unique.length) {

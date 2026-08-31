@@ -106,3 +106,11 @@
 {"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[آیا migration ۲۳ برای جداول AI چت‌ها اعمال شده است یا هنوز در حالت توسعه است؟]","by":"model","why":"userbug learn --source"}
 {"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[چگونه logger.js کار می‌کند و آیا در تولید غیرفعال می‌شود؟]","by":"model","why":"userbug learn --source"}
 {"at":"2026-08-31T10:39:31.076Z","op":"update","path":"openQuestions[آیا سرور PHP برای چه کارهایی استفاده می‌شود؟ (همگام‌سازی، احراز هویت، ذخیرهٔ رمزگذاری‌شده؟)]","by":"model","why":"پاسخ از رابط"}
+{"at":"2026-08-31T12:50:44.709Z","op":"add","path":"routes[/blank]","by":"run","why":"اجرای 2026-08-31T12-50-09_nepi_104fe50c","ref":"2026-08-31T12-50-09_nepi_104fe50c"}
+{"at":"2026-08-31T12:50:44.709Z","op":"add","path":"openQuestions[صفحهٔ /blank برای چیست؟]","by":"model","why":"اجرای 2026-08-31T12-50-09_nepi_104fe50c","ref":"2026-08-31T12-50-09_nepi_104fe50c"}
+{"at":"2026-08-31T12:51:50.520Z","op":"remove","path":"routes[/blank]","by":"user","why":"روتِ ساختگیِ about:blank"}
+{"at":"2026-08-31T12:51:50.520Z","op":"remove","path":"openQuestions[صفحهٔ /blank برای چیست؟]","by":"user","why":"روتِ ساختگیِ about:blank"}
+{"at":"2026-08-31T12:52:24.691Z","op":"add","path":"routes[/blank]","by":"run","why":"اجرای 2026-08-31T12-51-52_nepi_060b29d4","ref":"2026-08-31T12-51-52_nepi_060b29d4"}
+{"at":"2026-08-31T12:52:24.691Z","op":"add","path":"openQuestions[صفحهٔ /blank برای چیست؟]","by":"model","why":"اجرای 2026-08-31T12-51-52_nepi_060b29d4","ref":"2026-08-31T12-51-52_nepi_060b29d4"}
+{"at":"2026-08-31T12:53:37.815Z","op":"remove","path":"routes[/blank]","by":"user","why":"روتِ ساختگیِ about:blank"}
+{"at":"2026-08-31T12:53:37.815Z","op":"remove","path":"openQuestions[صفحهٔ /blank برای چیست؟]","by":"user","why":"روتِ ساختگیِ about:blank"}

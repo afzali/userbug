@@ -267,6 +267,22 @@ export async function saveTriage(target, fingerprint, patch) {
   if (!allowed.has(status)) throw new Error('وضعیت تریاژ نامعتبر است');
   const note = String(patch.note || '').slice(0, 4000);
 
+  /**
+   * برچسبِ قضاوت، جدا از وضعیت.
+   *
+   * ── چرا فیلدِ تازه و نه استفاده از `ignored` ──
+   *
+   * `ignored` امروز دو چیزِ متضاد را با هم قاطی می‌کند: «چک اشتباه کرد» و
+   * «باگ واقعی است ولی الان کاری نمی‌کنیم». برای حلقهٔ یادگیری این دو
+   * سیگنالِ مخالف‌اند — اولی باید چک را خاموش کند و دومی باید در شناخت
+   * بماند.
+   *
+   * پس `status` دست‌نخورده ماند (تریاژِ موجود نباید معنایش عوض شود) و
+   * `verdict` کنارش نشست، اختیاری.
+   */
+  const verdicts = new Set(['false-positive', 'real-bug', 'by-design', 'later']);
+  const verdict = patch.verdict && verdicts.has(String(patch.verdict)) ? String(patch.verdict) : null;
+
   const locksKey = Symbol.for('userbug.ui.triage-locks');
   const locks = globalThis[locksKey] || new Map();
   globalThis[locksKey] = locks;
@@ -276,6 +292,9 @@ export async function saveTriage(target, fingerprint, patch) {
     const file = path.join(TRIAGE_DIR, `${key}.json`);
     const state = (await readJson(file, {})) || {};
     const saved = { status, note, updatedAt: new Date().toISOString() };
+    // برچسبِ قبلی می‌ماند مگر اینکه برچسبِ تازه‌ای داده شود
+    const keptVerdict = verdict ?? state[print]?.verdict ?? null;
+    if (keptVerdict) saved.verdict = keptVerdict;
     state[print] = saved;
     const temporary = `${file}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
     try {
