@@ -56,10 +56,22 @@ const SYSTEM = `تو یک سناریوی تست کاربرمحور می‌نوی
 - "notes" جای چیزهایی است که از متن کاربر مشخص نبود و حدس زده‌ای؛ اگر چیزی نبود رشتهٔ خالی.
 - چیزی از خودت به سناریو اضافه نکن که کاربر نگفته.`;
 
-function buildUser({ text, target, source }) {
+function buildUser({ text, target, source, knowledge }) {
   const lines = [`متنِ کاربر:\n${text}`];
   if (target?.baseURL) lines.push(`\nآدرس پایهٔ اپ: ${target.baseURL}`);
   if (target?.name) lines.push(`نام پروژه: ${target.name}`);
+
+  /**
+   * شناخت پیش از سورس می‌آید، عمداً.
+   *
+   * تکه‌های سورس خام‌اند و مدل باید از رویشان استنباط کند؛ شناخت جمعِ‌بندیِ
+   * همان کار است و بخشی‌اش را آدم تأیید کرده. وقتی هر دو هستند، آنکه بالاتر
+   * می‌آید لنگرِ فهم است.
+   *
+   * و مهم‌تر: فهرست مسیرها یعنی `go:` دیگر حدس نیست. پیش‌تر مدل در `notes`
+   * صادقانه می‌نوشت «بر اساس الگوهای رایج فرض شده».
+   */
+  if (knowledge) lines.push('\nآنچه از این پروژه می‌دانیم:', knowledge);
 
   /**
    * سورس، وقتی هست.
@@ -145,7 +157,7 @@ export function assertScenarioShape(json) {
 }
 
 /** سناریوی سنجیده‌شده را به متنِ YAML با سرصفحهٔ توضیحی تبدیل کن. */
-export function toYaml({ name, steps, notes }, { text, sourceFiles = [] }) {
+export function toYaml({ name, steps, notes }, { text, sourceFiles = [], knowledge = '' }) {
   const header = [
     '# ساخته‌شده از متنِ کاربر با هوش مصنوعی.',
     '#',
@@ -154,6 +166,10 @@ export function toYaml({ name, steps, notes }, { text, sourceFiles = [] }) {
       .split(/\r?\n/)
       .map((line) => `#   ${line}`),
   ];
+
+  // بدون این، بعداً نمی‌شد فهمید سناریو با شناخت ساخته شده یا بی‌آن — و وقتی
+  // کیفیتِ دو سناریو فرق کند، همین خط جوابِ «چرا» است.
+  if (knowledge) header.push('#', '# با شناختِ ثبت‌شدهٔ پروژه ساخته شد.');
 
   // بدون این، بعداً نمی‌شد فهمید برچسب‌ها از کد آمده‌اند یا حدس بوده‌اند.
   if (sourceFiles.length) {
@@ -183,9 +199,10 @@ export function toYaml({ name, steps, notes }, { text, sourceFiles = [] }) {
  * @param {object} o.models   خروجی `resolveModel()`
  * @param {object} [o.target] برای اینکه مدل آدرس پایه و نام پروژه را بداند
  * @param {object} [o.source] خروجی `findRelevantSource()`، اگر کاربر اجازه داده باشد
+ * @param {string} [o.knowledge] خروجی `knowledgeFor()` — مسیرها، ورود، واژه‌ها، خطرها
  * @returns {Promise<{yaml: string, name: string, steps: number, notes: string, slug: string, budget: object}>}
  */
-export async function scenarioFromText({ text, models, target, source }) {
+export async function scenarioFromText({ text, models, target, source, knowledge }) {
   const trimmed = String(text ?? '').trim();
   if (trimmed.length < 10) throw new Error('متن خیلی کوتاه است؛ بگویید کاربر چه کاری انجام می‌دهد');
   if (trimmed.length > MAX_TEXT) throw new Error(`متن بیش از ${MAX_TEXT} نویسه است؛ آن را به چند سناریو بشکنید`);
@@ -195,14 +212,14 @@ export async function scenarioFromText({ text, models, target, source }) {
     models,
     {
       system: SYSTEM.replace('{{VERBS}}', [...KNOWN_VERBS].join(' ')),
-      user: buildUser({ text: trimmed, target, source }),
+      user: buildUser({ text: trimmed, target, source, knowledge }),
     },
     budget
   );
 
   const scenario = assertScenarioShape(json);
   return {
-    yaml: toYaml(scenario, { text: trimmed, sourceFiles: source?.files || [] }),
+    yaml: toYaml(scenario, { text: trimmed, sourceFiles: source?.files || [], knowledge }),
     sourceFiles: source?.files || [],
     name: scenario.name,
     steps: scenario.steps.length,

@@ -151,6 +151,26 @@ export async function askJson(cfg, prompt, budget) {
   try {
     return { json: extractJson(text), usage: data.usage, model: cfg.model };
   } catch {
-    throw new Error(`پاسخ مدل JSON معتبر نبود: ${text.slice(0, 200)}`);
+    /**
+     * پاسخِ **بریده** با پاسخِ **بدشکل** یکی نیست.
+     *
+     * وقتی مدل به سقفِ خروجی بخورد، JSON وسطِ راه قطع می‌شود و پیامِ «JSON
+     * معتبر نبود» آدم را می‌فرستد سراغ prompt یا کیفیتِ مدل — در حالی که
+     * مسئله فقط طول است و راهش عوض کردنِ مدل یا کوتاه کردنِ خواسته است.
+     *
+     * یک بار همین شد: سناریوی چندقدمی با هدفِ درست ساخته می‌شد و در قدمِ
+     * ششم قطع می‌شد، و خطا هیچ اشاره‌ای به سقف نداشت. مسیرِ «پاسخ خالی»
+     * از قبل `finish_reason` را می‌گفت؛ این یکی نمی‌گفت.
+     */
+    const reason = data.choices?.[0]?.finish_reason;
+    if (reason === 'length') {
+      throw new Error(
+        `پاسخ مدل ${cfg.model} پیش از تمام شدن بریده شد (finish_reason: length).\n` +
+          '  خواسته را کوچک‌تر کنید یا مدلی با خروجیِ بلندتر انتخاب کنید.'
+      );
+    }
+    throw new Error(
+      `پاسخ مدل JSON معتبر نبود${reason ? ` (finish_reason: ${reason})` : ''}: ${text.slice(0, 200)}`
+    );
   }
 }

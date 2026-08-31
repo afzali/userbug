@@ -3,6 +3,7 @@ import { scenarioFromText } from '../../../../../../src/scenario/from-text.js';
 import { findRelevantSource, resolveSourceRoot } from '../../../../../../src/source-access.js';
 import { assertModelSlug, loadGlobalConfig, resolveModel } from '../../../../../../src/models/config.js';
 import { listProjects } from '$lib/server/projects.js';
+import { knowledgeFor } from '../../../../../../src/knowledge/select.js';
 import { jsonError } from '$lib/server/http.js';
 import { assertMutationRequest } from '$lib/server/security.js';
 
@@ -64,11 +65,22 @@ export async function POST(event) {
       source = await findRelevantSource({ root, text: body?.text });
     }
 
+    /**
+     * شناخت، بی‌شرطِ اضافه.
+     *
+     * برخلاف سورس، این یکی `useSource` نمی‌خواهد: پرونده را خودِ کاربر ساخته
+     * (با `learn` یا با جواب دادن به پرسش‌ها) و محتوایش از قبل از همان مرز
+     * رد شده. شرط گذاشتن رویش یعنی کاربر باید دو بار اجازه بدهد برای چیزی
+     * که یک بار داده.
+     */
+    const knowledge = knowledgeFor({ target, text: body?.text });
+
     const draft = await scenarioFromText({
       text: body?.text,
       models,
       target: { name: project.name, baseURL: project.baseURL },
       source,
+      knowledge,
     });
 
     return json({
@@ -78,6 +90,8 @@ export async function POST(event) {
       // دیگری بنشیند.
       relative: `_drafts/${draft.slug}.yml`,
       model: `${models.provider}:${models.model}`,
+      // رابط باید بتواند بگوید «با شناخت ساخته شد» یا نه
+      usedKnowledge: Boolean(knowledge),
     });
   } catch (cause) {
     return jsonError(cause, 400);

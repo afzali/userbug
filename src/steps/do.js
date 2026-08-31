@@ -16,6 +16,7 @@ import { signatureOf } from './signature.js';
 import { snapshotPage, descriptorFor } from './snapshot.js';
 import { redactDeep, secretsOf } from '../models/redact.js';
 import { askJson } from '../models/provider.js';
+import { knowledgeFor } from '../knowledge/select.js';
 
 const SYSTEM = `تو یک دستیارِ تستِ رابط کاربری هستی.
 
@@ -136,11 +137,34 @@ async function askModel({ page, intent, models, budget, identity, rejected = nul
       `دلیل: ${rejected.why}\nعنصر دیگری از همان فهرست انتخاب کن.`
     : '';
 
+  /**
+   * واژه‌نامه، فقط برای واژه‌هایی که در همین نیت آمده.
+   *
+   * ── چرا اینجا کم‌ترین چیز می‌رود ──
+   *
+   * `do:` پرتکرارترین فراخوانیِ ابزار است و کلِ اقتصادِ فاز ۲ روی ارزان
+   * بودنش بنا شده. پس نه خلاصه می‌رود نه فهرست مسیر — فقط چیزی که به
+   * **همین جمله** ربط دارد.
+   *
+   * و آن چیز واژه‌نامه است: نیتِ «سند جدید بساز» وقتی مدل نداند «سند» در این
+   * اپ یعنی چه، به هر دکمه‌ای با واژهٔ نزدیک می‌خورد. `budget` کوچک است تا
+   * حتی وقتی پرونده بزرگ شد، این مسیر ارزان بماند.
+   */
+  const knowledge = knowledgeFor({
+    target: process.env.UB_TARGET || '',
+    text: intent,
+    url: page.url(),
+    budget: 300,
+  });
+
   const { json } = await askJson(
     models,
     {
       system: SYSTEM,
-      user: `نیت: ${intent}\n\nصفحه:\n${JSON.stringify(safe, null, 1)}${retryNote}`,
+      user:
+        `نیت: ${intent}\n\n` +
+        (knowledge ? `زمینه:\n${knowledge}\n\n` : '') +
+        `صفحه:\n${JSON.stringify(safe, null, 1)}${retryNote}`,
     },
     budget
   );

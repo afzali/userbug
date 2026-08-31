@@ -41,6 +41,7 @@ import { resolveTarget } from '../scenario/resolve.js';
 import { redactDeep, secretsOf } from '../models/redact.js';
 import { askJson } from '../models/provider.js';
 import { writeDraft } from './author.js';
+import { avoidFrom, knowledgeFor, purposeOfPage } from '../knowledge/select.js';
 
 const SYSTEM = `تو یک تسترِ انسانی را شبیه‌سازی می‌کنی که با یک اپ کار می‌کند.
 
@@ -65,7 +66,29 @@ const SYSTEM = `تو یک تسترِ انسانی را شبیه‌سازی می�
  * @param {number} [o.maxSteps] سقف قدم — بدون آن کاوش تا timeout ادامه می‌دهد
  */
 export async function explore({ page, ub, ctx, goal, maxSteps = 12, author = false, preamble = [] }) {
-  const avoid = (ub.target.explore?.avoid || []).map((r) => new RegExp(r, 'i'));
+  /**
+   * فهرستِ ممنوع از دو جا می‌آید و **ادغام** می‌شود.
+   *
+   * `explore.avoid` در کانفیگ، دستِ کاربر است و می‌ماند. `risks` در پروندهٔ
+   * شناخت، همان چیزی است که هضمِ سورس یا گشت پیدا کرده. با هم یعنی پروژه‌ای
+   * که تازه `learn` شده، بی‌آنکه کسی چیزی بنویسد، از «حذف حساب» دوری می‌کند.
+   *
+   * ادغام است نه جایگزینی: پرونده می‌تواند چیزی را نداند که کاربر می‌داند،
+   * و برعکس.
+   */
+  const targetKey = ub.target.key || process.env.UB_TARGET || '';
+  const avoid = [...new Set([...(ub.target.explore?.avoid || []), ...avoidFrom(targetKey)])].map(
+    (r) => new RegExp(r, 'i')
+  );
+
+  /**
+   * شناخت یک بار خوانده می‌شود، نه هر قدم.
+   *
+   * حلقه تا دوازده بار مدل صدا می‌زند و پرونده وسط اجرا عوض نمی‌شود. بودجه
+   * از پیش‌فرض کمتر است چون snapshot صفحه خودش بزرگ است و اینجا رقیب دارد.
+   */
+  const knowledge = knowledgeFor({ target: targetKey, text: goal, budget: 900 });
+
   const history = [];
   /** چند بار روی هر عنصر کار شده — کلید: توصیفِ همان عنصر */
   const used = new Map();
@@ -87,12 +110,24 @@ export async function explore({ page, ub, ctx, goal, maxSteps = 12, author = fal
 
     const safe = redactDeep({ ...snapshot, items }, secretsOf(ctx.identity));
 
+    /**
+     * هدفِ همین صفحه، از پرونده — یک بار در هر قدم، نه دو بار در prompt.
+     *
+     * این همان چیزی است که کاوشگر را از حلقهٔ فرضِ غلط بیرون می‌آورد: در
+     * «کاوش editor» ده قدم از دوازده صرف hover شد به امیدِ منویی که وجود
+     * نداشت. کاوشگری که بداند این صفحه برای چیست، کمتر دنبالِ چیزِ نبوده
+     * می‌گردد.
+     */
+    const purpose = purposeOfPage(targetKey, page.url());
+
     const { json } = await askJson(
       ctx.models,
       {
         system: SYSTEM,
         user:
           `هدف کاوش: ${goal}\n\n` +
+          (knowledge ? `آنچه از این اپ می‌دانیم:\n${knowledge}\n\n` : '') +
+          (purpose ? `این صفحه: ${purpose}\n\n` : '') +
           `کارهای انجام‌شده تا حالا:\n${history.map((h) => `- ${h.why || h.action}`).join('\n') || '(هیچ)'}\n\n` +
           `صفحهٔ فعلی:\n${JSON.stringify(safe, null, 1)}`,
       },
