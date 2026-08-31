@@ -148,6 +148,20 @@ test('نوشتن، تاریخچه می‌سازد و ترفیع را جدا ثب
   });
 });
 
+test('پاسخ به پرسش در تاریخچه by: user ثبت می‌شود، نه by: model', () => {
+  /**
+   * پرسش کلیدِ `by` ندارد و نباید داشته باشد: خودش را مدل ساخته، جوابش را
+   * آدم داده. با قاعدهٔ عمومی، ثبتِ پاسخ `by: model` می‌خورد — همان اشتباهِ
+   * منبعی که کلِ این دفتر برای جلوگیری از آن نوشته شده.
+   */
+  const before = normalizeDossier({ openQuestions: [{ q: 'این چیست؟' }] });
+  const after = normalizeDossier({ openQuestions: [{ q: 'این چیست؟', answer: 'یک ویرایشگر' }] });
+
+  const [change] = diffDossier(before, after);
+  expect(change.by).toBe('user');
+  expect(change.op).toBe('promote');
+});
+
 test('تفاوت، تغییرِ اعتماد را با تغییرِ محتوا قاطی نمی‌کند', () => {
   const before = normalizeDossier({ routes: [{ path: '/a', purpose: 'x', by: 'model' }] });
   const same = normalizeDossier({ routes: [{ path: '/a', purpose: 'x', by: 'model' }] });

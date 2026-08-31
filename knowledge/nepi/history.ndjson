@@ -105,3 +105,4 @@
 {"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[صفحهٔ /lock برای چه منظوری است و چه تفاوتی با /login دارد؟]","by":"model","why":"userbug learn --source"}
 {"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[آیا migration ۲۳ برای جداول AI چت‌ها اعمال شده است یا هنوز در حالت توسعه است؟]","by":"model","why":"userbug learn --source"}
 {"at":"2026-08-31T09:19:14.813Z","op":"add","path":"openQuestions[چگونه logger.js کار می‌کند و آیا در تولید غیرفعال می‌شود؟]","by":"model","why":"userbug learn --source"}
+{"at":"2026-08-31T10:39:31.076Z","op":"update","path":"openQuestions[آیا سرور PHP برای چه کارهایی استفاده می‌شود؟ (همگام‌سازی، احراز هویت، ذخیرهٔ رمزگذاری‌شده؟)]","by":"model","why":"پاسخ از رابط"}

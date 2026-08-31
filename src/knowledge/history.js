@@ -76,14 +76,23 @@ export function readHistory(dir, { limit = 200 } = {}) {
   return rows;
 }
 
-/** فهرست‌هایی که با یک کلید یکتا می‌شوند، و کلیدشان. */
+/**
+ * فهرست‌هایی که با یک کلید یکتا می‌شوند: نام، کلید، و منبعِ هر عضو.
+ *
+ * ── چرا پرسش‌ها تابعِ خودشان را دارند ──
+ *
+ * پرسش کلیدِ `by` ندارد و نباید داشته باشد: خودِ پرسش را مدل ساخته، ولی
+ * **جوابش** را آدم داده. با قاعدهٔ عمومی، ثبتِ یک پاسخ در تاریخچه
+ * `by: model` می‌خورد — یعنی دقیقاً همان اشتباهِ منبعی که این دفتر برای
+ * جلوگیری از آن نوشته شده. یک بار در آزمونِ رابط دیده شد و همان‌جا اصلاح شد.
+ */
 const KEYED_LISTS = [
   ['routes', 'path'],
   ['glossary', 'term'],
   ['entities', 'name'],
   ['flows', 'name'],
   ['risks', 'label'],
-  ['openQuestions', 'q'],
+  ['openQuestions', 'q', (item) => (item.answer ? 'user' : 'model')],
 ];
 
 const SCALAR_FIELDS = ['summary'];
@@ -122,14 +131,15 @@ export function diffDossier(before, after) {
     }
   }
 
-  for (const [field, key] of KEYED_LISTS) {
+  for (const [field, key, byOf] of KEYED_LISTS) {
+    const sourceOf = byOf || ((item) => item.by);
     const oldMap = new Map((old[field] || []).map((item) => [item[key], item]));
     const newMap = new Map((now[field] || []).map((item) => [item[key], item]));
 
     for (const [id, item] of newMap) {
       const previous = oldMap.get(id);
       if (!previous) {
-        changes.push({ op: 'add', path: `${field}[${id}]`, by: item.by });
+        changes.push({ op: 'add', path: `${field}[${id}]`, by: sourceOf(item) });
       } else if (JSON.stringify(previous) !== JSON.stringify(item)) {
         /**
          * ترفیع، جدا از ویرایش.
@@ -137,8 +147,9 @@ export function diffDossier(before, after) {
          * بندی که از `model` به `user` می‌رود اتفاقِ مهمی است — یعنی آدم
          * تأییدش کرده. زیر برچسبِ عمومیِ «update» گم می‌شد.
          */
-        const op = TRUST[item.by] > TRUST[previous.by] ? 'promote' : 'update';
-        changes.push({ op, path: `${field}[${id}]`, by: item.by });
+        const [was, is] = [sourceOf(previous), sourceOf(item)];
+        const op = TRUST[is] > TRUST[was] ? 'promote' : 'update';
+        changes.push({ op, path: `${field}[${id}]`, by: is });
       }
     }
 

@@ -32,6 +32,7 @@
     inProject
       ? [
           { href: base, label: 'اجرا', icon: '▶', exact: true },
+          { href: `${base}/knowledge`, label: 'شناخت', icon: '◈' },
           { href: `${base}/triage`, label: 'تریاژ', icon: '◇' },
           { href: `${base}/compare`, label: 'مقایسه', icon: '⇄' },
           { href: `${base}/files`, label: 'سناریوها', icon: '⌘' },
