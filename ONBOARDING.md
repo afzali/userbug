@@ -324,15 +324,13 @@ SSE زنده است:
 
 ## کارها
 
-- [ ] `src/tour/session.js` — بالا آوردن مرورگرِ حاضر، وصل کردن رصدگرها.
-- [ ] `src/tour/recorder.js` — اسکریپتِ داخلِ صفحه + نرمال‌سازی در نود.
-- [ ] `src/tour/emit.js` — گشت → صفحه‌ها، YAML، کش، یافته‌ها.
-- [ ] `jobs.js`: وضعیتِ تازهٔ `attended` — بی‌timeout، پایانش با کاربر است.
-- [ ] رابط: `/projects/<کلید>/tour`.
-- [ ] `userbug tour <پروژه>` در CLI (بی‌رابط: ضبط می‌کند، توضیح را از stdin
-      می‌گیرد).
-- [ ] خودآزما: گشتِ ساختگی روی `userbug-ui` که ضبط → YAML → بازپخش را ثابت
-      کند.
+- [x] `src/tour/session.js` — مرورگرِ حاضر + همهٔ رصدگرها + چک‌ها
+- [x] `src/tour/recorder.js` — اسکریپتِ داخلِ صفحه + `descriptorFor` در نود
+- [x] `src/tour/emit.js` — گشت → صفحه‌ها، YAML، کش، پرونده
+- [x] `ui/src/lib/server/tours.js` — گشت شیءِ زنده است، نه job؛ مهلتِ بی‌فعالیتی ۳۰ دقیقه
+- [x] رابط: `/projects/<کلید>/tour` با SSE زنده
+- [x] `userbug tour <پروژه>` در CLI، با توضیح از stdin
+- [x] خودآزما: ۱۳ تست، شاملِ ضبط → YAML → **بازپخش**
 
 ---
 

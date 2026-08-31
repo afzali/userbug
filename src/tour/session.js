@@ -146,7 +146,9 @@ export class TourSession extends EventEmitter {
     this.status = 'running';
     this.idleTimer = setInterval(() => this.checkIdle(), 60_000);
     this.emitEvent('started', { runId: this.runId, url: this.page.url(), baseURL: target.baseURL });
-    await this.notePage({ auto: true });
+    // نخستین صفحه هم از همان مسیرِ ناوبری ثبت می‌شود، نه با یک ثبتِ جداگانه:
+    // مقصدِ نهاییِ زنجیرهٔ تغییرمسیر را فقط آن مسیر درست می‌بیند.
+    this.scheduleChecks(this.page);
     return this;
   }
 
@@ -167,8 +169,7 @@ export class TourSession extends EventEmitter {
        */
       if (!this.recording) page.evaluate(() => (window.__ubRecording = false)).catch(() => {});
 
-      // صفحهٔ تازه یعنی جای تازه برای چک کردن
-      this.runChecks().catch(() => {});
+      this.scheduleChecks(page);
     });
     page.on('download', async (download) => {
       /**
@@ -260,8 +261,50 @@ export class TourSession extends EventEmitter {
     else if (existing < 0) this.pages.push(record);
 
     this.emitEvent('page', { page: { path: record.path, purpose: record.purpose, shot, by: record.by } });
+
+    // ثبتِ دستی یعنی کاربر روی این صفحه ایستاده و منتظر جواب است؛ چکِ فوری
+    // اینجا معنا دارد. ثبتِ خودکار از دلِ همان تایمری می‌آید که خودش چک را
+    // صدا می‌زند، پس دوباره صدا زدنش فقط کارِ تکراری است.
     if (!auto) await this.runChecks();
     return record;
+  }
+
+  /**
+   * چک‌ها بعد از **نشستنِ** صفحه، نه لحظهٔ ناوبری.
+   *
+   * ── چرا این لازم شد ──
+   *
+   * نخستین گشتِ واقعی روی نپی یک یافتهٔ قلابی داد: «صفحهٔ / چیزی برای دیدن
+   * یا کلیک کردن ندارد». درست بود — در همان میلی‌ثانیه صفحه واقعاً خالی بود،
+   * چون روترِ سمتِ کلاینت داشت به `/login` می‌رفت.
+   *
+   * این دقیقاً همان چکِ پرسروصداست که کلِ گزارش را بی‌ارزش می‌کند. پس هر
+   * ناوبری تایمر را از نو می‌اندازد: در زنجیرهٔ تغییرمسیر، فقط مقصدِ نهایی
+   * سنجیده می‌شود.
+   */
+  scheduleChecks(page) {
+    clearTimeout(this.checkTimer);
+    this.checkTimer = setTimeout(async () => {
+      if (this.status !== 'running' || page.isClosed()) return;
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+
+      /**
+       * نقشه هم همین‌جا کامل می‌شود، نه با یک ثبتِ یک‌بارهٔ اول.
+       *
+       * ── چرا ثبتِ ابتدای گشت کافی نبود ──
+       *
+       * روی نپی، `goto` روی `/` می‌نشست و روتر بعداً به `/login` می‌رفت. هر
+       * مهلتِ ثابتی که بگذاریم، برای یک اپ زود است و برای دیگری دیر. ولی
+       * `framenavigated` **هر** مقصد را می‌بیند، و همین تایمرِ نشستن هم از
+       * قبل اینجاست.
+       *
+       * پس هر جایی که کاربر واقعاً رویش ماند، خودش ثبت می‌شود — با
+       * `by: tour` تا وقتی آدم برایش جمله بنویسد.
+       */
+      await this.notePage({ auto: true }).catch(() => {});
+      await this.runChecks().catch(() => {});
+    }, 1200);
+    this.checkTimer.unref?.();
   }
 
   async runChecks() {
@@ -339,6 +382,7 @@ export class TourSession extends EventEmitter {
     if (this.status === 'stopped') return this.snapshotState();
     this.status = 'stopping';
     clearInterval(this.idleTimer);
+    clearTimeout(this.checkTimer);
 
     // آخرین خطوطِ لاگ سرور، پیش از بستن. کاری که کاربر در ثانیهٔ آخر کرد هم
     // ردِ سروری دارد و بی این، فقط آن یکی گم می‌شد.
