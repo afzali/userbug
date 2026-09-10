@@ -9,6 +9,59 @@
   let { data } = $props();
 
   const workspace = (key) => `/projects/${encodeURIComponent(key)}`;
+
+  /**
+   * حذف پروژه — با نشان دادنِ آنچه از بین می‌رود.
+   *
+   * ── چرا «مطمئنید؟» کافی نبود ──
+   *
+   * این تنها جای رابط است که چیزی را برای همیشه پاک می‌کند. پرسشِ خالی هیچ
+   * نمی‌گوید و آدم روی «بله» می‌زند چون همیشه می‌زند. ولی «۱۹ سناریو،
+   * ۲۲۱۲ فایلِ اجرا، پروندهٔ شناخت» جمله‌ای است که یا متوقف می‌کند یا مطمئن.
+   *
+   * و نوشتنِ کلید لازم است چون کارت‌ها کنار هم‌اند و کلیک روی ردیفِ اشتباه
+   * ساده‌ترین اشتباهِ ممکن است.
+   */
+  let removing = $state(null);
+  let footprint = $state(null);
+  let confirmText = $state('');
+  let keepHistory = $state(false);
+  let busy = $state(false);
+  let error = $state('');
+
+  async function askRemove(project) {
+    removing = project;
+    footprint = null;
+    confirmText = '';
+    keepHistory = false;
+    error = '';
+    try {
+      const response = await fetch(`/api/projects?footprint=${encodeURIComponent(project.key)}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'خوانده نشد');
+      footprint = payload;
+    } catch (cause) {
+      error = cause.message;
+    }
+  }
+
+  async function confirmRemove() {
+    busy = true;
+    error = '';
+    try {
+      const response = await fetch('/api/projects', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({ key: removing.key, confirm: confirmText, keepHistory }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'حذف نشد');
+      location.reload();
+    } catch (cause) {
+      error = cause.message;
+      busy = false;
+    }
+  }
 </script>
 
 <PageHeader
@@ -64,6 +117,16 @@
         <Card.Footer class="gap-2 px-5">
           <Button href={workspace(project.key)} class="flex-1">ورود به پروژه</Button>
           <Button href={`${workspace(project.key)}/files`} variant="outline">سناریوها</Button>
+          <!--
+            حذف کم‌رنگ و آخر از همه. کارِ روزمره نیست و نباید هم‌وزنِ
+            «ورود به پروژه» دیده شود.
+          -->
+          <Button
+            variant="ghost"
+            class="px-2 text-muted-foreground hover:text-destructive"
+            aria-label={`حذف ${project.name}`}
+            onclick={() => askRemove(project)}
+          >حذف</Button>
         </Card.Footer>
       </Card.Root>
     {/each}
@@ -72,5 +135,84 @@
   <div class="rounded-xl border border-dashed p-12 text-center">
     <p class="mb-4 text-muted-foreground">هیچ پروژه‌ای در <span class="code-value">targets/</span> نیست.</p>
     <Button href="/projects/new">ساخت نخستین پروژه</Button>
+  </div>
+{/if}
+
+{#if removing}
+  <!--
+    پنل تأیید حذف.
+
+    عمداً فهرستِ عددی نشان می‌دهد نه یک جملهٔ کلی: «۱۹ سناریو» و «۲۲۱۲ فایل
+    اجرا» با «همهٔ داده‌های پروژه» یک چیز نیستند — دومی را کسی نمی‌خواند.
+  -->
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-label="حذف پروژه"
+    tabindex="-1"
+    onclick={(event) => { if (event.target === event.currentTarget && !busy) removing = null; }}
+    onkeydown={(event) => { if (event.key === 'Escape' && !busy) removing = null; }}
+  >
+    <Card.Root class="w-full max-w-lg">
+      <Card.Header>
+        <Card.Title>حذف «{removing.name}»</Card.Title>
+        <Card.Description>این کار برگشت ندارد.</Card.Description>
+      </Card.Header>
+
+      <Card.Content class="space-y-4 text-sm">
+        {#if !footprint && !error}
+          <p class="text-muted-foreground">در حال شمردن…</p>
+        {:else if footprint}
+          <div class="space-y-1.5 rounded-lg border p-3">
+            <p class="text-xs font-semibold text-muted-foreground">پاک می‌شود</p>
+            <ul class="space-y-1">
+              <li>کانفیگ پروژه — <span class="code-value">{footprint.target}.config.js</span></li>
+              {#if footprint.scenarios}<li>{formatNumber(footprint.scenarios)} فایل سناریو (شاملِ کشِ آموخته)</li>{/if}
+              {#if footprint.knowledge}<li>{formatNumber(footprint.knowledge)} فایل شناخت</li>{/if}
+              {#if footprint.schedule}<li>زمان‌بندی</li>{/if}
+              {#if !keepHistory && footprint.runs}<li>{formatNumber(footprint.runs)} اجرا با همهٔ عکس‌ها و traceها</li>{/if}
+              {#if !keepHistory && footprint.triage}<li>وضعیت تریاژ</li>{/if}
+              {#if !keepHistory && footprint.findings}<li>فهرست یافته‌ها</li>{/if}
+            </ul>
+          </div>
+
+          {#if footprint.runs || footprint.triage || footprint.findings}
+            <!--
+              تاریخچه ساعت‌ها کارِ آدم و مدل است. گاهی فقط تعریفِ پروژه غلط
+              بوده و کسی نمی‌خواهد یافته‌هایش را از دست بدهد.
+            -->
+            <label class="flex items-start gap-2 text-sm">
+              <input type="checkbox" bind:checked={keepHistory} class="mt-1" />
+              <span>
+                تاریخچه بماند
+                <span class="block text-xs text-muted-foreground">اجراها، تریاژ و یافته‌ها دست‌نخورده می‌مانند؛ فقط تعریفِ پروژه و سناریوها می‌روند.</span>
+              </span>
+            </label>
+          {/if}
+
+          <label class="block space-y-1.5">
+            <span>برای تأیید، کلیدِ پروژه را بنویسید: <span class="code-value">{removing.key}</span></span>
+            <input
+              bind:value={confirmText}
+              dir="ltr"
+              class="h-9 w-full rounded-md border bg-background px-3 font-mono text-sm"
+              placeholder={removing.key}
+            />
+          </label>
+        {/if}
+
+        {#if error}<p class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-destructive">{error}</p>{/if}
+      </Card.Content>
+
+      <Card.Footer class="justify-end gap-2">
+        <Button variant="ghost" disabled={busy} onclick={() => (removing = null)}>انصراف</Button>
+        <Button
+          variant="destructive"
+          disabled={busy || confirmText !== removing.key}
+          onclick={confirmRemove}
+        >{busy ? 'در حال حذف…' : 'حذف کن'}</Button>
+      </Card.Footer>
+    </Card.Root>
   </div>
 {/if}

@@ -2,12 +2,15 @@ import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import YAML from 'yaml';
 import {
   ROOT,
+  RUNS_DIR,
   SCENARIOS_DIR,
   TARGETS_DIR,
+  TRIAGE_DIR,
   assertSafeSegment,
   ensureWritableInside,
   existingDirectoryInside,
@@ -219,10 +222,30 @@ export async function readProjectFile({ kind, target, relative }) {
 async function validateJavaScript(file, targetConfig) {
   await execFileAsync(process.execPath, ['--check', file], { cwd: ROOT, windowsHide: true, timeout: 15_000 });
   if (!targetConfig) return;
+  /**
+   * سورس هم همین‌جا سنجیده می‌شود، نه بعداً.
+   *
+   * ── چرا لازم شد ──
+   *
+   * نخستین کاربری که فرمِ «دو پوشهٔ جدا» را پر کرد، `D:/Projects/nepi` و
+   * `D:/Projects/nepi/nepi-server` را داد — که تودرتوست. کانفیگ **با موفقیت
+   * ذخیره شد**، در فهرست ظاهر شد، «سورس دارد» نشان داد، و تازه وقتی چیزی
+   * می‌خواست کد را بخواند می‌شکست.
+   *
+   * این بدترین جنسِ خرابی است: کاربر فکر می‌کند کار کرده و ساعت‌ها بعد
+   * می‌فهمد نکرده. اعتبارسنجی باید نزدیک‌ترین جا به اشتباه بایستد.
+   *
+   * در زیرپروسه انجام می‌شود چون کانفیگ کدِ کاربر است و نباید در پروسهٔ
+   * رابط اجرا شود — همان دلیلی که این تابع از اول زیرپروسه داشت.
+   */
   const check = [
     "import { pathToFileURL } from 'node:url';",
+    "import { resolveSourceRoots, declaredRoots } from " +
+      JSON.stringify(pathToFileURL(path.join(ROOT, 'src', 'source-access.js')).href) +
+      ';',
     'const mod = await import(pathToFileURL(process.argv[1]).href + `?check=${Date.now()}`);',
     "if (!mod.default || !mod.default.baseURL) throw new Error('default export با baseURL لازم است');",
+    'if (declaredRoots(mod.default).length) await resolveSourceRoots(mod.default);',
   ].join(' ');
   await execFileAsync(process.execPath, ['--input-type=module', '-e', check, file], {
     cwd: ROOT,
@@ -362,4 +385,149 @@ export function sourceOf(project) {
   if (project?.sourceRoots?.length > 1) return { roots: project.sourceRoots };
   const root = project?.sourceRoots?.[0]?.path || project?.sourceRoot || '';
   return root ? { root } : {};
+}
+
+/**
+ * هرچه از یک پروژه روی دیسک هست.
+ *
+ * ── چرا پیش از حذف، شمرده می‌شود ──
+ *
+ * حذفِ کانفیگ به‌تنهایی ساده است و غلط: سناریوها، پروندهٔ شناخت، اجراها و
+ * زمان‌بندی سرِ جایشان می‌مانند و پروژه‌ای که «حذف شده» با همان کلید دوباره
+ * ساخته می‌شود و ناگهان تاریخچهٔ یک پروژهٔ دیگر را دارد.
+ *
+ * و حذفِ همه‌چیز بی‌آنکه گفته شود هم غلط است. اجراها و پروندهٔ شناخت ساعت‌ها
+ * کار آدم و مدل‌اند. پس اول شمرده می‌شود، کاربر می‌بیند، بعد تصمیم می‌گیرد.
+ */
+export async function projectFootprint(key) {
+  const target = assertSafeSegment(key);
+
+  const count = async (dir) => {
+    let total = 0;
+    const walk = async (current) => {
+      let entries;
+      try {
+        entries = await fsp.readdir(current, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        if (entry.isDirectory()) await walk(path.join(current, entry.name));
+        else total += 1;
+      }
+    };
+    await walk(dir);
+    return total;
+  };
+
+  const exists = async (file) => {
+    try {
+      await fsp.stat(file);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  /** اجراهای همین هدف. نامِ پوشه هدف را دارد، ولی تکیه بر نام کافی نیست. */
+  const runs = [];
+  let names = [];
+  try {
+    names = await fsp.readdir(RUNS_DIR);
+  } catch {
+    names = [];
+  }
+  for (const name of names) {
+    const meta = await readJsonOrNull(path.join(RUNS_DIR, name, 'run.json'));
+    if (meta?.target === target) runs.push(name);
+  }
+
+  return {
+    target,
+    config: await exists(path.join(TARGETS_DIR, `${target}.config.js`)),
+    scenarios: await count(path.join(SCENARIOS_DIR, target)),
+    knowledge: await count(path.join(ROOT, 'knowledge', target)),
+    runs: runs.length,
+    runDirs: runs,
+    triage: await exists(path.join(TRIAGE_DIR, `${target}.json`)),
+    schedule: await exists(path.join(ROOT, 'schedules', `${target}.json`)),
+    findings: await exists(path.join(ROOT, 'findings', `${target}.md`)),
+  };
+}
+
+async function readJsonOrNull(file) {
+  try {
+    return JSON.parse(await fsp.readFile(file, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * حذف پروژه.
+ *
+ * @param {string} key کلید پروژه
+ * @param {{keepHistory?: boolean}} [options] `keepHistory` اجراها و تریاژ و
+ *   یافته‌ها را نگه می‌دارد — برای وقتی که فقط تعریفِ پروژه غلط بوده.
+ */
+export async function deleteProject(key, { keepHistory = false } = {}) {
+  const footprint = await projectFootprint(key);
+  const target = footprint.target;
+  if (!footprint.config) throw new Error(`پروژهٔ «${target}» وجود ندارد`);
+
+  const removed = [];
+
+  /**
+   * فقط چیزی که واقعاً بود، گزارش می‌شود.
+   *
+   * `fs.rm` با `force` روی مسیرِ ناموجود هم موفق برمی‌گردد. نسخهٔ اول همین
+   * را «حذف شد» می‌شمرد و گزارش می‌گفت «زمان‌بندی حذف شد» برای پروژه‌ای که
+   * هیچ‌وقت زمان‌بندی نداشت.
+   *
+   * ضرری نداشت و دقیقاً همان چیزی است که این ابزار برای گرفتنش ساخته شده:
+   * گزارشی که راست به نظر می‌رسد و نیست. اگر اینجا اهمیت ندهیم، جای دیگر
+   * هم نمی‌دهیم.
+   */
+  const drop = async (file, label) => {
+    let existed = true;
+    try {
+      await fsp.stat(file);
+    } catch {
+      existed = false;
+    }
+    if (!existed) return;
+
+    try {
+      await fsp.rm(file, { recursive: true, force: true });
+      removed.push(label);
+    } catch (cause) {
+      throw new Error(`${label} حذف نشد: ${cause.message}`);
+    }
+  };
+
+  /**
+   * کانفیگ آخر از همه حذف می‌شود.
+   *
+   * اگر وسطِ کار چیزی بشکند، پروژه هنوز در فهرست هست و کاربر می‌بیند که
+   * ناقص مانده. برعکسش یعنی پروژه ناپدید می‌شود و بقایایش نامرئی می‌ماند —
+   * و همان بقایا با کلیدِ تکراری بعداً برمی‌گردند.
+   */
+  await drop(path.join(SCENARIOS_DIR, target), 'سناریوها');
+  await drop(path.join(ROOT, 'knowledge', target), 'شناخت');
+  await drop(path.join(ROOT, 'schedules', `${target}.json`), 'زمان‌بندی');
+  await drop(path.join(ROOT, 'schedules', `${target}.cmd`), 'راه‌انداز زمان‌بندی');
+  await drop(path.join(ROOT, 'schedules', `${target}.log`), 'لاگ زمان‌بندی');
+
+  if (!keepHistory) {
+    for (const name of footprint.runDirs) {
+      await fsp.rm(path.join(RUNS_DIR, name), { recursive: true, force: true });
+    }
+    if (footprint.runDirs.length) removed.push(`${footprint.runDirs.length} اجرا`);
+    await drop(path.join(TRIAGE_DIR, `${target}.json`), 'تریاژ');
+    await drop(path.join(ROOT, 'findings', `${target}.md`), 'یافته‌ها');
+  }
+
+  await drop(path.join(TARGETS_DIR, `${target}.config.js`), 'کانفیگ پروژه');
+
+  return { target, removed, keptHistory: keepHistory };
 }
