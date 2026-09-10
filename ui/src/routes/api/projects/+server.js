@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { renderTargetConfig, assertProjectKey } from '../../../../../src/target-template.js';
+import { renderTargetConfig, assertNewProjectKey, assertProjectKey } from '../../../../../src/target-template.js';
 import { deleteProject, listProjects, projectFootprint, writeProjectFile } from '$lib/server/projects.js';
 import { jsonError } from '$lib/server/http.js';
 import { assertMutationRequest } from '$lib/server/security.js';
@@ -38,7 +38,8 @@ export async function POST(event) {
   try {
     assertMutationRequest(event);
     const fields = await event.request.json();
-    const key = assertProjectKey(fields?.key);
+    // ساختِ تازه سخت‌گیر است؛ خواندن و حذف نه — وگرنه پروژهٔ دیروز ناپیدا می‌شد.
+    const key = assertNewProjectKey(fields?.key);
     const content = renderTargetConfig(fields);
 
     const saved = await writeProjectFile({ kind: 'target', target: key, content, createOnly: true });

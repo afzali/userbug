@@ -3,6 +3,7 @@
   import * as Card from '$lib/components/ui/card/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import { latinFromPersianLayout } from '../../../../../src/target-template.js';
 
   /**
    * ساختِ پروژه، بیرون از فضای کاریِ هر پروژه.
@@ -12,6 +13,34 @@
    */
   let saving = $state(false);
   let error = $state('');
+
+  /**
+   * هشدارِ کلید، همان لحظه که تایپ می‌شود.
+   *
+   * ── چرا سرور تنها کافی نبود ──
+   *
+   * سرور از دیروز کلیدِ بد را رد می‌کند، ولی کاربر آن را **بعد از** پر کردنِ
+   * کلِ فرم و زدنِ «ساخت پروژه» می‌بیند. اعتبارسنجی باید نزدیک‌ترین جا به
+   * اشتباه بایستد، نه دورترین.
+   *
+   * و مهم‌تر: «نامعتبر است» هیچ کمکی نمی‌کند وقتی کاربر اصلاً نمی‌داند چه
+   * اتفاقی افتاده. «دثحه» بی‌معنا نیست — «nepi» است با صفحه‌کلید فارسی.
+   * پس همان را می‌گوییم و یک دکمه می‌گذاریم که درستش کند.
+   */
+  const keyHint = $derived.by(() => {
+    const key = form.key.trim();
+    if (!key) return null;
+    if (/^[a-z0-9][a-z0-9_-]*$/.test(key)) return null;
+
+    const suggestion = latinFromPersianLayout(key);
+    if (suggestion) {
+      return { fix: suggestion, message: 'انگار صفحه‌کلید فارسی بوده. منظورتان این بود؟' };
+    }
+    if (/[A-Z]/.test(key) && /^[A-Za-z0-9_-]+$/.test(key)) {
+      return { fix: key.toLowerCase(), message: 'کلید با حرف کوچک نوشته می‌شود.' };
+    }
+    return { fix: '', message: 'کلید باید لاتینِ کوچک باشد: حرف، عدد، خط تیره و زیرخط.' };
+  });
 
   /**
    * `environment` پیش‌فرضِ `local` دارد چون آدرسِ پیش‌فرض هم لوکال است، ولی سرور
@@ -108,7 +137,23 @@
 <Card.Root class="mx-auto max-w-3xl">
   <Card.Content class="space-y-5 pt-6">
     <div class="grid gap-3 sm:grid-cols-2">
-      <label class="block space-y-1.5 text-sm font-medium"><span>کلید (نام فایل)</span><Input bind:value={form.key} dir="ltr" placeholder="my-app" /></label>
+      <label class="block space-y-1.5 text-sm font-medium">
+        <span>کلید (نام فایل)</span>
+        <Input bind:value={form.key} dir="ltr" placeholder="my-app" />
+        {#if keyHint}
+          <span class="flex flex-wrap items-center gap-2 pt-1 text-xs font-normal text-muted-foreground">
+            <span>{keyHint.message}</span>
+            {#if keyHint.fix}
+              <button
+                type="button"
+                dir="ltr"
+                class="rounded-md border px-2 py-0.5 font-mono text-xs hover:bg-accent"
+                onclick={() => (form.key = keyHint.fix)}
+              >{keyHint.fix}</button>
+            {/if}
+          </span>
+        {/if}
+      </label>
       <label class="block space-y-1.5 text-sm font-medium"><span>نام خوانا</span><Input bind:value={form.name} placeholder="اپ من" /></label>
       <label class="block space-y-1.5 text-sm font-medium"><span>آدرس فرانت</span><Input bind:value={form.baseURL} dir="ltr" placeholder="http://localhost:3000" /></label>
       <label class="block space-y-1.5 text-sm font-medium"><span>آدرس API</span><Input bind:value={form.apiURL} dir="ltr" placeholder="http://127.0.0.1:8080" /></label>

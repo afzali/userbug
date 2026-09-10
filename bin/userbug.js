@@ -15,7 +15,7 @@ import { finalizeRun, printSummary } from '../src/finalize.js';
 import { assertModelSlug, listModels, loadGlobalConfig, resolveModel } from '../src/models/config.js';
 import { Budget } from '../src/models/provider.js';
 import { loadTarget } from '../src/target.js';
-import { assertProjectKey, renderTargetConfig } from '../src/target-template.js';
+import { assertNewProjectKey, assertProjectKey, renderTargetConfig } from '../src/target-template.js';
 import {
   createSchedule,
   listSchedules,
@@ -1020,7 +1020,8 @@ function cmdDiff({ positional }) {
  * `--log` تکرارشدنی است: `--log php=D:/x/err.log --log vite=D:/y/out.log`
  */
 function cmdInit({ flags, positional }) {
-  const key = assertProjectKey(positional[0]);
+  // ساختِ تازه سخت‌گیر است؛ بقیهٔ فرمان‌ها با کلیدِ موجود کار می‌کنند.
+  const key = assertNewProjectKey(positional[0]);
   const file = path.join(ROOT, 'targets', `${key}.config.js`);
 
   // بازنویسیِ بی‌صدا بدترین حالت است: کانفیگی که کسی دستی کاملش کرده بود
