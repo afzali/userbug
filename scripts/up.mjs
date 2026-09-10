@@ -21,6 +21,8 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 
+import { pickPort } from './port.mjs';
+
 const ROOT = path.resolve(import.meta.dirname, '..');
 const NEPI = path.resolve(ROOT, '..', 'nepi');
 const PHP = 'C:\\xampp\\php\\php.exe';
@@ -46,9 +48,10 @@ function log(label, line) {
  * بدون shell با `EINVAL` رد می‌شود. همهٔ فرمان‌هایی که از این راه می‌روند
  * ثابت و در همین فایل نوشته شده‌اند، پس چیزی برای تزریق نیست.
  */
-function start(label, command, args, cwd, useShell = false) {
+function start(label, command, args, cwd, useShell = false, env = null) {
   const child = spawn(useShell ? [command, ...args].join(' ') : command, useShell ? undefined : args, {
     cwd,
+    env: env ? { ...process.env, ...env } : process.env,
     shell: useShell,
     windowsHide: true,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -214,12 +217,32 @@ if (withTarget) {
 console.log(paint('[ui]', 'ساخت رابط...'));
 await runOnce('ui:build', 'npm run ui:build', ROOT);
 
-start('ui', 'npm', ['run', 'ui:start'], ROOT, true);
-const ready = await waitForPort(4174, 'ui', 60);
+/**
+ * پورت پیش از راه‌اندازی انتخاب می‌شود، نه با شکستِ سرور کشف.
+ *
+ * ۴۱۷۴ روی بعضی ویندوزها داخل بازهٔ رزروشدهٔ Hyper-V/WSL می‌افتد و
+ * `EACCES` می‌دهد بی‌آنکه چیزی رویش نشسته باشد. توضیحش در
+ * `scripts/port.mjs`.
+ *
+ * انتخاب اینجا انجام می‌شود نه در خودِ رابط، چون این فایل هم باید بداند
+ * روی کدام پورت منتظر بماند و کدام آدرس را چاپ کند. دو تصمیم‌گیرنده یعنی
+ * دیر یا زود دوتا عدد.
+ *
+ * `PORT` فقط به فرزندِ رابط داده می‌شود؛ گذاشتنش در `process.env` یعنی
+ * سرور توسعهٔ هدف هم آن را می‌خواند و روی پورتِ اشتباه بالا می‌آید.
+ */
+const uiPort = await pickPort(4174);
+if (uiPort !== 4174) log('ui', `۴۱۷۴ روی این ویندوز رزرو شده؛ رابط روی ${uiPort} بالا می‌آید.`);
+
+start('ui', 'npm', ['run', 'ui:start'], ROOT, true, {
+  PORT: String(uiPort),
+  ORIGIN: `http://127.0.0.1:${uiPort}`,
+});
+const ready = await waitForPort(uiPort, 'ui', 60);
 
 console.log('\n  ' + '─'.repeat(40));
 if (withTarget) console.log(paint('', usePreview ? 'هدف:  http://localhost:4173  (nepi-preview)' : 'هدف:  http://localhost:5173  (nepi)'));
-console.log(paint('', 'رابط: http://127.0.0.1:4174'));
+console.log(paint('', `رابط: http://127.0.0.1:${uiPort}`));
 console.log(paint('', 'بستن: Ctrl+C'));
 console.log('  ' + '─'.repeat(40) + '\n');
 

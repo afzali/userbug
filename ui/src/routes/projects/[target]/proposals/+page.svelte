@@ -176,8 +176,16 @@
       {#if impact.routes.length}
         <div class="flex flex-wrap gap-1.5">
           {#each impact.routes as route (route.path)}
-            <Badge variant={route.hub ? 'outline' : 'secondary'} class="font-mono text-[10px]">
-              {route.path}{route.hub ? ' · گذرگاه' : ''}{route.by === 'directory' ? ' · هم‌پوشه' : ''}
+            <!--
+              مسیر در ظرفِ جهت‌دارِ خودش.
+
+              بدون آن، `/contents` کنار واژهٔ فارسی به‌شکل `contents/` دیده
+              می‌شد: اسلش نویسهٔ خنثی است و جهتش را از همسایه می‌گیرد. متنِ
+              DOM درست بود و فقط نمایش غلط — بدترین جنسِ باگ، چون جست‌وجو
+              پیدایش نمی‌کند.
+            -->
+            <Badge variant={route.hub ? 'outline' : 'secondary'} class="text-[10px]">
+              <bdi dir="ltr" class="font-mono">{route.path}</bdi>{route.hub ? ' · گذرگاه' : ''}{route.by === 'directory' ? ' · هم‌پوشه' : ''}
             </Badge>
           {/each}
         </div>

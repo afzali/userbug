@@ -6,7 +6,26 @@ const uiRoot = path.resolve(import.meta.dirname, '..');
 process.chdir(uiRoot);
 process.env.USERBUG_ROOT = path.resolve(uiRoot, '..');
 process.env.HOST = '127.0.0.1';
-process.env.PORT ||= '4174';
+
+/**
+ * پورت پیش از راه‌اندازی سنجیده می‌شود، نه با شکستِ سرور کشف.
+ *
+ * بدون این، `adapter-node` با `EACCES` و یک stack trace می‌مرد و پیامش
+ * دربارهٔ علتِ واقعی — بازهٔ رزروشدهٔ ویندوز — هیچ نمی‌گفت. توضیحش در
+ * `scripts/port.mjs`.
+ *
+ * اگر `PORT` صریح داده شده باشد دست نمی‌خورد: کسی که پورت را تعیین کرده
+ * دلیلی داشته، و عوض کردنِ خاموشش بدتر از شکستن است.
+ */
+if (!process.env.PORT) {
+  const { pickPort } = await import('../../scripts/port.mjs');
+  const port = await pickPort(4174);
+  if (port !== 4174) {
+    console.log(`رابط روی ${port} بالا می‌آید — ۴۱۷۴ روی این ویندوز رزرو شده است.`);
+  }
+  process.env.PORT = String(port);
+}
+
 process.env.ORIGIN ||= `http://127.0.0.1:${process.env.PORT}`;
 
 await import('../build/index.js');
