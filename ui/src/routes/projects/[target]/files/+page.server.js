@@ -11,5 +11,14 @@ export async function load({ params, url }) {
   } catch (cause) {
     fileError = cause.message;
   }
-  return { kind, relative, file, fileError };
+  /**
+   * متنِ آماده، از صفحهٔ «چه باید آزمود».
+   *
+   * پیشنهاد فقط جمله را می‌دهد؛ ساختنش از همین‌جا و از همان پنلی می‌گذرد که
+   * کاربر خودش هم استفاده می‌کند. مسیرِ دومِ ساخت یعنی دو رفتار که به‌مرور
+   * واگرا می‌شوند.
+   */
+  const compose = (url.searchParams.get('compose') || '').slice(0, 2000);
+
+  return { kind, relative, file, fileError, compose };
 }

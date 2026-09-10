@@ -37,6 +37,7 @@
           { href: `${base}/triage`, label: 'تریاژ', icon: '◇' },
           { href: `${base}/compare`, label: 'مقایسه', icon: '⇄' },
           { href: `${base}/files`, label: 'سناریوها', icon: '⌘' },
+          { href: `${base}/proposals`, label: 'چه باید آزمود', icon: '◎' },
         ]
       : [
           { href: '/', label: 'پروژه‌ها', icon: '◫', exact: true },

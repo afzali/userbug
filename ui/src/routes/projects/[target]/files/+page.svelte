@@ -48,9 +48,11 @@
    */
   let mode = $state('ai');
   /** پنل سناریوی تازه؛ از دکمهٔ بالای فهرست باز می‌شود. */
-  let adding = $state(false);
+  // svelte-ignore state_referenced_locally
+  let adding = $state(Boolean(data.compose));
   let creating = $state(false);
-  let intent = $state('');
+  // svelte-ignore state_referenced_locally
+  let intent = $state(data.compose || '');
   let model = $state('');
   let drafting = $state(false);
   /**
