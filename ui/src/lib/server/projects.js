@@ -68,7 +68,11 @@ async function projectSettings(key) {
         name: log.name || log.type || 'log',
         path: log.path || log.url || '',
       })),
-      sourceRoot: target.source?.root || '',
+      sourceRoot: target.source?.root || target.source?.roots?.[0]?.path || '',
+      sourceRoots: (target.source?.roots || []).map((item) => ({
+        name: item?.name || '',
+        path: item?.path || item?.root || '',
+      })),
       isolation: target.isolation?.mode || '',
       allowlist: (target.allowlist || []).length,
       hasStateProbe: Boolean(target.state?.sql),
@@ -345,4 +349,17 @@ export async function writeProjectFile({ kind, target, relative, content, create
     await fsp.rm(temporary, { force: true }).catch(() => {});
   }
   return { kind, target: key, relative: kind === 'target' ? `${key}.config.js` : assertScenarioPath(relative), savedAt: new Date().toISOString() };
+}
+
+/**
+ * کلید `source` به شکلی که موتور می‌فهمد.
+ *
+ * رابط پروژه را به‌شکل تخت نگه می‌دارد (`sourceRoot`، `sourceRoots`) چون
+ * فرم‌ها با ساختار تخت راحت‌ترند. موتور ولی همان شکلِ کانفیگ را می‌خواهد.
+ * تبدیل یک جا انجام می‌شود تا سه فراخوان‌کننده سه‌جور نسازندش.
+ */
+export function sourceOf(project) {
+  if (project?.sourceRoots?.length > 1) return { roots: project.sourceRoots };
+  const root = project?.sourceRoots?.[0]?.path || project?.sourceRoot || '';
+  return root ? { root } : {};
 }

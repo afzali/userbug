@@ -1,6 +1,7 @@
 import { impactOf } from '../../../../../../src/knowledge/impact.js';
 import { proposalsFor } from '../../../../../../src/knowledge/propose.js';
-import { listProjects } from '$lib/server/projects.js';
+import { resolveSourceRoots } from '../../../../../../src/source-access.js';
+import { listProjects, sourceOf } from '$lib/server/projects.js';
 
 export async function load({ params }) {
   const empty = { proposals: [], open: 0, coveredRoutes: 0, totalRoutes: 0 };
@@ -24,7 +25,8 @@ export async function load({ params }) {
   let impactError = '';
   try {
     const project = (await listProjects()).find((item) => item.key === params.target);
-    impact = await impactOf(params.target, { root: project?.sourceRoot, base: 'HEAD' });
+    const roots = await resolveSourceRoots({ key: params.target, source: sourceOf(project) });
+    impact = await impactOf(params.target, { roots, base: 'HEAD' });
   } catch (cause) {
     impactError = cause.message;
   }

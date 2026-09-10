@@ -1,8 +1,8 @@
 import { json } from '@sveltejs/kit';
 import { scenarioFromText } from '../../../../../../src/scenario/from-text.js';
-import { findRelevantSource, resolveSourceRoot } from '../../../../../../src/source-access.js';
+import { findRelevantSource, resolveSourceRoots } from '../../../../../../src/source-access.js';
 import { assertModelSlug, loadGlobalConfig, resolveModel } from '../../../../../../src/models/config.js';
-import { listProjects } from '$lib/server/projects.js';
+import { listProjects, sourceOf } from '$lib/server/projects.js';
 import { knowledgeFor } from '../../../../../../src/knowledge/select.js';
 import { listFixtures } from '../../../../../../src/knowledge/fixtures.js';
 import { listAccounts } from '../../../../../../src/knowledge/credentials.js';
@@ -63,8 +63,8 @@ export async function POST(event) {
             '  آن را در کانفیگ پروژه بگذارید تا سورس قابل خواندن شود.'
         );
       }
-      const root = await resolveSourceRoot({ key: target, source: { root: project.sourceRoot } });
-      source = await findRelevantSource({ root, text: body?.text });
+      const roots = await resolveSourceRoots({ key: target, source: sourceOf(project) });
+      source = await findRelevantSource({ roots, text: body?.text });
     }
 
     /**

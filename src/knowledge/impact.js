@@ -135,14 +135,30 @@ function routesForFile(file, routes) {
  * @param {string} target کلید پروژه
  * @param {{root: string, base?: string}} options ریشهٔ سورس و مرجع مقایسه
  */
-export async function impactOf(target, { root, base = 'HEAD' } = {}) {
-  if (!root) {
-    throw Object.assign(new Error('این پروژه `source.root` ندارد؛ بدون سورس، اثرِ تغییر معلوم نیست.'), {
+export async function impactOf(target, { root, roots, base = 'HEAD' } = {}) {
+  /**
+   * هر ریشه مخزنِ خودش را دارد.
+   *
+   * فرانت و بک می‌توانند دو مخزنِ مستقل باشند با تاریخچه‌های جدا. یک
+   * `git diff` روی یکی، تغییرِ آن یکی را اصلاً نمی‌بیند — و گزارش می‌گفت
+   * «چیزی عوض نشده» در حالی که نیمی از اپ بازنویسی شده بود.
+   *
+   * پس گیت به‌ازای هر ریشه اجرا می‌شود و مسیرها همان پیشوندی را می‌گیرند
+   * که `listAllSourceFiles` می‌دهد، تا با `route.sourceFile` جور دربیایند.
+   */
+  const all = roots?.length ? roots : root ? [{ name: '', root }] : [];
+  if (!all.length) {
+    throw Object.assign(new Error('این پروژه سورسی اعلام نکرده؛ بدون سورس، اثرِ تغییر معلوم نیست.'), {
       code: 'ENOSOURCE',
     });
   }
 
-  const files = await changedFiles({ root, base });
+  const files = [];
+  for (const entry of all) {
+    const found = await changedFiles({ root: entry.root, base });
+    for (const file of found) files.push(entry.name ? `${entry.name}/${file}` : file);
+  }
+  files.sort();
   const dossier = readDossier(target);
   const routes = dossier.routes || [];
 
@@ -230,7 +246,8 @@ export async function impactOf(target, { root, base = 'HEAD' } = {}) {
 
   return {
     base,
-    root,
+    root: all[0].root,
+    roots: all.map((item) => item.name).filter(Boolean),
     changed: files.length,
     mapped,
     unmapped,

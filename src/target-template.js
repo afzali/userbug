@@ -136,10 +136,24 @@ export function assertProjectFields(input = {}) {
     locale: String(input.locale ?? '').trim() || 'fa',
     dir: String(input.dir ?? '').trim() === 'ltr' ? 'ltr' : 'rtl',
     logs: normalizeLogs(input.logs),
-    sourceRoot: String(input.sourceRoot ?? '')
-      .trim()
-      .replace(/\\/g, '/'),
+    sourceRoot: cleanPath(input.sourceRoot),
+    /**
+     * ریشهٔ دومِ سورس — وقتی فرانت و بک دو پوشهٔ جدا باشند.
+     *
+     * خالی ماندنش حالتِ رایج است و چیزی را عوض نمی‌کند: کانفیگ همان
+     * `source: { root }` تک‌ریشه را می‌گیرد و مسیرها بدون پیشوند می‌مانند.
+     */
+    backRoot: cleanPath(input.backRoot),
+    frontName: String(input.frontName ?? '').trim() || 'front',
+    backName: String(input.backName ?? '').trim() || 'back',
   };
+}
+
+/** مسیر با بک‌اسلشِ ویندوزی، به اسلشِ رو به جلو. */
+function cleanPath(value) {
+  return String(value ?? '')
+    .trim()
+    .replace(/\\/g, '/');
 }
 
 /** رشته برای گذاشتن در سورس، با نقل‌قول تک. */
@@ -242,10 +256,26 @@ export function renderTargetConfig(input) {
   lines.push('    /favicon/i,');
   lines.push('  ],');
 
-  if (fields.sourceRoot) {
+  if (fields.sourceRoot && fields.backRoot) {
+    /**
+     * دو ریشه، دو نام.
+     *
+     * نام‌ها تزئین نیستند: مسیرهای نسبی با آنها پیشوند می‌گیرند
+     * (`front/src/app.js`) تا فایلِ هم‌نام در دو پوشه با هم قاطی نشود، و
+     * گزارش بتواند بگوید مشکل کدام طرف است.
+     */
+    lines.push('');
+    lines.push('  // سورس در دو پوشه — مسیرها با نامِ ریشه پیشوند می‌گیرند.');
+    lines.push('  source: {');
+    lines.push('    roots: [');
+    lines.push(`      { name: ${quote(fields.frontName)}, path: ${quote(fields.sourceRoot)} },`);
+    lines.push(`      { name: ${quote(fields.backName)}, path: ${quote(fields.backRoot)} },`);
+    lines.push('    ],');
+    lines.push('  },');
+  } else if (fields.sourceRoot || fields.backRoot) {
     lines.push('');
     lines.push('  // پوشهٔ سورس پروژه — برای وقتی که مدل باید کد را بخواند.');
-    lines.push(`  source: { root: ${quote(fields.sourceRoot)} },`);
+    lines.push(`  source: { root: ${quote(fields.sourceRoot || fields.backRoot)} },`);
   }
 
   lines.push('};');

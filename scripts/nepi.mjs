@@ -37,6 +37,29 @@ function log(label, line) {
   if (text) console.log(paint(`[${label}]`, text));
 }
 
+/**
+ * خروجیِ ترمینال، هم‌زمان روی فایل.
+ *
+ * ── چرا لازم است ──
+ *
+ * userbug اپ شما را بالا نمی‌آورد، پس به stdout آن دسترسی ندارد و فقط
+ * می‌تواند **فایل** بخواند. سرور توسعهٔ ویت خطاهایش را روی ترمینال می‌ریزد و
+ * جایی نمی‌نویسد — یعنی دقیقاً همان خطاها در هیچ اجرایی دیده نمی‌شدند.
+ *
+ * این راه‌انداز چون خودش پروسه را ساخته، دستش هست. پس همان‌جا به فایل هم
+ * می‌نویسد و آدرسش را چاپ می‌کند تا در فرمِ پروژه گذاشته شود.
+ */
+const LOG_DIR = path.join(NEPI, 'nepi-data');
+const logFiles = {};
+
+function logStream(label) {
+  fs.mkdirSync(LOG_DIR, { recursive: true });
+  const file = path.join(LOG_DIR, `${label}.log`);
+  logFiles[label] = file;
+  // `w` نه `a`: لاگِ اجرای قبلی در گزارشِ امروز نباید ظاهر شود.
+  return fs.createWriteStream(file, { flags: 'w' });
+}
+
 function start(label, command, args, cwd, useShell = false) {
   const child = spawn(useShell ? [command, ...args].join(' ') : command, useShell ? undefined : args, {
     cwd,
@@ -46,6 +69,10 @@ function start(label, command, args, cwd, useShell = false) {
   });
 
   children.push({ label, child });
+
+  const sink = logStream(label);
+  child.stdout.pipe(sink, { end: false });
+  child.stderr.pipe(sink, { end: false });
 
   const pipe = (stream) => {
     let buffer = '';
@@ -199,7 +226,8 @@ if (withApi) {
 console.log('\n  ' + '─'.repeat(46));
 console.log(paint('', `فرانت: http://localhost:${appPort}`));
 if (apiReady) console.log(paint('', 'API:   http://127.0.0.1:8081'));
-console.log(paint('', 'لاگ:   ' + path.join(NEPI, 'nepi-data', 'php-error.log')));
+if (logFiles.nepi) console.log(paint('', 'لاگ فرانت: ' + logFiles.nepi));
+console.log(paint('', 'لاگ بک:    ' + path.join(LOG_DIR, 'php-error.log')));
 console.log(paint('', 'سورس:  ' + NEPI));
 console.log(paint('', 'بستن:  Ctrl+C'));
 console.log('  ' + '─'.repeat(46));

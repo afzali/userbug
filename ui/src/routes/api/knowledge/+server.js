@@ -10,7 +10,7 @@ import { fetchDoc, listDocs, removeDoc } from '../../../../../src/knowledge/docs
 import { readChecksConfig, setCheckMode } from '../../../../../src/checks/config.js';
 import { assertModelSlug, loadGlobalConfig, resolveModel } from '../../../../../src/models/config.js';
 import { Budget } from '../../../../../src/models/provider.js';
-import { listProjects } from '$lib/server/projects.js';
+import { listProjects, sourceOf } from '$lib/server/projects.js';
 import { jsonError } from '$lib/server/http.js';
 import { assertLoopbackRequest, assertMutationRequest } from '$lib/server/security.js';
 
@@ -151,7 +151,7 @@ async function digest({ project, body }) {
    * فایل جاوااسکریپت است و import کردنش یعنی اجرای کدِ کاربر در پروسهٔ رابط.
    * `digestSource` فقط `source.root` را لازم دارد.
    */
-  const target = { key: project.key, name: project.name, source: { root: project.sourceRoot } };
+  const target = { key: project.key, name: project.name, source: sourceOf(project) };
 
   if (body?.dry) {
     const { scan } = await digestSource({ target });

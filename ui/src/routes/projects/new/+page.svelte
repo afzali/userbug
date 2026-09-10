@@ -29,7 +29,46 @@
     frontLog: '',
     backLog: '',
     sourceRoot: '',
+    backRoot: '',
+    frontName: 'front',
+    backName: 'back',
   });
+
+  /**
+   * «یک پوشه» یا «دو پوشه».
+   *
+   * پیش‌فرض یکی است چون حالتِ رایج‌تر همان است و پرسیدنِ چیزی که اکثراً
+   * جوابش «یکی» است، فرم را بی‌دلیل شلوغ می‌کند. ولی وقتی فرانت و بک دو
+   * مخزنِ جدا باشند، با یک ریشه نیمی از اپ برای مدل نامرئی می‌ماند.
+   */
+  let splitSource = $state(false);
+
+  let picking = $state('');
+
+  /**
+   * پنجرهٔ واقعیِ انتخاب پوشه.
+   *
+   * مرورگر مسیرِ مطلق نمی‌دهد (عمداً)، پس این کار از سرورِ محلی می‌گذرد.
+   * اگر پنجره‌ای باز نشد — سرورِ بی‌دسکتاپ، یا انصرافِ کاربر — ورودی متنی
+   * سرِ جایش می‌ماند و چیزی خراب نمی‌شود.
+   */
+  async function pickFolder(field) {
+    picking = field;
+    try {
+      const response = await fetch('/api/fs/pick', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({}),
+      });
+      const payload = await response.json();
+      if (payload.ok && payload.path) form[field] = payload.path;
+      else if (payload.reason === 'no-dialog') error = 'پنجرهٔ انتخاب پوشه روی این سیستم باز نشد؛ مسیر را دستی بنویسید.';
+    } catch (cause) {
+      error = cause.message;
+    } finally {
+      picking = '';
+    }
+  }
 
   async function create() {
     saving = true;
@@ -95,10 +134,65 @@
       <label class="block space-y-1.5 text-sm font-medium"><span>لاگ فرانت (فایل)</span><Input bind:value={form.frontLog} dir="ltr" placeholder="D:/app/logs/vite.log" /></label>
       <label class="block space-y-1.5 text-sm font-medium"><span>لاگ بک (فایل)</span><Input bind:value={form.backLog} dir="ltr" placeholder="D:/app/logs/error.log" /></label>
     </div>
-    <p class="text-xs leading-6 text-muted-foreground">خطاهای کنسول مرورگر خودکار گرفته می‌شوند و مسیر نمی‌خواهند؛ این دو برای لاگ‌هایی است که سرور روی دیسک می‌نویسد. خالی بگذارید اگر ندارید.</p>
+    <!--
+      اینجا باید صریح گفته شود که چه چیزی گرفته **نمی‌شود**.
 
-    <label class="block space-y-1.5 text-sm font-medium"><span>پوشهٔ سورس</span><Input bind:value={form.sourceRoot} dir="ltr" placeholder="D:/Projects/my-app" /></label>
-    <p class="text-xs leading-6 text-muted-foreground">با این کلید، هوش مصنوعی می‌تواند هنگام ساختِ سناریو برچسب‌های واقعی را از کد بخواند. بدون آن، حدس می‌زند.</p>
+      متنِ قبلی فقط می‌گفت «لاگ‌هایی که سرور روی دیسک می‌نویسد» و کاربر
+      منطقاً فکر می‌کرد خروجی ترمینال هم گرفته می‌شود. نمی‌شود — و ندانستنش
+      یعنی کاربر منتظرِ خطایی می‌ماند که هیچ‌وقت نمی‌آید.
+    -->
+    <p class="text-xs leading-6 text-muted-foreground">
+      خطاهای کنسول مرورگر خودکار گرفته می‌شوند و مسیر نمی‌خواهند. این دو فقط <strong>فایل</strong> می‌خوانند.
+      خروجیِ ترمینالِ اپ گرفته نمی‌شود، چون userbug اپ شما را بالا نمی‌آورد و پروسه‌اش دستش نیست.
+      اگر لاگتان فقط روی ترمینال است، آن را به فایل بریزید:
+      <span class="code-value" dir="ltr">npm run dev &gt; dev.log 2&gt;&amp;1</span>
+      و همان فایل را اینجا بدهید.
+    </p>
+
+    <div class="space-y-3 rounded-lg border p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <span class="text-sm font-medium">پوشهٔ سورس</span>
+        <div class="flex overflow-hidden rounded-md border text-xs">
+          <button type="button" class={`px-3 py-1.5 ${!splitSource ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'}`} onclick={() => (splitSource = false)}>فرانت و بک یک‌جا</button>
+          <button type="button" class={`px-3 py-1.5 ${splitSource ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'}`} onclick={() => (splitSource = true)}>دو پوشهٔ جدا</button>
+        </div>
+      </div>
+
+      <label class="block space-y-1.5 text-sm">
+        <span class="font-medium">{splitSource ? 'پوشهٔ فرانت' : 'پوشهٔ پروژه'}</span>
+        <span class="flex gap-2">
+          <Input bind:value={form.sourceRoot} dir="ltr" placeholder="D:/Projects/my-app" />
+          <Button variant="outline" class="shrink-0" disabled={picking === 'sourceRoot'} onclick={() => pickFolder('sourceRoot')}>
+            {picking === 'sourceRoot' ? '…' : 'انتخاب…'}
+          </Button>
+        </span>
+      </label>
+
+      {#if splitSource}
+        <label class="block space-y-1.5 text-sm">
+          <span class="font-medium">پوشهٔ بک</span>
+          <span class="flex gap-2">
+            <Input bind:value={form.backRoot} dir="ltr" placeholder="D:/Projects/my-api" />
+            <Button variant="outline" class="shrink-0" disabled={picking === 'backRoot'} onclick={() => pickFolder('backRoot')}>
+              {picking === 'backRoot' ? '…' : 'انتخاب…'}
+            </Button>
+          </span>
+        </label>
+
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label class="block space-y-1.5 text-xs"><span class="text-muted-foreground">نامِ ریشهٔ فرانت</span><Input bind:value={form.frontName} dir="ltr" placeholder="front" /></label>
+          <label class="block space-y-1.5 text-xs"><span class="text-muted-foreground">نامِ ریشهٔ بک</span><Input bind:value={form.backName} dir="ltr" placeholder="back" /></label>
+        </div>
+
+        <!--
+          نام‌ها تزئین نیستند و همین را باید گفت، وگرنه کاربر رهایشان می‌کند
+          روی پیش‌فرض و بعد در گزارش نمی‌فهمد `front/` یعنی چه.
+        -->
+        <p class="text-xs leading-6 text-muted-foreground">مسیرها با این نام‌ها پیشوند می‌گیرند — <span class="code-value">front/src/app.js</span> — تا فایلِ هم‌نام در دو پوشه قاطی نشود و گزارش بگوید مشکل کدام طرف است.</p>
+      {/if}
+
+      <p class="text-xs leading-6 text-muted-foreground">با این، هوش مصنوعی هنگام ساختِ سناریو برچسب‌های واقعی را از کد می‌خواند؛ بدون آن حدس می‌زند. <span class="code-value">.env</span> و کلیدها هیچ‌وقت خوانده نمی‌شوند.</p>
+    </div>
 
     {#if error}<p class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm leading-6 whitespace-pre-line text-destructive">{error}</p>{/if}
 

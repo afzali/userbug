@@ -96,8 +96,96 @@ function assertInside(root, candidate) {
  *
  * @param {{name?: string, key?: string, source?: {root?: string}}} target
  */
+/**
+ * ریشه‌های اعلام‌شدهٔ یک هدف، خام و بدون سنجش.
+ *
+ * ── چرا یک ریشه کافی نبود ──
+ *
+ * فرض اولیه این بود که هر پروژه یک پوشه دارد. برای نپی درست بود (فرانت و
+ * `server/` در یک مخزن)، ولی حالتِ رایج‌تر دو پوشهٔ جداست — گاهی دو مخزنِ
+ * مستقل. با یک ریشه، سورسِ بک اصلاً دیده نمی‌شد و مدل دربارهٔ نیمی از اپ
+ * حدس می‌زد.
+ *
+ * ── چرا نام اجباری است وقتی بیش از یکی باشد ──
+ *
+ * مسیرهای نسبی باید یکتا بمانند: `src/index.js` می‌تواند در هر دو ریشه
+ * باشد. با پیشوندِ نام، `front/src/index.js` و `back/src/index.js` از هم
+ * جدا می‌مانند — و گزارش هم می‌تواند بگوید فایل از کدام طرف است.
+ *
+ * با یک ریشه پیشوند گذاشته نمی‌شود، تا مسیرها همان چیزی بمانند که در
+ * ویرایشگر و در `git diff` دیده می‌شوند.
+ */
+export function declaredRoots(target) {
+  const source = target?.source || {};
+  if (Array.isArray(source.roots) && source.roots.length) {
+    return source.roots
+      .map((item, index) => ({
+        name: String(item?.name || `root${index + 1}`).trim(),
+        path: String(item?.path || item?.root || '').trim(),
+      }))
+      .filter((item) => item.path);
+  }
+  if (source.root) return [{ name: '', path: String(source.root) }];
+  return [];
+}
+
+/**
+ * ریشه‌ها، سنجیده و به مسیرِ واقعی تبدیل‌شده.
+ *
+ * @returns {Promise<{name: string, root: string}[]>} با یک ریشه، `name` خالی است.
+ */
+export async function resolveSourceRoots(target) {
+  const declared = declaredRoots(target);
+  if (!declared.length) {
+    throw new Error(
+      `هدف «${target?.key || target?.name || '؟'}» سورسی اعلام نکرده.\n` +
+        '  خواندن سورس فقط با اعلامِ صریح در کانفیگ همان پروژه ممکن است.'
+    );
+  }
+
+  const out = [];
+  for (const item of declared) {
+    let real;
+    try {
+      real = await fsp.realpath(path.resolve(item.path));
+    } catch {
+      throw new Error(`پوشهٔ سورس پیدا نشد: ${item.path}`);
+    }
+    const stat = await fsp.stat(real);
+    if (!stat.isDirectory()) throw new Error(`مسیر سورس پوشه نیست: ${item.path}`);
+    out.push({ name: declared.length > 1 ? item.name : '', root: real });
+  }
+
+  /**
+   * ریشهٔ تودرتو رد می‌شود.
+   *
+   * اگر «بک» داخل «فرانت» باشد، هر فایلش دو بار پیمایش می‌شود و یک بار هم
+   * با پیشوندِ اشتباه. بدتر: `impact` همان تغییر را دو بار می‌شمارد و عددِ
+   * گزارش دو برابر می‌شود — عددی که راست به نظر می‌رسد و نیست.
+   */
+  for (const a of out) {
+    for (const b of out) {
+      if (a === b) continue;
+      if (isInside(a.root, b.root)) {
+        throw new Error(
+          `پوشهٔ «${b.name || b.root}» داخل «${a.name || a.root}» است.\n` +
+            '  ریشه‌ها باید جدا باشند وگرنه فایل‌ها دوبار شمرده می‌شوند.'
+        );
+      }
+    }
+  }
+
+  return out;
+}
+
+/** آیا `child` داخل `parent` است؟ (خودش هم داخلِ خودش شمرده می‌شود) */
+function isInside(parent, child) {
+  const relative = path.relative(parent, child);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
 export async function resolveSourceRoot(target) {
-  const declared = target?.source?.root;
+  const declared = target?.source?.root || declaredRoots(target)[0]?.path;
   if (!declared) {
     throw new Error(
       `هدف «${target?.key || target?.name || '؟'}» کلید source.root ندارد.\n` +
@@ -156,6 +244,43 @@ export async function listSourceFiles(root, { limit = MAX_WALK_FILES } = {}) {
 
   await walk(root);
   return files;
+}
+
+/**
+ * فایل‌های همهٔ ریشه‌ها، با پیشوندِ نام وقتی بیش از یکی باشد.
+ *
+ * @param {{name: string, root: string}[]} roots خروجی `resolveSourceRoots`
+ */
+export async function listAllSourceFiles(roots, options = {}) {
+  const out = [];
+  for (const { name, root } of roots) {
+    const files = await listSourceFiles(root, options);
+    for (const relative of files) out.push(name ? `${name}/${relative}` : relative);
+  }
+  return out;
+}
+
+/**
+ * مسیرِ پیشونددار → ریشه و مسیرِ داخلی.
+ *
+ * با یک ریشه پیشوندی در کار نیست، پس همه‌چیز داخلی است.
+ */
+export function splitRelative(roots, relative) {
+  const text = String(relative || '').replace(/\\/g, '/');
+  if (roots.length === 1 && !roots[0].name) return { entry: roots[0], inner: text };
+
+  const slash = text.indexOf('/');
+  const head = slash === -1 ? text : text.slice(0, slash);
+  const entry = roots.find((item) => item.name === head);
+  if (!entry) throw new Error(`این مسیر به هیچ ریشه‌ای تعلق ندارد: ${relative}`);
+  return { entry, inner: text.slice(slash + 1) };
+}
+
+/** خواندنِ فایل از هر ریشه‌ای که باشد. */
+export async function readAnySourceFile(roots, relative, options = {}) {
+  const { entry, inner } = splitRelative(roots, relative);
+  const file = await readSourceFile(entry.root, inner, options);
+  return { ...file, relative, root: entry.name };
 }
 
 /**
@@ -245,13 +370,21 @@ function fileWeight(relative) {
  */
 export async function findRelevantSource({
   root,
+  roots,
   text,
   budget = 6000,
   maxFiles = 4,
   treeLimit = 60,
 } = {}) {
+  /**
+   * `root` تکی هنوز پذیرفته می‌شود.
+   *
+   * فراخوان‌های قدیمی نباید بشکنند، ولی شکلِ درست `roots` است. یکی کردنشان
+   * همین بالا انجام می‌شود تا بقیهٔ تابع فقط یک حالت بشناسد.
+   */
+  const all_roots = roots?.length ? roots : [{ name: '', root }];
   const words = keywords(text);
-  const all = await listSourceFiles(root);
+  const all = await listAllSourceFiles(all_roots);
   if (!words.length) return { files: [], tree: [], snippets: '', matched: 0, scanned: all.length };
 
   const scored = [];
@@ -259,7 +392,7 @@ export async function findRelevantSource({
     const weight = fileWeight(relative);
     let content;
     try {
-      ({ content } = await readSourceFile(root, relative));
+      ({ content } = await readAnySourceFile(all_roots, relative));
     } catch {
       continue; // بزرگ، بی‌اجازه، یا رازدار — همه رد می‌شوند
     }

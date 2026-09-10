@@ -21,7 +21,7 @@
  */
 import path from 'node:path';
 import { askJson } from '../models/provider.js';
-import { listSourceFiles, readSourceFile, resolveSourceRoot } from '../source-access.js';
+import { listAllSourceFiles, readAnySourceFile, resolveSourceRoots } from '../source-access.js';
 import { detectStack, discoverRoutes } from './routes.js';
 import { mineInvariants } from './schema-mine.js';
 import { readDocs } from './docs.js';
@@ -55,10 +55,10 @@ const SYSTEM = `تو یک اپ وب را از روی ساختار سورسش م�
 - چیزی را که در سورس ندیدی ننویس. فیلدِ خالی از فیلدِ حدسی بهتر است.`;
 
 /** خواندنی که خطایش اجرا را نمی‌شکند — فایلِ بزرگ یا رازدار فقط رد می‌شود. */
-function readerFor(root) {
+function readerFor(roots) {
   return async (relative) => {
     try {
-      const { content } = await readSourceFile(root, relative);
+      const { content } = await readAnySourceFile(roots, relative);
       return content;
     } catch {
       return '';
@@ -86,9 +86,9 @@ function documentationFiles(files) {
  * کاربر تصمیم بگیرد پول خرج کند.
  */
 export async function scanSource(target) {
-  const root = await resolveSourceRoot(target);
-  const files = await listSourceFiles(root);
-  const read = readerFor(root);
+  const roots = await resolveSourceRoots(target);
+  const files = await listAllSourceFiles(roots);
+  const read = readerFor(roots);
 
   const [stack, discovered, invariants] = await Promise.all([
     detectStack({ files, read }),
@@ -98,7 +98,8 @@ export async function scanSource(target) {
   ]);
 
   return {
-    root,
+    root: roots[0].root,
+    roots,
     target: target?.key || '',
     files,
     stack,
