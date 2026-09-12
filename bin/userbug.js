@@ -124,6 +124,13 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --watch <شناسه>             یافته ثبت کن، ولی نشکن (پیش‌فرض)
       --expect <شناسه>            سخت بشکن — یعنی «این قاعده است»
 
+  userbug ai                      تنظیمات هوش مصنوعی: کلید، مدلِ هر نقش، بودجه
+      --check                     هر مدل را با ارزان‌ترین درخواست بسنج
+      --role <نقش>=<اسلاگ>        مدلِ یک نقش (resolve|author|analyze|default)
+                                  مقدارِ خالی یعنی برگرد به پیش‌فرض
+      --budget <دلار>             سقفِ هزینهٔ هر اجرا
+      --key <کلید>                ذخیره در فایل .env؛ هرگز چاپ نمی‌شود
+
   userbug models [--free]         فهرست زندهٔ مدل‌های OpenRouter
   userbug repro <runId> [اثرانگشت]
                                   بازتولید یک یافته از اجرای گذشته
@@ -848,6 +855,70 @@ async function cmdTour({ flags, positional }) {
 }
 
 /**
+ * تنظیماتِ هوش مصنوعی.
+ *
+ * ── چرا `--check` هست ──
+ *
+ * اسلاگِ رایگان یک روز رایگان نیست. پیش‌فرضِ نقشِ `analyze` روزی با ۴۰۴
+ * برگشت و پیامش وسطِ صفحهٔ شناخت به کاربر رسید — یعنی وقتی فهمید که کارش
+ * شکسته بود. این فرمان همان را پیش از کار می‌پرسد.
+ */
+async function cmdAi({ flags }) {
+  const { checkAllModels, effectiveModels, setApiKey, setBudget, setModel } = await import(
+    '../src/models/settings.js'
+  );
+
+  let changed = false;
+
+  if (flags.key && flags.key !== true) {
+    await setApiKey(flags.key);
+    console.log('  کلید در .env ذخیره شد.');
+    changed = true;
+  }
+
+  for (const pair of [].concat(flags.role || [])) {
+    if (pair === true) throw new Error('--role مقدار می‌خواهد: --role analyze=<اسلاگ>');
+    const index = String(pair).indexOf('=');
+    if (index < 1) throw new Error(`--role باید «نقش=اسلاگ» باشد؛ «${pair}» نبود`);
+    const role = String(pair).slice(0, index).trim();
+    const slug = String(pair).slice(index + 1).trim();
+    await setModel({ role, slug: slug || null });
+    console.log(`  ${role}: ${slug || '(برگشت به پیش‌فرض)'}`);
+    changed = true;
+  }
+
+  if (flags.budget && flags.budget !== true) {
+    await setBudget(flags.budget);
+    console.log(`  سقفِ بودجه: ${flags.budget}$`);
+    changed = true;
+  }
+
+  const view = await effectiveModels();
+  const checks = flags.check ? await checkAllModels() : null;
+
+  console.log(`\n  کلید: ${view.key.present ? `هست (…${view.key.tail}، از ${view.key.from})` : 'نیست'}`);
+  console.log(`  بودجهٔ هر اجرا: ${view.budgetPerRun}$ (${view.budgetFrom})`);
+  console.log('');
+
+  for (const item of view.roles) {
+    const status = checks?.find((entry) => entry.role === item.role);
+    const mark = !status ? ' ' : status.ok ? '✓' : '✗';
+    console.log(`  ${mark} ${item.role.padEnd(8)} ${item.slug}   (${item.from})`);
+    for (const hidden of item.shadowed) {
+      console.log(`      ↳ «${hidden.slug}» از ${hidden.from} پوشانده شد`);
+    }
+    if (status && !status.ok) {
+      console.log(`      ${status.error}`);
+      if (status.suggestion) console.log(`      پیشنهادِ ارائه‌دهنده: ${status.suggestion}`);
+    }
+  }
+
+  console.log(`\n  فایل تنظیمات: ${path.relative(ROOT, view.file)}`);
+  if (!changed && !flags.check) console.log('  برای سنجشِ زنده: userbug ai --check\n');
+  else console.log('');
+}
+
+/**
  * نقشهٔ اپ.
  *
  * ── چرا سقف‌ها اجباری‌اند و پیش‌فرض دارند ──
@@ -1265,6 +1336,9 @@ try {
       break;
     case 'map':
       await cmdMap(parsed);
+      break;
+    case 'ai':
+      await cmdAi(parsed);
       break;
     case 'checks':
       cmdChecks(parsed);

@@ -39,10 +39,14 @@
           { href: `${base}/compare`, label: 'مقایسه', icon: '⇄' },
           { href: `${base}/files`, label: 'سناریوها', icon: '⌘' },
           { href: `${base}/proposals`, label: 'چه باید آزمود', icon: '◎' },
+          // سراسری است، ولی از داخلِ پروژه هم باید در دسترس باشد: خطای مدل
+          // وسطِ کار پیدا می‌شود، نه در صفحهٔ اولِ فهرست پروژه‌ها
+          { href: '/settings', label: 'تنظیمات', icon: '⚙' },
         ]
       : [
           { href: '/', label: 'پروژه‌ها', icon: '◫', exact: true },
           { href: '/projects/new', label: 'پروژهٔ تازه', icon: '＋' },
+          { href: '/settings', label: 'تنظیمات', icon: '⚙' },
         ]
   );
 

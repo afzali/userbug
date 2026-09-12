@@ -1,15 +1,18 @@
 /**
- * تنظیمات مدل — سه لایه.
+ * تنظیمات مدل — چهار لایه.
  *
- *   پیش‌فرض کلی  →  هدف  →  تک‌درخواست
+ *   DEFAULTS  →  userbug.config.js  →  userbug.settings.json  →  هدف  →  درخواست
  *
  * هر لایه فقط چیزی را که می‌گوید بازنویسی می‌کند. یعنی همیشه یک پیش‌فرضِ
  * کارآمد هست و هر جا لازم شد می‌شود فقط همان یک قدم را به مدل دیگری سپرد.
+ *
+ * لایهٔ `settings` تازه است و رابط می‌نویسدش (`src/models/settings.js`).
+ * دلیلِ جدا بودنش از `userbug.config.js` آنجا نوشته شده.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { ROOT } from '../target.js';
+import { rootDir } from '../target.js';
 import { loadEnv } from '../env.js';
 
 loadEnv();
@@ -36,8 +39,15 @@ export const DEFAULTS = {
     // پرتکرارترین نقش: باید سریع باشد و JSON تمیز بدهد
     resolve: 'inclusionai/ling-3.0-flash-fin:free',
     author: 'inclusionai/ling-3.0-flash-fin:free',
-    // کم‌تکرار، پس می‌شود مدل قوی‌تری گذاشت
-    analyze: 'z-ai/glm-5.2:free',
+    /**
+     * کم‌تکرار، پس می‌شود مدل قوی‌تری گذاشت.
+     *
+     * پیش‌تر `z-ai/glm-5.2:free` بود و **رایگان بودنش تمام شد**: ارائه‌دهنده
+     * ۴۰۴ داد با پیامِ «نسخهٔ پولی را بزن»، و آن پیام وسطِ صفحهٔ شناخت به
+     * کاربر رسید. هیچ اسلاگی برای همیشه رایگان نمی‌ماند؛ برای همین
+     * `userbug ai --check` هست و صفحهٔ تنظیمات می‌گذارد همین‌جا عوضش کنید.
+     */
+    analyze: 'nvidia/nemotron-3-ultra-550b-a55b:free',
   },
   /** سقف هزینهٔ هر اجرا به دلار. رد شدن از آن اجرا را متوقف می‌کند، نه اینکه بی‌صدا ادامه دهد. */
   budgetPerRun: 0.5,
@@ -92,13 +102,71 @@ export function assertModelSlug(value) {
   return slug;
 }
 
-/** `userbug.config.js` کنار ریشه، اگر باشد. */
-export async function loadGlobalConfig() {
-  if (globalCache) return globalCache;
-  const file = path.join(ROOT, 'userbug.config.js');
-  if (!fs.existsSync(file)) return (globalCache = {});
-  globalCache = (await import(pathToFileURL(file).href)).default || {};
+/**
+ * تنظیماتِ کلی: `userbug.config.js` و رویش `userbug.settings.json`.
+ *
+ * ── چرا دو فایل، و چرا این ترتیب ──
+ *
+ * اولی را آدم می‌نویسد و کامنت دارد؛ ابزار هرگز بازنویسی‌اش نمی‌کند. دومی
+ * مالِ ابزار است و رابط می‌نویسدش. تنظیماتِ رابط بالاتر می‌نشیند چون کاری
+ * است که کاربر همین حالا کرده — ولی صفحهٔ تنظیمات صریح می‌گوید چه چیزی را
+ * پوشانده. بازنویسیِ خاموش، بدترین حالتِ ممکن است.
+ *
+ * ادغام فقط یک لایه عمیق است و همین کافی است: `models` تنها کلیدِ مشترک
+ * است و شکلش تخت.
+ */
+export async function loadGlobalConfig({ fresh = false } = {}) {
+  if (globalCache && !fresh) return globalCache;
+
+  const config = await loadConfigFile({ fresh });
+  const settings = readSettingsFile();
+  globalCache = {
+    ...config,
+    ...settings,
+    models: {
+      ...(config.models || {}),
+      ...(settings.models || {}),
+      roles: { ...(config.models?.roles || {}), ...(settings.models?.roles || {}) },
+    },
+  };
   return globalCache;
+}
+
+/** بعد از نوشتنِ تنظیمات، همین پروسه هم باید مقدارِ تازه را ببیند. */
+export function clearGlobalConfigCache() {
+  globalCache = undefined;
+}
+
+/**
+ * فقط `userbug.config.js`، بی ادغام با تنظیمات.
+ *
+ * صفحهٔ تنظیمات باید بگوید هر مقدار از **کدام لایه** آمده، و برای آن به
+ * لایه‌ها به‌شکل جدا نیاز دارد. نخستین نسخه همان `loadGlobalConfig` را
+ * می‌خواند و چون آن ادغام‌شده برمی‌گردد، هر مقداری را «پوشانده‌شده توسط
+ * خودش» گزارش می‌کرد.
+ */
+export async function loadConfigFile({ fresh = false } = {}) {
+  const file = path.join(rootDir(), 'userbug.config.js');
+  if (!fs.existsSync(file)) return {};
+  // `?v=` چون import کش دارد و بی آن، ویرایشِ فایل تا ریستارتِ پروسه دیده نمی‌شود
+  const url = `${pathToFileURL(file).href}${fresh ? `?v=${Date.now()}` : ''}`;
+  return (await import(url)).default || {};
+}
+
+/**
+ * خواندنِ خامِ فایلِ تنظیمات.
+ *
+ * عمداً اینجا و نه `import` از `settings.js`: آن ماژول از همین فایل import
+ * می‌کند و حلقهٔ وابستگی می‌سازد. خواندنِ یک JSON آن‌قدر کوچک است که تکرارش
+ * از حلقه بهتر است.
+ */
+function readSettingsFile() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(rootDir(), 'userbug.settings.json'), 'utf8'));
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch {
+    return {};
+  }
 }
 
 /**

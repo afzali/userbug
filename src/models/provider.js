@@ -11,6 +11,27 @@
  */
 
 /** قیمت هر میلیون توکن، به دلار. برای تخمینِ هزینه، نه صورتحساب. */
+/**
+ * پیامِ ارائه‌دهنده → جمله‌ای خواندنی، و اسلاگی که خودش پیشنهاد داده.
+ *
+ * اینجا نشسته نه در `settings.js`، چون «زبانِ ارائه‌دهنده» را همین فایل
+ * می‌فهمد. صفحهٔ تنظیمات هم از همین‌جا برمی‌دارد — یک تعریف، نه دو تا.
+ */
+export function explainModelError(body) {
+  try {
+    const message = JSON.parse(body)?.error?.message;
+    if (message) return String(message).slice(0, 300);
+  } catch {
+    // بدنهٔ غیرِ JSON: خودِ متن بهتر از هیچ است
+  }
+  return String(body).slice(0, 300);
+}
+
+/** OpenRouter در همان بدنه می‌گوید جایگزین چیست؛ بیرون کشیدنش کارِ ماست. */
+export function suggestedSlug(body) {
+  return String(body ?? '').match(/use this slug instead:\s*([\w.-]+\/[\w.:-]+)/i)?.[1] || '';
+}
+
 const PRICES = {
   'anthropic/claude-haiku-4.5': { in: 1.0, out: 5.0 },
   'anthropic/claude-sonnet-5': { in: 3.0, out: 15.0 },
@@ -123,8 +144,27 @@ export async function askJson(cfg, prompt, budget) {
     }),
   });
 
+  /**
+   * خطای ارائه‌دهنده → جمله‌ای که بشود با آن کاری کرد.
+   *
+   * ── چرا JSONِ خام کافی نبود ──
+   *
+   * وقتی `z-ai/glm-5.2:free` رایگان بودنش تمام شد، کاربر این را وسطِ صفحهٔ
+   * شناخت دید: `{"error":{"message":"This model is unavailable for free…`.
+   * درست بود و بی‌فایده: نمی‌گفت کدام تنظیم را کجا عوض کند.
+   *
+   * خودِ ارائه‌دهنده اسلاگِ جایگزین را در همان بدنه می‌گوید. بیرون کشیدنش
+   * کارِ ماست، نه کارِ کسی که گزارش را می‌خواند.
+   */
   if (!res.ok) {
-    throw new Error(`مدل ${cfg.model} پاسخ ${res.status} داد: ${(await res.text()).slice(0, 300)}`);
+    const body = await res.text();
+    const suggestion = suggestedSlug(body);
+    throw new Error(
+      `مدلِ «${cfg.model}» (نقشِ ${cfg.role || '—'}) پاسخ ${res.status} داد: ${explainModelError(body)}\n` +
+        (suggestion ? `  ارائه‌دهنده می‌گوید به‌جایش «${suggestion}» را بزنید.\n` : '') +
+        `  تنظیماتِ مدل: صفحهٔ «تنظیمات» در رابط، یا userbug ai --role ${cfg.role || 'analyze'}=<اسلاگ>\n` +
+        '  فهرست مدل‌های رایگانِ امروز: userbug models --free'
+    );
   }
 
   const data = await res.json();
