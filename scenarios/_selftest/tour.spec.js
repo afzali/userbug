@@ -204,6 +204,59 @@ test('ضبطِ خاموش، قدمی ثبت نمی‌کند', async () => {
   });
 });
 
+/**
+ * ── چرا این آزمون جدا از آزمونِ بالاست ──
+ *
+ * آزمونِ بالا «ضبطِ خاموش» را می‌سنجید و سبز بود، در حالی که دکمهٔ «توقف
+ * ضبط» در عمل کار نمی‌کرد. چون ناوبری نمی‌کرد.
+ *
+ * اسکریپتِ ضبط یک init script است: با **هر ناوبری** در محیطی تازه از نو
+ * اجرا می‌شود. نسخهٔ قبلی همان‌جا مقدار را روی روشن می‌گذاشت، پس تصمیمِ
+ * کاربر با نخستین تعویضِ صفحه باطل می‌شد و قدم‌ها دوباره ثبت می‌شدند.
+ *
+ * کاربر این را در گشتِ واقعی دید، نه ما. آزمونی که مرزِ ناوبری را رد نکند،
+ * دربارهٔ init script چیزی ثابت نمی‌کند.
+ */
+test('توقف ضبط از تعویضِ صفحه جان سالم می‌برد', async () => {
+  await withTemporaryTarget(APP, async ({ url }) => {
+    const session = await tour(url, async (s) => {
+      s.setRecording(false);
+      await s.page.waitForTimeout(100);
+
+      // همان مرزی که می‌شکست: بارگذاریِ تازه، محیطِ جاوااسکریپتِ تازه.
+      await s.page.goto(url, { waitUntil: 'domcontentloaded' });
+      await s.page.waitForTimeout(100);
+
+      expect(await s.page.evaluate(() => window.__ubRecording)).toBe(false);
+      await s.page.getByRole('button', { name: 'ورود' }).click();
+    });
+
+    const state = await session.stop();
+    expect(state.steps).toEqual([]);
+  });
+});
+
+test('روشن کردنِ دوباره هم از ناوبری رد می‌شود', async () => {
+  await withTemporaryTarget(APP, async ({ url }) => {
+    const session = await tour(url, async (s) => {
+      s.setRecording(false);
+      await s.page.waitForTimeout(100);
+      s.setRecording(true);
+      await s.page.waitForTimeout(100);
+
+      await s.page.goto(url, { waitUntil: 'domcontentloaded' });
+      await s.page.waitForTimeout(100);
+
+      expect(await s.page.evaluate(() => window.__ubRecording)).toBe(true);
+      await s.page.getByRole('button', { name: 'ورود' }).click();
+      await s.page.waitForTimeout(300);
+    });
+
+    const state = await session.stop();
+    expect(state.steps.length).toBeGreaterThan(0);
+  });
+});
+
 test('گشت → YAML → بازپخش: حلقه بسته می‌شود', async () => {
   await withTemporaryTarget(APP, async ({ root, url }) => {
     const session = await tour(url, async (s) => {

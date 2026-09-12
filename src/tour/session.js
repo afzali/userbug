@@ -349,7 +349,23 @@ export class TourSession extends EventEmitter {
   setRecording(on) {
     this.recording = Boolean(on);
     this.lastActivity = Date.now();
-    this.page?.evaluate((v) => (window.__ubRecording = v), this.recording).catch(() => {});
+    /**
+     * هم در حافظه و هم در `sessionStorage`.
+     *
+     * اولی برای همین صفحه است و دومی برای صفحه‌های بعدی: اسکریپتِ ضبط با هر
+     * ناوبری از نو اجرا می‌شود و مقدارش را از `sessionStorage` می‌خواند.
+     * بدون دومی، «توقف ضبط» با نخستین تعویضِ صفحه باطل می‌شد.
+     */
+    this.page
+      ?.evaluate((v) => {
+        window.__ubRecording = v;
+        try {
+          sessionStorage.setItem('__ubRecording', v ? '1' : '0');
+        } catch {
+          // انبار در دسترس نیست؛ همین صفحه درست می‌ماند و بعدی‌ها نه.
+        }
+      }, this.recording)
+      .catch(() => {});
     this.emitEvent('recording', { recording: this.recording });
   }
 

@@ -32,6 +32,22 @@
   let findings = $state(data.tour?.findings || []);
   // svelte-ignore state_referenced_locally
   let url = $state(data.tour?.url || '');
+
+  /**
+   * مسیرِ نسبی، نه آدرس کامل.
+   *
+   * صفحه‌های ثبت‌شده پایین همین پنل با مسیر نشان داده می‌شوند (`/contents`)،
+   * پس بالای جعبه هم باید همان باشد؛ وگرنه کاربر باید خودش
+   * `http://localhost:5173/contents` را با `/contents` تطبیق بدهد.
+   */
+  let currentPath = $derived.by(() => {
+    if (!url) return '';
+    try {
+      return new URL(url).pathname;
+    } catch {
+      return url;
+    }
+  });
   // svelte-ignore state_referenced_locally
   let recording = $state(data.tour?.recording ?? true);
 
@@ -44,10 +60,39 @@
   let warning = $state('');
 
   let source = null;
+  let retry = null;
+  let attempts = $state(0);
+  let disconnected = $state(false);
 
+  /**
+   * قطعیِ لحظه‌ای نباید پنل را بکشد.
+   *
+   * ── چه اتفاقی می‌افتاد ──
+   *
+   * `onerror` جریان را برای همیشه می‌بست. یعنی هر بار که اتصال یک لحظه
+   * می‌پرید — که در جریانی که ساعت‌ها باز می‌ماند حتمی است — پنل ساکت
+   * می‌شد: گشت در مرورگر زنده بود و ضبط می‌کرد، ولی این صفحه دیگر چیزی
+   * نشان نمی‌داد. با رفرش برمی‌گشت، که دقیقاً نشانهٔ همین است.
+   *
+   * بستنِ صریح، بازوصلیِ خودکارِ `EventSource` را هم از بین می‌برد؛ پس
+   * بدترینِ هر دو دنیا بود.
+   *
+   * ── چرا وضعیت پیش از بازوصل پاک می‌شود ──
+   *
+   * جریان، تاریخچه را از اول بازپخش می‌کند (تا پنلی که دیر رسیده خالی
+   * نماند). اگر آرایه‌ها را پاک نکنیم، هر بازوصل قدم‌ها را دوباره اضافه
+   * می‌کند و شمارنده دو برابر می‌شود — عددی که راست به نظر می‌رسد و نیست.
+   */
   function listen() {
     close();
+    disconnected = false;
     source = new EventSource(`/api/tour/events?target=${encodeURIComponent(data.target)}`);
+
+    source.onopen = () => {
+      attempts = 0;
+      disconnected = false;
+    };
+
     source.onmessage = (message) => {
       let event;
       try {
@@ -57,11 +102,29 @@
       }
       apply(event);
     };
-    // خطای SSE یعنی گشت تمام شده یا سرور رفته؛ هیچ‌کدام نباید صفحه را بخوابانند
-    source.onerror = () => close();
+
+    source.onerror = () => {
+      close();
+      // گشتِ تمام‌شده بازوصل نمی‌خواهد؛ `stopped` از قبل `running` را خوابانده.
+      if (!running) return;
+
+      disconnected = true;
+      attempts += 1;
+      if (attempts > 10) return;
+
+      const wait = Math.min(1000 * attempts, 8000);
+      retry = setTimeout(() => {
+        steps = [];
+        pages = [];
+        findings = [];
+        listen();
+      }, wait);
+    };
   }
 
   function close() {
+    if (retry) clearTimeout(retry);
+    retry = null;
     source?.close();
     source = null;
   }
@@ -211,15 +274,37 @@
 {#if running}
   <div class="mb-4 flex flex-wrap items-center gap-3 rounded-xl border p-3 text-sm">
     <Badge variant={recording ? 'default' : 'outline'}>{recording ? 'در حال ضبط' : 'ضبط متوقف'}</Badge>
+    {#if disconnected}
+      <!--
+        سکوتِ بی‌توضیح بدترین حالت است: گشت زنده بود و پنل مرده به نظر
+        می‌رسید. حالا می‌گوید دارد برمی‌گردد.
+      -->
+      <Badge variant="destructive">اتصال قطع شد — تلاش {attempts}</Badge>
+    {/if}
     <code class="min-w-0 flex-1 truncate text-xs">{url || '—'}</code>
     <span class="text-xs text-muted-foreground">{steps.length} قدم · {pages.length} صفحه · {findings.length} یافته</span>
   </div>
 
   <section class="mb-6 rounded-xl border p-4">
-    <h2 class="mb-1 text-sm font-bold">این صفحه برای چیست؟</h2>
+    <!--
+      «این صفحه» کدام صفحه است؟
+
+      کاربر می‌پرسید «نمی‌دانم چطور باید روی هر بخش کامنت بگذارم» در حالی که
+      پنل چهار صفحه را درست ثبت کرده بود. مشکل فهمیدنِ سیستم نبود، نگفتنِ
+      پنل بود: جعبه می‌گفت «این صفحه» و هیچ‌جا نمی‌گفت کدام.
+
+      یادداشت همیشه به صفحه‌ای می‌چسبد که **همین حالا** در پنجرهٔ گشت باز
+      است. حالا همان مسیر بالای جعبه نوشته می‌شود و با هر ناوبری عوض می‌شود.
+    -->
+    <h2 class="mb-1 flex flex-wrap items-baseline gap-2 text-sm font-bold">
+      <span>این صفحه برای چیست؟</span>
+      <code dir="ltr" class="rounded bg-muted px-1.5 py-0.5 text-[11px] font-normal">{currentPath || '—'}</code>
+    </h2>
     <p class="mb-3 text-xs leading-6 text-muted-foreground">
-      جملهٔ شما <code>by: user</code> می‌گیرد — پراعتمادترین چیزی که این سیستم دارد. بی‌توضیح هم
-      می‌توانید ثبت کنید؛ آن‌وقت فقط نقشه است، نه معنا.
+      یادداشت به همان صفحه‌ای می‌چسبد که <strong>همین حالا</strong> در پنجرهٔ گشت باز است. در آن
+      پنجره به صفحهٔ دلخواه بروید، بعد اینجا بنویسید. جملهٔ شما <code>by: user</code> می‌گیرد —
+      پراعتمادترین چیزی که این سیستم دارد. بی‌توضیح هم می‌توانید ثبت کنید؛ آن‌وقت فقط نقشه است،
+      نه معنا.
     </p>
     <div class="flex flex-wrap gap-2">
       <Input bind:value={purpose} placeholder="مثلاً: اینجا فهرست اسناد کاربر است" disabled={Boolean(busy)} />
