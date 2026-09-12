@@ -41,6 +41,23 @@
   // هدف از مسیر می‌آید، پس دیگر یک `$state` نیست که بشود بی‌صدا عوضش کرد.
   let target = $derived(data.target);
   let project = $derived(data.project);
+
+  /**
+   * پروژه‌ای که هنوز هیچ چیزی ندارد.
+   *
+   * ── چرا این حالت لازم شد ──
+   *
+   * کاربری که تازه پروژه ساخته، با فرمِ «اجرای تازه» روبه‌رو می‌شد که
+   * کشویی سناریوهایش خالی بود. یعنی نخستین چیزی که می‌دید، دکمه‌ای بود که
+   * هیچ کاری نمی‌کرد — و هیچ‌کس نمی‌گفت از کجا باید شروع کند.
+   *
+   * چهار قطعه از قبل ساخته شده بودند و ترتیبشان هم روشن بود، ولی این ترتیب
+   * فقط در ذهنِ سازنده بود: در رابط، چهار آیتمِ هم‌وزن در منوی کناری بودند.
+   *
+   * شرط «هیچ اجرایی هم نبوده» عمدی است: پروژه‌ای که سناریوهایش پاک شده ولی
+   * تاریخچه دارد، کاربرِ تازه‌کار نیست و نباید راهنمای شروع ببیند.
+   */
+  let blank = $derived(!project.scenarios?.length && !runs.length && !job);
   let busy = $derived(ACTIVE_JOB_STATUSES.has(job?.status));
   let canCancel = $derived(['starting', 'running'].includes(job?.status));
   let latestStep = $derived(liveSteps.at(-1));
@@ -182,6 +199,66 @@
     <Button href={`/projects/${encodeURIComponent(target)}/compare`} variant="outline">مقایسهٔ اجراها</Button>
   {/snippet}
 </PageHeader>
+
+{#if blank}
+  <!--
+    مسیرِ شروع، نه فهرستِ امکانات.
+
+    سه قدم به ترتیبِ واقعی‌شان، و فقط قدمِ اول دکمهٔ برجسته دارد. اگر هر سه
+    برجسته بودند، دوباره همان «چهار آیتمِ هم‌وزن» می‌شد که مشکل بود.
+  -->
+  <section class="mb-6 rounded-xl border bg-muted/30 p-6">
+    <h2 class="text-base font-semibold">از کجا شروع کنیم</h2>
+    <p class="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+      این پروژه هنوز سناریویی ندارد، و نوشتنِ سناریو از صفر کارِ سختی است.
+      راهِ کوتاه‌تر این است که یک بار با هم در اپ بگردیم: ابزار تماشا می‌کند،
+      یاد می‌گیرد، و بعد خودش می‌گوید چه چیزهایی باید آزموده شوند.
+    </p>
+
+    <ol class="mt-5 grid gap-4 md:grid-cols-3">
+      <li class="rounded-lg border bg-background p-4">
+        <p class="text-xs font-semibold text-muted-foreground">قدم ۱</p>
+        <p class="mt-1 font-medium">با هم بگردیم</p>
+        <p class="mt-1.5 text-xs leading-6 text-muted-foreground">
+          مرورگر باز می‌شود و <strong>شما</strong> می‌رانید. روی هر صفحه می‌توانید
+          بنویسید کارش چیست، و هر ایرادی که دیدید همان‌جا ثبت کنید.
+        </p>
+        <Button href={`/projects/${encodeURIComponent(target)}/tour`} class="mt-3 w-full">شروع گشت</Button>
+      </li>
+
+      <li class="rounded-lg border bg-background p-4">
+        <p class="text-xs font-semibold text-muted-foreground">قدم ۲</p>
+        <p class="mt-1 font-medium">شناخت ساخته می‌شود</p>
+        <p class="mt-1.5 text-xs leading-6 text-muted-foreground">
+          صفحه‌ها، مسیرها و کارهای خطرناک ثبت می‌شوند. هرچه خودتان گفته باشید
+          بالاترین اعتماد را دارد — بالاتر از حدسِ مدل.
+        </p>
+        <Button href={`/projects/${encodeURIComponent(target)}/knowledge`} variant="ghost" class="mt-3 w-full text-xs">شناخت</Button>
+      </li>
+
+      <li class="rounded-lg border bg-background p-4">
+        <p class="text-xs font-semibold text-muted-foreground">قدم ۳</p>
+        <p class="mt-1 font-medium">سناریوها درمی‌آیند</p>
+        <p class="mt-1.5 text-xs leading-6 text-muted-foreground">
+          «چه باید آزمود» شکافِ میان آنچه می‌دانیم و آنچه می‌آزماییم را حساب
+          می‌کند و متنِ هر سناریو را آماده می‌دهد.
+        </p>
+        <Button href={`/projects/${encodeURIComponent(target)}/proposals`} variant="ghost" class="mt-3 w-full text-xs">چه باید آزمود</Button>
+      </li>
+    </ol>
+
+    <!--
+      راهِ فرار، ولی کم‌رنگ.
+      کسی که می‌داند چه می‌کند نباید مجبور به گشت شود؛ کسی که نمی‌داند هم
+      نباید این را راهِ اصلی ببیند.
+    -->
+    <p class="mt-4 text-xs text-muted-foreground">
+      یا اگر خودتان سناریو دارید، مستقیم
+      <a href={`/projects/${encodeURIComponent(target)}/files`} class="underline underline-offset-2">بسازیدش</a>.
+      فرمِ اجرا پایین همین صفحه است.
+    </p>
+  </section>
+{/if}
 
 <div class="grid gap-6 xl:grid-cols-[23rem_minmax(0,1fr)]">
   <Card.Root class="h-fit gap-5 xl:sticky xl:top-20">

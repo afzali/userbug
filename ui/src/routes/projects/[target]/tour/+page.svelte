@@ -180,6 +180,19 @@
       <p class="mt-2 text-xs text-muted-foreground">
         پیش‌نویس <code>status: draft</code> است. تا یک بار اجرا نشده، سناریو نیست.
       </p>
+
+      <!--
+        قدمِ بعد، صریح.
+
+        تا امروز گشت اینجا تمام می‌شد: گزارش می‌داد و رها می‌کرد. ولی کلِ
+        ارزشِ گشت در چیزی است که **بعدش** ممکن می‌شود — شناختی که حالا پر
+        شده، به فهرستِ «چه باید آزمود» تبدیل می‌شود.
+      -->
+      <div class="mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
+        <span class="text-xs text-muted-foreground">قدم بعد:</span>
+        <Button href={`/projects/${data.target}/proposals`} size="sm">ببین چه باید آزمود</Button>
+        <Button href={`/projects/${data.target}/knowledge`} size="sm" variant="outline">شناختِ ساخته‌شده</Button>
+      </div>
     {/if}
   </section>
 {/if}
