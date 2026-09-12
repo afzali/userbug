@@ -159,7 +159,7 @@
       const response = await fetch('/api/scenarios/draft', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ target: data.target, text: intent, model, useSource }),
+        body: JSON.stringify({ target: data.target, text: intent, model, useSource, proposalId: data.proposalId }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'سناریو ساخته نشد');

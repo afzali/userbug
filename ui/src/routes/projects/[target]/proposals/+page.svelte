@@ -68,8 +68,15 @@
     }
   }
 
-  /** ساخت از همان پنلِ سناریوی تازه، با متنِ آماده. */
-  const composeHref = (item) => `${base}/files?compose=${encodeURIComponent(item.text)}`;
+  /**
+   * ساخت از همان پنلِ سناریوی تازه، با متنِ آماده.
+   *
+   * شناسهٔ پیشنهاد هم می‌رود، چون بعضی پیشنهادها مقدمهٔ قطعی دارند (مسیرِ
+   * رسیدن، از نقشه). خودِ قدم‌ها در آدرس نمی‌آیند: سرور آن‌ها را از روی همین
+   * شناسه برمی‌دارد.
+   */
+  const composeHref = (item) =>
+    `${base}/files?compose=${encodeURIComponent(item.text)}&proposal=${encodeURIComponent(item.id)}`;
 
   /* ─────────────────────── اثرِ تغییرِ کد ─────────────────────── */
 

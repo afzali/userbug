@@ -167,7 +167,7 @@ export function assertScenarioShape(json) {
 }
 
 /** سناریوی سنجیده‌شده را به متنِ YAML با سرصفحهٔ توضیحی تبدیل کن. */
-export function toYaml({ name, steps, notes }, { text, sourceFiles = [], knowledge = '' }) {
+export function toYaml({ name, steps, notes }, { text, sourceFiles = [], knowledge = '', preamble = 0 }) {
   const header = [
     '# ساخته‌شده از متنِ کاربر با هوش مصنوعی.',
     '#',
@@ -180,6 +180,21 @@ export function toYaml({ name, steps, notes }, { text, sourceFiles = [], knowled
   // بدون این، بعداً نمی‌شد فهمید سناریو با شناخت ساخته شده یا بی‌آن — و وقتی
   // کیفیتِ دو سناریو فرق کند، همین خط جوابِ «چرا» است.
   if (knowledge) header.push('#', '# با شناختِ ثبت‌شدهٔ پروژه ساخته شد.');
+
+  /**
+   * مرزِ «قطعی» و «حدس» در خودِ فایل نوشته می‌شود.
+   *
+   * قدم‌های مقدمه از نقشه آمده‌اند — مسیری که خزنده واقعاً رفت. بقیه را مدل
+   * نوشته. بی این خط، بازبینِ فایل هر دو را یک‌جور می‌خواند و وقتی سناریو
+   * بشکند، نمی‌داند از کدام نیمه شروع کند.
+   */
+  if (preamble) {
+    header.push(
+      '#',
+      `# ${preamble} قدمِ اولْ مقدمهٔ نقشه است: مسیرِ واقعیِ رسیدن به این نما،`,
+      '# نه حدسِ مدل. بقیه از متنِ بالا ساخته شده.'
+    );
+  }
 
   // بدون این، بعداً نمی‌شد فهمید برچسب‌ها از کد آمده‌اند یا حدس بوده‌اند.
   if (sourceFiles.length) {
@@ -212,7 +227,7 @@ export function toYaml({ name, steps, notes }, { text, sourceFiles = [], knowled
  * @param {string} [o.knowledge] خروجی `knowledgeFor()` — مسیرها، ورود، واژه‌ها، خطرها
  * @returns {Promise<{yaml: string, name: string, steps: number, notes: string, slug: string, budget: object}>}
  */
-export async function scenarioFromText({ text, models, target, source, knowledge }) {
+export async function scenarioFromText({ text, models, target, source, knowledge, preamble = [] }) {
   const trimmed = String(text ?? '').trim();
   if (trimmed.length < 10) throw new Error('متن خیلی کوتاه است؛ بگویید کاربر چه کاری انجام می‌دهد');
   if (trimmed.length > MAX_TEXT) throw new Error(`متن بیش از ${MAX_TEXT} نویسه است؛ آن را به چند سناریو بشکنید`);
@@ -228,11 +243,27 @@ export async function scenarioFromText({ text, models, target, source, knowledge
   );
 
   const scenario = assertScenarioShape(json);
+
+  /**
+   * مقدمه **پیش از** سنجشِ شکل نمی‌آید، بعدش می‌آید.
+   *
+   * `assertScenarioShape` خروجیِ مدل را می‌سنجد؛ مقدمه خروجیِ مدل نیست و از
+   * نقشه آمده. قاطی کردنشان یعنی خطای مقدمه به‌نامِ مدل نوشته شود و برعکس.
+   *
+   * و اگر مدل خودش هم یک `go` نوشته باشد، مقدمه پیش از آن می‌نشیند: بدترین
+   * حالتش یک ناوبریِ اضافه است، در برابرِ بهترین حالتِ نداشتنش که سناریو
+   * اصلاً به آن نما نمی‌رسد.
+   */
+  const steps = [...preamble, ...scenario.steps];
+
   return {
-    yaml: toYaml(scenario, { text: trimmed, sourceFiles: source?.files || [], knowledge }),
+    yaml: toYaml(
+      { ...scenario, steps },
+      { text: trimmed, sourceFiles: source?.files || [], knowledge, preamble: preamble.length }
+    ),
     sourceFiles: source?.files || [],
     name: scenario.name,
-    steps: scenario.steps.length,
+    steps: steps.length,
     notes: scenario.notes,
     slug: slugify(scenario.name),
     budget: budget.snapshot(),

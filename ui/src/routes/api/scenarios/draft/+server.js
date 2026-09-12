@@ -4,6 +4,7 @@ import { findRelevantSource, resolveSourceRoots } from '../../../../../../src/so
 import { assertModelSlug, loadGlobalConfig, resolveModel } from '../../../../../../src/models/config.js';
 import { listProjects, sourceOf } from '$lib/server/projects.js';
 import { knowledgeFor } from '../../../../../../src/knowledge/select.js';
+import { proposalsFor } from '../../../../../../src/knowledge/propose.js';
 import { listFixtures } from '../../../../../../src/knowledge/fixtures.js';
 import { listAccounts } from '../../../../../../src/knowledge/credentials.js';
 import { jsonError } from '$lib/server/http.js';
@@ -85,12 +86,30 @@ export async function POST(event) {
       accounts: listAccounts(target).map((item) => item.id),
     });
 
+    /**
+     * مقدمه از **شناسهٔ پیشنهاد** می‌آید، نه از بدنهٔ درخواست.
+     *
+     * ── چرا قدم‌ها را از کلاینت نمی‌گیریم ──
+     *
+     * قدمِ سناریو کد نیست ولی کنشِ مرورگر است، و هر چیزی که از مرورگر بیاید
+     * ورودیِ نامعتمد است. با فرستادنِ شناسه، سرور خودش مقدمه را از نقشه
+     * برمی‌دارد — همان مسیری که خزنده واقعاً رفته. یک سطحِ حمله کمتر، و
+     * هم‌زمان تضمینِ اینکه مقدمه واقعاً از نقشه است نه از دستِ کسی.
+     */
+    let preamble = [];
+    const proposalId = String(body?.proposalId ?? '').trim();
+    if (proposalId) {
+      const found = proposalsFor(target).proposals.find((item) => item.id === proposalId);
+      if (found?.preamble?.length) preamble = found.preamble;
+    }
+
     const draft = await scenarioFromText({
       text: body?.text,
       models,
       target: { name: project.name, baseURL: project.baseURL },
       source,
       knowledge,
+      preamble,
     });
 
     return json({
@@ -102,6 +121,7 @@ export async function POST(event) {
       model: `${models.provider}:${models.model}`,
       // رابط باید بتواند بگوید «با شناخت ساخته شد» یا نه
       usedKnowledge: Boolean(knowledge),
+      preambleSteps: preamble.length,
     });
   } catch (cause) {
     return jsonError(cause, 400);

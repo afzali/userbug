@@ -29,6 +29,17 @@ function runDir(runId) {
   return resolveInside(RUNS_DIR, assertSafeSegment(runId, 'شناسهٔ اجرا'));
 }
 
+/**
+ * سقف‌های خزش از فرم می‌آیند، پس ورودیِ بی‌معنا ممکن است.
+ *
+ * مقدارِ نامعتبر **حذف** می‌شود نه اینکه صفر شود: نبودِ پرچم یعنی پیش‌فرضِ
+ * خودِ CLI، و آن تنها منبعِ حقیقتِ سقف‌هاست.
+ */
+function toCap(value) {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 && number <= 1000 ? number : null;
+}
+
 function codedError(code, message) {
   const error = new Error(message);
   error.code = code;
@@ -425,6 +436,22 @@ export async function startJob(rawOptions = {}) {
     repeat: Number.isFinite(repeat) ? Math.max(1, Math.min(10, repeat)) : 1,
     headed: Boolean(rawOptions?.headed),
     author: Boolean(rawOptions?.author),
+
+    /**
+     * نوعِ کار: اجرای سناریو، یا خزشِ نقشه.
+     *
+     * ── چرا یک slot، نه دو سیستمِ کار ──
+     *
+     * خزش هم یک اجراست: پوشهٔ `runs/` می‌سازد، رخدادِ `step` می‌نویسد، عکس
+     * می‌گیرد و یافته ثبت می‌کند. پس همان لولهٔ SSE و همان صفحهٔ اجرای زنده
+     * بی یک خط تغییر کار می‌کنند. و هر دو مرورگر باز می‌کنند، پس هم‌زمانی‌شان
+     * هم نباید ممکن باشد — که با همین slotِ مشترک خودبه‌خود رعایت می‌شود.
+     */
+    kind: rawOptions?.kind === 'map' ? 'map' : 'run',
+    from: rawOptions?.from ? String(rawOptions.from).slice(0, 300) : '',
+    states: toCap(rawOptions?.states),
+    minutes: toCap(rawOptions?.minutes),
+    fresh: Boolean(rawOptions?.fresh),
   };
 
   if (state.activeId) {
@@ -475,7 +502,7 @@ export async function startJob(rawOptions = {}) {
     const projects = await listProjects();
     const project = projects.find((item) => item.key === target);
     if (!project) throw new Error(`هدف «${target}» وجود ندارد`);
-    if (options.grep && !project.scenarios.some((scenario) => scenario.runnable && scenario.name === options.grep)) {
+    if (options.kind === 'run' && options.grep && !project.scenarios.some((scenario) => scenario.runnable && scenario.name === options.grep)) {
       throw new Error('سناریوی انتخاب‌شده در این هدف نیست');
     }
   } catch (cause) {
@@ -492,15 +519,23 @@ export async function startJob(rawOptions = {}) {
     return publicJob(job);
   }
 
-  const args = [path.join(ROOT, 'bin', 'userbug.js'), 'run', target];
-  if (options.grep) args.push('--grep', options.grep);
-  if (options.device) args.push('--device', options.device);
-  if (options.persona) args.push('--persona', options.persona);
-  if (options.depth) args.push('--depth', String(options.depth));
-  if (options.model) args.push('--model', options.model);
-  if (options.repeat > 1) args.push('--repeat', String(options.repeat));
-  if (options.headed) args.push('--headed');
-  if (options.author) args.push('--author');
+  const args = [path.join(ROOT, 'bin', 'userbug.js'), options.kind, target];
+  if (options.kind === 'map') {
+    if (options.from) args.push('--from', options.from);
+    if (options.states) args.push('--states', String(options.states));
+    if (options.minutes) args.push('--minutes', String(options.minutes));
+    if (options.fresh) args.push('--fresh');
+    if (options.headed) args.push('--headed');
+  } else {
+    if (options.grep) args.push('--grep', options.grep);
+    if (options.device) args.push('--device', options.device);
+    if (options.persona) args.push('--persona', options.persona);
+    if (options.depth) args.push('--depth', String(options.depth));
+    if (options.model) args.push('--model', options.model);
+    if (options.repeat > 1) args.push('--repeat', String(options.repeat));
+    if (options.headed) args.push('--headed');
+    if (options.author) args.push('--author');
+  }
 
   let child;
   try {

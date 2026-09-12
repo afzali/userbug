@@ -109,6 +109,16 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
                                   گشتِ زنده: مرورگر باز می‌شود، شما کار
                                   می‌کنید، و ابزار ضبط و شناخت می‌سازد
 
+  userbug map <هدف> [گزینه‌ها]    نقشهٔ اپ: هر حالتی که می‌شود به آن رسید
+      --from <سناریو>             مسیرِ ورود؛ قدم‌هایش پیش از خزش بازپخش می‌شوند
+      --states <n> --actions <n> --minutes <n>
+                                  سقف‌ها (پیش‌فرض ۶۰ · ۲۵ · ۲۰)
+      --fresh                     از صفر، نه ادامهٔ نقشهٔ موجود
+      --headed                     مرورگر دیده شود
+      --device <نام>              دستگاه
+      --allow-destructive         کنشِ برگشت‌ناپذیر هم زده شود
+      --show                      نقشهٔ موجود را نشان بده، بی‌خزش
+
   userbug checks <هدف>            چکِ همگانی: حالت، برخورد، و سروصدا
       --off <شناسه> --why <متن>   خاموش کردن؛ دلیل اجباری است
       --watch <شناسه>             یافته ثبت کن، ولی نشکن (پیش‌فرض)
@@ -838,6 +848,92 @@ async function cmdTour({ flags, positional }) {
 }
 
 /**
+ * نقشهٔ اپ.
+ *
+ * ── چرا سقف‌ها اجباری‌اند و پیش‌فرض دارند ──
+ *
+ * خزش ذاتاً بی‌پایان است: هر کلیک می‌تواند حالتِ تازه بسازد. سقف‌ها همان
+ * تصمیمی‌اند که `--depth` برای کاوش گرفت — عدد، نه نامی مثل «کامل»، چون عدد
+ * همان هزینه است و «کامل» ادعایی است که هیچ خزشی نمی‌تواند بدهد.
+ */
+async function cmdMap({ flags, positional }) {
+  const target = positional[0];
+  if (!target) throw new Error('نام هدف لازم است: userbug map <هدف>');
+
+  const { readMap } = await import('../src/map/store.js');
+  const { renderMap } = await import('../src/map/render.js');
+  const knownRoutes = (readDossier(target).routes || []).map((route) => route.path).filter(Boolean);
+
+  if (flags.show) {
+    console.log('\n' + renderMap(readMap(target), { knownRoutes }) + '\n');
+    return;
+  }
+
+  const caps = {};
+  for (const [flag, key] of [
+    ['states', 'states'],
+    ['actions', 'actionsPerState'],
+    ['minutes', 'minutes'],
+  ]) {
+    if (flags[flag] === undefined) continue;
+    const value = Number(flags[flag]);
+    if (!Number.isInteger(value) || value < 1 || value > 1000) {
+      throw new Error(`--${flag} باید عددی صحیح بین ۱ و ۱۰۰۰ باشد؛ «${flags[flag]}» نبود`);
+    }
+    caps[key] = value;
+  }
+
+  /**
+   * مسیرِ ورود از یک سناریو می‌آید، نه از پرچم‌های ورود.
+   *
+   * «چطور وارد می‌شوند» خودش دانش است و جای نوشتنش سناریوست. و آن سناریو از
+   * قبل وجود دارد: خروجیِ گشت، همان‌جا که کاربر یک بار لاگین کرد.
+   */
+  let entrySteps = [];
+  let entryLabel = '';
+  if (flags.from && flags.from !== true) {
+    const { loadScenario } = await import('../src/scenario/load.js');
+    const file = path.resolve(String(flags.from));
+    if (!fs.existsSync(file)) throw new Error(`سناریوی مسیرِ ورود پیدا نشد: ${file}`);
+    const scenario = loadScenario(file);
+    entrySteps = scenario.steps;
+    entryLabel = path.relative(ROOT, file).split(path.sep).join('/');
+  }
+
+  const { MapSession } = await import('../src/map/session.js');
+  const session = new MapSession({
+    target,
+    device: flags.device === true ? undefined : flags.device,
+    headless: !flags.headed,
+    caps,
+    entrySteps,
+    entryLabel,
+    fresh: Boolean(flags.fresh),
+    allowDestructive: Boolean(flags['allow-destructive']),
+  });
+
+  session.on('event', (event) => {
+    if (event.type === 'state') console.log(`  + ${event.route}${event.view ? ` ▸ ${event.view}` : ''}  (${event.actions} کنش)`);
+    else if (event.type === 'finding') console.log(`  ⚠ ${event.finding.message}`.slice(0, 160));
+    else if (event.type === 'warning') console.log(`  ! ${event.message}`);
+  });
+
+  await session.start();
+  console.log(`\n  خزش آغاز شد: ${session.runId}\n`);
+
+  let map;
+  try {
+    map = await session.crawl();
+  } finally {
+    await session.stop();
+  }
+
+  console.log('\n' + renderMap(map, { knownRoutes }));
+  console.log(`\n  یافته‌ها: ${session.findings.length} ثبت‌شده از ${session.seenFindings.size} یکتا`);
+  console.log(`  نقشه: knowledge/${target}/map.json  ·  اجرا: runs/${session.runId}/report.html\n`);
+}
+
+/**
  * چک‌ها — دیدن و تنظیم کردن.
  *
  * ── چرا `--off` دلیل می‌خواهد ──
@@ -1166,6 +1262,9 @@ try {
       break;
     case 'tour':
       await cmdTour(parsed);
+      break;
+    case 'map':
+      await cmdMap(parsed);
       break;
     case 'checks':
       cmdChecks(parsed);

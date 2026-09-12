@@ -19,6 +19,8 @@ export async function load({ params, url }) {
    * واگرا می‌شوند.
    */
   const compose = (url.searchParams.get('compose') || '').slice(0, 2000);
+  // فقط شناسه؛ خودِ مقدمه را سرور از نقشه برمی‌دارد
+  const proposalId = (url.searchParams.get('proposal') || '').slice(0, 80);
 
-  return { kind, relative, file, fileError, compose };
+  return { kind, relative, file, fileError, compose, proposalId };
 }

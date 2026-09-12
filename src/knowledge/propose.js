@@ -32,6 +32,7 @@ import path from 'node:path';
 import { loadScenarios } from '../scenario/load.js';
 import { normalizeRoutePath } from './schema.js';
 import { knowledgeDir, listPages, readDossier } from './store.js';
+import { readMap } from '../map/store.js';
 
 /**
  * پیشنهادهای ردشده — `knowledge/<کلید>/dismissed.json`.
@@ -165,6 +166,99 @@ function mentionedIn(haystacks, words) {
 }
 
 /**
+ * پیشنهاد از روی نقشه.
+ *
+ * ── چرا نقشه چیزی می‌گوید که پرونده نمی‌گوید ──
+ *
+ * `routes` در پرونده فقط **آدرس** دارد. نقشه حالت دارد: مودالِ «افزودن کتاب
+ * جدید» و کشوی «همه نویسندگان» هیچ آدرسی ندارند، پس تا امروز در هیچ
+ * پیشنهادی نمی‌آمدند — و همان‌ها بودند که کسی تست نداشت.
+ *
+ * ── و چرا این پیشنهاد از بقیه اجراپذیرتر است ──
+ *
+ * `preamble` مسیرِ واقعیِ رسیدن به آن حالت است، همان‌طور که خزنده رفت. بقیهٔ
+ * پیشنهادها متن می‌دهند و مدل باید مسیر را حدس بزند؛ این یکی مسیر را
+ * **می‌داند**. حدس زدنِ چیزی که یک بار قطعی دیده شده، همان «پول دادن برای
+ * چیزی که readdir جواب می‌دهد» است، یک پله بالاتر.
+ */
+function fromMap(target, { touched, haystacks }) {
+  const map = readMap(target);
+  const out = [];
+
+  for (const state of map.states || []) {
+    // حالتِ بی‌نما همان صفحه است و بند ۱ سراغش رفته
+    if (!state.view) continue;
+
+    /**
+     * فقط مودال، نه منو و کشو.
+     *
+     * ── چرا فهرست کوتاه می‌ماند ──
+     *
+     * نقشهٔ نپی پنج کشوی فیلتر و یک منوی کاربر دارد که نامشان از متنِ
+     * دکمه‌شان می‌آید — یکی‌شان ایمیلِ کاربرِ همان اجرا بود. پیشنهادی به نامِ
+     * «منوی U ub-620883b2@userbug.test» هم بی‌معناست هم ناپایدار.
+     *
+     * مودال جایی است که کارِ کاربر انجام می‌شود؛ منو فقط راه است. و همان
+     * قاعدهٔ همیشگی: فهرستی که دو بار چیزِ بی‌ربط پیشنهاد بدهد، بار سوم بسته
+     * می‌شود.
+     */
+    if (state.viewKind && state.viewKind !== 'dialog') continue;
+    if (mentionedIn(haystacks, [state.view])) continue;
+
+    /**
+     * حالتی که هیچ کنشِ امتحان‌نشده‌ای نداشته، چیزِ زیادی برای گفتن ندارد.
+     *
+     * ولی حالتی که ۳۹ کنش دارد و ۲ تایش امتحان شده، دقیقاً همان جایی است که
+     * نه خزش رسید و نه سناریویی هست.
+     */
+    const actions = state.actions || [];
+    const tried = actions.filter((action) => action.tried).length;
+
+    /**
+     * فقط چیزی که **مالِ خودِ این نماست**، نه آنچه پشتش دیده می‌شود.
+     *
+     * ── چرا لازم شد ──
+     *
+     * نخستین فهرستِ واقعی این متن را داد: «چیزهایی که در این نما هست: مطالب
+     * مطالعه و نظر، خانه، … ، U ub-657c0be8@userbug.test کاربر سامانه».
+     * هیچ‌کدام در مودال نبودند — نوارِ کناری بود که پشتِ مودال هنوز در DOM
+     * است. و یکی‌شان ایمیلِ کاربرِ همان اجرا بود، که هم بی‌ربط است هم هر بار
+     * عوض می‌شود.
+     *
+     * تفاضل با گرهِ والد (همان که یالش به اینجا رسیده) این را حل می‌کند، و
+     * والد را نقشه از قبل می‌داند.
+     */
+    const parentId = (map.edges || []).find((edge) => edge.to === state.id)?.from;
+    const parent = parentId ? (map.states || []).find((item) => item.id === parentId) : null;
+    const inherited = new Set((parent?.actions || []).map((action) => action.key));
+
+    const labels = actions
+      .filter((action) => action.kind === 'unknown' || action.kind === 'nav')
+      .filter((action) => !inherited.has(action.key))
+      .map((action) => action.label)
+      .filter(Boolean)
+      .slice(0, 8);
+
+    out.push({
+      id: idOf('state', `${state.route}|${state.view}`),
+      kind: 'state',
+      title: `«${state.view}» آزموده نمی‌شود`,
+      why: `نقشه این نما را روی ${state.route} دیده و هیچ سناریویی سراغش نمی‌رود.`,
+      evidence: `${actions.length} کنش، ${tried} امتحان‌شده · ${state.path?.length || 0} قدم تا اینجا`,
+      routes: [state.route],
+      // مسیرِ قطعی، نه متن: مصرف‌کننده‌اش `scenarioFromText` است
+      preamble: state.path || [],
+      text:
+        `«${state.view}» را باز کن و کارِ اصلی‌اش را تا آخر انجام بده.\n` +
+        (labels.length ? `چیزهایی که در این نما هست: ${labels.join('، ')}.\n` : '') +
+        'بررسی کن نتیجه واقعاً ذخیره یا اعمال شد، و بستنش چیزی را خراب نمی‌کند.',
+    });
+  }
+
+  return out;
+}
+
+/**
  * پیشنهادها، از پروندهٔ شناخت.
  *
  * @param {string} target کلید پروژه
@@ -287,6 +381,9 @@ export function proposalsFor(target) {
       text: `${page.path} را دوباره از اول تا آخر برو و بررسی کن چه چیزی عوض شده.`,
     });
   }
+
+  /* ── ۶. حالتی که نقشه پیدا کرده و هیچ سناریویی سراغش نمی‌رود ── */
+  for (const proposal of fromMap(target, { touched, haystacks })) out.push(proposal);
 
   /**
    * ردشده‌ها حذف نمی‌شوند، علامت می‌خورند.

@@ -14,6 +14,7 @@ import { attachClientObservers, INIT_SCRIPT } from './observe/client.js';
 import { createServerCollectors, startAll, drainAll } from './observe/server.js';
 import { judge, fingerprint, normalizeMessage } from './observe/oracle.js';
 import { routeOf } from './observe/route.js';
+import { dismissBlockers } from './observe/blockers.js';
 import { RunStore, getCurrentRun } from './store/run-store.js';
 import { freshIdentity } from './data/persian.js';
 import { countHits, readChecksConfig } from './checks/config.js';
@@ -295,52 +296,21 @@ export const test = base.extend({
       /**
        * پنجره‌هایی که روی مسیر کاربر نشسته‌اند.
        *
-       * کاربر واقعی می‌بنددشان و کارش را ادامه می‌دهد — پس ما هم. ولی هر کدام
-       * ثبت می‌شود، چون «کاربر توانست ببندد» با «نباید آنجا می‌بود» یکی نیست.
-       * بدون ثبت، این پنجره‌ها بی‌صدا در همهٔ اجراهای بعدی هم عبور می‌کردند.
+       * خودِ منطق در `src/observe/blockers.js` است، چون خزشِ نقشه هم همان را
+       * لازم دارد. آنچه اینجا می‌ماند تصمیمِ این مصرف‌کننده است: **یافته
+       * بساز.** در سناریو، پنجره‌ای که کلیک را گرفته یک نقص است حتی وقتی
+       * بسته شد.
        */
       async dismissBlockers({ expected = [] } = {}) {
-        const found = [];
-        const noted = new Set();
-
-        for (let guard = 0; guard < 8; guard++) {
-          // ترتیب مهم است: alertdialog لایهٔ بالاتری دارد و تا بسته نشود،
-          // کلیک روی dialogِ زیرش را می‌گیرد. اولین باری که این را رعایت
-          // نکردیم، حلقه پنج بار همان پنجره را «دید» و هیچ‌کدام بسته نشد.
-          let top = page.locator('[role="alertdialog"]').first();
-          let visible = (await top.count()) > 0 && (await top.isVisible().catch(() => false));
-          if (!visible) {
-            top = page.locator('[role="dialog"]').first();
-            visible = (await top.count()) > 0 && (await top.isVisible().catch(() => false));
-          }
-          if (!visible) break;
-
-          const title =
-            ((await top.getByRole('heading').first().innerText().catch(() => '')) || '(بی‌عنوان)').trim();
-          found.push(title);
-
-          if (!noted.has(title) && !expected.some((rx) => rx.test(title))) {
-            noted.add(title);
-            await ub.note({
+        return await dismissBlockers(page, {
+          expected,
+          onBlocker: (title) =>
+            ub.note({
               source: 'blocker',
               message: `پنجرهٔ «${title}» روی مسیر کاربر باز بود و کلیک را می‌گرفت`,
               detail: `قدم: ${currentStep}`,
-            });
-          }
-
-          const closer = top.getByRole('button', {
-            name: /^(بستن|بعداً|نشان نده|انصراف|باشه|متوجه شدم|Close)$/,
-          });
-          if (await closer.count()) {
-            await closer.first().click({ timeout: 4000 }).catch(() => {});
-          } else {
-            await page.keyboard.press('Escape').catch(() => {});
-          }
-          // اگر بسته نشد، حلقهٔ بعدی همان را دوباره می‌بیند — پس منتظر رفتنش می‌مانیم
-          await top.waitFor({ state: 'hidden', timeout: 4000 }).catch(() => {});
-        }
-
-        return found;
+            }),
+        });
       },
 
       /**

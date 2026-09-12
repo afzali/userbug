@@ -211,11 +211,11 @@
     <h2 class="text-base font-semibold">از کجا شروع کنیم</h2>
     <p class="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
       این پروژه هنوز سناریویی ندارد، و نوشتنِ سناریو از صفر کارِ سختی است.
-      راهِ کوتاه‌تر این است که یک بار با هم در اپ بگردیم: ابزار تماشا می‌کند،
-      یاد می‌گیرد، و بعد خودش می‌گوید چه چیزهایی باید آزموده شوند.
+      راهِ کوتاه‌تر این است که یک بار با هم در اپ بگردیم، بعد ابزار خودش بقیهٔ
+      اپ را بگردد؛ آن‌وقت می‌داند چه چیزهایی باید آزموده شوند.
     </p>
 
-    <ol class="mt-5 grid gap-4 md:grid-cols-3">
+    <ol class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <li class="rounded-lg border bg-background p-4">
         <p class="text-xs font-semibold text-muted-foreground">قدم ۱</p>
         <p class="mt-1 font-medium">با هم بگردیم</p>
@@ -226,8 +226,22 @@
         <Button href={`/projects/${encodeURIComponent(target)}/tour`} class="mt-3 w-full">شروع گشت</Button>
       </li>
 
+      <!--
+        نقشه بعد از گشت می‌آید، نه پیش از آن: بی مسیرِ ورودی که گشت نشان
+        می‌دهد، خزنده روی صفحهٔ ورود می‌ماند و یک گره پیدا می‌کند.
+      -->
       <li class="rounded-lg border bg-background p-4">
         <p class="text-xs font-semibold text-muted-foreground">قدم ۲</p>
+        <p class="mt-1 font-medium">بقیه را خودش بگردد</p>
+        <p class="mt-1.5 text-xs leading-6 text-muted-foreground">
+          مرورگر هر دکمهٔ امنی را می‌زند و می‌نویسد از کجا به کجا می‌رسد —
+          صفحه‌ها، و مودال‌ها و منوهایی که آدرس ندارند. بی هوش مصنوعی.
+        </p>
+        <Button href={`/projects/${encodeURIComponent(target)}/map`} variant="ghost" class="mt-3 w-full text-xs">نقشهٔ اپ</Button>
+      </li>
+
+      <li class="rounded-lg border bg-background p-4">
+        <p class="text-xs font-semibold text-muted-foreground">قدم ۳</p>
         <p class="mt-1 font-medium">شناخت ساخته می‌شود</p>
         <p class="mt-1.5 text-xs leading-6 text-muted-foreground">
           صفحه‌ها، مسیرها و کارهای خطرناک ثبت می‌شوند. هرچه خودتان گفته باشید
@@ -237,7 +251,7 @@
       </li>
 
       <li class="rounded-lg border bg-background p-4">
-        <p class="text-xs font-semibold text-muted-foreground">قدم ۳</p>
+        <p class="text-xs font-semibold text-muted-foreground">قدم ۴</p>
         <p class="mt-1 font-medium">سناریوها درمی‌آیند</p>
         <p class="mt-1.5 text-xs leading-6 text-muted-foreground">
           «چه باید آزمود» شکافِ میان آنچه می‌دانیم و آنچه می‌آزماییم را حساب
