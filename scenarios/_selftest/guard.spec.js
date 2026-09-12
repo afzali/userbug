@@ -10,18 +10,35 @@
  */
 import { test, expect } from '@playwright/test';
 import { assertMayMutate, assertMayQuery, assertMayRequest, isSafeEnvironment } from '../../src/guard.js';
-import { loadTarget } from '../../src/target.js';
+
+/**
+ * هدف‌ها اینجا ساخته می‌شوند، نه از `targets/` خوانده.
+ *
+ * ── چرا عوض شد ──
+ *
+ * این آزمون `loadTarget('nepi-prod')` را صدا می‌زد. روزی که کاربر آن پروژه
+ * را حذف کرد، خودآزمای **دروازهٔ ایمنی** شکست — یعنی مهم‌ترین ادعای پروژه
+ * به این بند بود که یک فایلِ دلخواه در دیسکِ کسی باقی بماند.
+ *
+ * و خطرناک‌تر از شکستن: اگر کسی `nepi-prod` را دوباره می‌ساخت و محیطش را
+ * `local` می‌گذاشت، همهٔ این آزمون‌ها **سبز** می‌شدند بی‌آنکه چیزی بسنجند.
+ * آزمونی که موضوعش را از بیرون بگیرد، می‌تواند بی‌صدا بی‌معنا شود.
+ *
+ * `guard.js` فقط `name` و `environment` می‌خواهد، پس دو شیءِ ساده کافی است.
+ */
+const PROD = { name: 'هدفِ تولیدی', environment: 'production' };
+const LOCAL = { name: 'هدفِ محلی', environment: 'local' };
 
 test('دروازه: محیط توسعه اجازه می‌دهد', async () => {
-  const target = await loadTarget('nepi');
-  expect(isSafeEnvironment(target), 'nepi باید local باشد').toBe(true);
+  const target = LOCAL;
+  expect(isSafeEnvironment(target)).toBe(true);
 
   expect(() => assertMayMutate(target, 'کار آزمایشی')).not.toThrow();
   expect(() => assertMayRequest(target, 'POST', '/auth/register')).not.toThrow();
 });
 
 test('دروازه: محیط تولیدی نوشتن را رد می‌کند', async () => {
-  const target = await loadTarget('nepi-prod');
+  const target = PROD;
   expect(isSafeEnvironment(target)).toBe(false);
 
   expect(() => assertMayRequest(target, 'POST', '/auth/register')).toThrow(/رد شد/);
@@ -37,8 +54,8 @@ test('دروازه: محیط تولیدی نوشتن را رد می‌کند', a
  * می‌کند. تا امروز دروازه نداشت.
  */
 test('دروازه: پرس‌وجوی خواندنی آزاد است، نوشتن نه', async () => {
-  const prod = await loadTarget('nepi-prod');
-  const local = await loadTarget('nepi');
+  const prod = PROD;
+  const local = LOCAL;
 
   // همان چیزی که سناریوهای واقعی می‌زنند
   expect(() => assertMayQuery(prod, 'SELECT COUNT(*) AS n FROM users WHERE email = ?')).not.toThrow();
@@ -53,7 +70,7 @@ test('دروازه: پرس‌وجوی خواندنی آزاد است، نوشت�
 });
 
 test('دروازه: جملهٔ دوم و کامنت نمی‌توانند نوشتن را پنهان کنند', async () => {
-  const prod = await loadTarget('nepi-prod');
+  const prod = PROD;
 
   // بدون بررسی چندجمله‌ای، این از کنار شرطِ «با select شروع می‌شود» رد می‌شد
   expect(() => assertMayQuery(prod, 'SELECT 1; DELETE FROM users')).toThrow(/رد شد/);

@@ -257,6 +257,90 @@ test('روشن کردنِ دوباره هم از ناوبری رد می‌شود
   });
 });
 
+/**
+ * ── چرا «نما» لازم شد ──
+ *
+ * فرضِ اولیه این بود که هر چیزِ قابلِ توضیح یک آدرس دارد. کاربر روی اپ
+ * واقعی نشان داد غلط است: کارهای اصلی در مودال‌اند و همه روی یک مسیر.
+ *
+ * و بدتر از نداشتنِ جا، بازنویسی بود — هر مودالی که توضیح داده می‌شد،
+ * توضیحِ قبلی را پاک می‌کرد. یعنی هرچه کاربر بیشتر کار می‌کرد، کمتر می‌ماند.
+ */
+const APP_WITH_MODAL = `<!doctype html><html lang="fa" dir="rtl"><head><title>فهرست</title></head><body>
+  <h1>فهرست</h1>
+  <button id="a">وارد کردن</button>
+  <button id="b">اشتراک</button>
+  <div id="m1" role="dialog" aria-label="وارد کردن اطلاعات" hidden><button>تأیید</button></div>
+  <div id="m2" role="dialog" hidden><h2>اشتراک‌گذاری</h2><button>ارسال</button></div>
+  <div id="m3" hidden><button>لایهٔ بی‌نقش</button></div>
+<script>
+  a.onclick = () => { m1.hidden = false; };
+  b.onclick = () => { m1.hidden = true; m2.hidden = false; };
+</script>
+</body></html>`;
+
+test('مودالِ باز با نامش شناخته می‌شود، و دو مودال روی هم نمی‌نویسند', async () => {
+  await withTemporaryTarget(APP_WITH_MODAL, async ({ url }) => {
+    const session = await tour(url, async (s) => {
+      // بی‌مودال: نما خالی است
+      await s.notePage({ purpose: 'فهرستِ اصلی' });
+
+      await s.page.getByRole('button', { name: 'وارد کردن' }).click();
+      await s.page.waitForTimeout(100);
+      await s.notePage({ purpose: 'فایل را از اینجا می‌گیرد' });
+
+      await s.page.getByRole('button', { name: 'اشتراک' }).click();
+      await s.page.waitForTimeout(100);
+      await s.notePage({ purpose: 'لینک اشتراک می‌سازد' });
+    });
+
+    const state = await session.stop();
+    const noted = state.pages.filter((page) => page.purpose);
+
+    // سه رکوردِ جدا، نه یکی که دو بار بازنویسی شده
+    expect(noted).toHaveLength(3);
+
+    const byView = Object.fromEntries(noted.map((page) => [page.view || '(صفحه)', page.purpose]));
+    expect(byView['(صفحه)']).toBe('فهرستِ اصلی');
+    // از aria-label
+    expect(byView['وارد کردن اطلاعات']).toBe('فایل را از اینجا می‌گیرد');
+    // از عنوانِ داخلِ مودال، وقتی aria-label نیست
+    expect(byView['اشتراک‌گذاری']).toBe('لینک اشتراک می‌سازد');
+  });
+});
+
+test('لایه‌ای که تشخیص داده نمی‌شود، با نامِ دستی ثبت می‌شود', async () => {
+  await withTemporaryTarget(APP_WITH_MODAL, async ({ url }) => {
+    const session = await tour(url, async (s) => {
+      // `m3` نه role دارد نه عنوان — تشخیصِ خودکار نمی‌بیندش
+      await s.page.evaluate(() => (document.getElementById('m3').hidden = false));
+      await s.page.waitForTimeout(50);
+
+      expect(await s.detectView()).toBe('');
+
+      await s.notePage({ purpose: 'پنلِ دستی', view: 'کشوی تنظیمات' });
+    });
+
+    const state = await session.stop();
+    const noted = state.pages.find((page) => page.purpose === 'پنلِ دستی');
+    expect(noted.view).toBe('کشوی تنظیمات');
+    expect(noted.viewBy).toBe('user');
+  });
+});
+
+test('نامِ دستی بر تشخیصِ خودکار می‌چربد', async () => {
+  await withTemporaryTarget(APP_WITH_MODAL, async ({ url }) => {
+    const session = await tour(url, async (s) => {
+      await s.page.getByRole('button', { name: 'وارد کردن' }).click();
+      await s.page.waitForTimeout(100);
+      await s.notePage({ purpose: 'x', view: 'نامِ خودم' });
+    });
+
+    const state = await session.stop();
+    expect(state.pages.find((page) => page.purpose === 'x').view).toBe('نامِ خودم');
+  });
+});
+
 test('گشت → YAML → بازپخش: حلقه بسته می‌شود', async () => {
   await withTemporaryTarget(APP, async ({ root, url }) => {
     const session = await tour(url, async (s) => {

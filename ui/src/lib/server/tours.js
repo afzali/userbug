@@ -117,8 +117,11 @@ export async function tourAction(target, action, body = {}) {
 
   switch (action) {
     case 'note-page':
-      await session.notePage({ purpose: body.purpose || '' });
+      // `view` دستی: وقتی تشخیصِ خودکار لایه را ندید و کاربر خودش نامش را گفت.
+      await session.notePage({ purpose: body.purpose || '', view: body.view || '' });
       return tourState(target);
+    case 'detect-view':
+      return { ...tourState(target), detectedView: await session.detectView() };
     case 'note':
       await session.note(body.message || '');
       return tourState(target);

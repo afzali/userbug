@@ -162,6 +162,7 @@ export async function emitTour({ target, state, name, landing = false }) {
       target,
       {
         path: page.path,
+        view: page.view,
         title: page.title,
         purpose: page.purpose,
         shot: page.shot,
@@ -200,8 +201,15 @@ export async function emitTour({ target, state, name, landing = false }) {
 
   // ۴. پرونده
   const patch = {
+    /**
+     * فقط نماهای بی‌مودال به `routes` می‌روند.
+     *
+     * `routes` نقشهٔ آدرس‌هاست و `/contents` یک ردیف دارد، نه چهار تا برای
+     * چهار مودالش. توضیحِ مودال‌ها در `pages/` می‌ماند که جای درستشان است؛
+     * ریختنشان اینجا نقشه را با چیزی پر می‌کرد که آدرس نیست.
+     */
     routes: (state.pages || [])
-      .filter((page) => page.path)
+      .filter((page) => page.path && !page.view)
       .map((page) => ({
         path: page.path,
         title: page.title,

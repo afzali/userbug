@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "target": "nepi",
+  "updatedAt": "2026-09-12T08:14:42.075Z",
+  "summary": "",
+  "stack": {
+    "framework": "",
+    "language": "",
+    "backend": "",
+    "db": "",
+    "by": "model"
+  },
+  "auth": {
+    "kind": "unknown",
+    "loginPath": "",
+    "signupOpen": null,
+    "logoutLabel": "",
+    "sessionStore": "",
+    "by": "model"
+  },
+  "routes": [
+    {
+      "path": "/",
+      "title": "",
+      "purpose": "",
+      "requiresAuth": null,
+      "sourceFile": "",
+      "by": "tour"
+    },
+    {
+      "path": "/login",
+      "title": "",
+      "purpose": "ورود کاربران یعنی لاگین و رجیستر",
+      "requiresAuth": null,
+      "sourceFile": "",
+      "by": "user"
+    },
+    {
+      "path": "/contents",
+      "title": "مدیریت فایل‌ها :: نپی",
+      "purpose": "جستجو اصلی برنامه",
+      "requiresAuth": null,
+      "sourceFile": "",
+      "by": "user"
+    },
+    {
+      "path": "/content/f40a94a4b9",
+      "title": "نماز",
+      "purpose": "",
+      "requiresAuth": null,
+      "sourceFile": "",
+      "by": "tour"
+    },
+    {
+      "path": "/content/2c3c4d86ac",
+      "title": "نماز",
+      "purpose": "صفحه نمایش کتاب",
+      "requiresAuth": null,
+      "sourceFile": "",
+      "by": "user"
+    }
+  ],
+  "glossary": [],
+  "entities": [],
+  "flows": [],
+  "files": {
+    "uploads": [],
+    "downloads": []
+  },
+  "risks": [],
+  "openQuestions": [],
+  "sources": [
+    {
+      "kind": "tour",
+      "id": "2026-09-12T07-10-52_nepi_c53845f0",
+      "at": "2026-09-12T07:43:38.287Z",
+      "note": "19 قدم"
+    },
+    {
+      "kind": "tour",
+      "id": "2026-09-12T08-04-12_nepi_3b0e6dda",
+      "at": "2026-09-12T08:14:42.074Z",
+      "note": "24 قدم"
+    }
+  ]
+}

@@ -133,7 +133,11 @@
   function apply(event) {
     if (event.type === 'step') steps = [...steps, event.step];
     else if (event.type === 'step-removed') steps = steps.filter((item) => item.index !== event.index);
-    else if (event.type === 'page') pages = [...pages.filter((item) => item.path !== event.page.path), event.page];
+    else if (event.type === 'page') {
+      // هویت = مسیر و نما. با مسیرِ تنها، مودالِ دوم اولی را از فهرست می‌انداخت.
+      const key = (item) => `${item.path}|${item.view || ''}`;
+      pages = [...pages.filter((item) => key(item) !== key(event.page)), event.page];
+    }
     else if (event.type === 'finding') findings = [...findings, event.finding];
     else if (event.type === 'navigated' || event.type === 'started') url = event.url || url;
     else if (event.type === 'recording') recording = event.recording;
@@ -177,9 +181,47 @@
     listen();
   }
 
+  /**
+   * نمای باز — خودکار، با امکانِ دست بردن.
+   *
+   * تشخیص به `role="dialog"` تکیه می‌کند که قرارداد است نه قانون. لایه‌ای که
+   * با یک `div` و `position: fixed` ساخته شده از این تور رد می‌شود — و
+   * کم نیستند.
+   *
+   * آن حالت نباید بن‌بست باشد: کاربر خودش می‌بیند چیزی باز است. پس جعبهٔ
+   * نام همیشه هست و مقدارِ دستی بر تشخیصِ خودکار می‌چربد.
+   */
+  let view = $state('');
+  let detected = $state('');
+  let detecting = $state(false);
+
+  async function detectView() {
+    detecting = true;
+    try {
+      const response = await fetch('/api/tour', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({ target: data.target, action: 'detect-view' }),
+      });
+      const payload = await response.json();
+      if (response.ok) {
+        detected = payload.detectedView || '';
+        if (detected && !view) view = detected;
+      }
+    } catch {
+      // تشخیص‌نشدن خطا نیست؛ کاربر خودش نام می‌گذارد.
+    } finally {
+      detecting = false;
+    }
+  }
+
   async function notePage() {
-    const payload = await send({ action: 'note-page', purpose });
-    if (payload) purpose = '';
+    const payload = await send({ action: 'note-page', purpose, view });
+    if (payload) {
+      purpose = '';
+      view = '';
+      detected = '';
+    }
   }
 
   async function note() {
@@ -306,9 +348,41 @@
       پراعتمادترین چیزی که این سیستم دارد. بی‌توضیح هم می‌توانید ثبت کنید؛ آن‌وقت فقط نقشه است،
       نه معنا.
     </p>
+    <!--
+      نما، پیش از توضیح.
+
+      کاربر گفت بیشتر چیزهایی که می‌خواهد توضیح بدهد آدرس ندارند — مودال‌اند.
+      و تا دیروز هر مودالی که توضیح می‌داد، توضیحِ مودالِ قبلیِ همان صفحه را
+      پاک می‌کرد، چون هویت فقط مسیر بود.
+    -->
+    <div class="mb-3 space-y-2 rounded-lg border border-dashed p-3">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs font-medium">نمای باز</span>
+        <Input
+          bind:value={view}
+          class="h-8 min-w-0 flex-1 text-xs"
+          placeholder="خالی = خودِ صفحه. مثلاً: وارد کردن اطلاعات"
+          disabled={Boolean(busy)}
+        />
+        <Button variant="ghost" size="sm" class="h-8 text-xs" disabled={detecting || Boolean(busy)} onclick={detectView}>
+          {detecting ? '…' : 'تشخیص خودکار'}
+        </Button>
+      </div>
+      <p class="text-[11px] leading-5 text-muted-foreground">
+        {#if detected}
+          مودالِ باز شناسایی شد: <strong>{detected}</strong>.
+        {:else}
+          مودال و کشو آدرس ندارند، پس با نام شناخته می‌شوند. «تشخیص خودکار» را بزنید؛ اگر لایه‌ای
+          باز است ولی پیدا نشد، خودتان نامش را بنویسید — هر دو یک‌جور ثبت می‌شوند.
+        {/if}
+      </p>
+    </div>
+
     <div class="flex flex-wrap gap-2">
       <Input bind:value={purpose} placeholder="مثلاً: اینجا فهرست اسناد کاربر است" disabled={Boolean(busy)} />
-      <Button variant="outline" disabled={Boolean(busy)} onclick={notePage}>ثبت این صفحه</Button>
+      <Button variant="outline" disabled={Boolean(busy)} onclick={notePage}>
+        {view ? 'ثبت این نما' : 'ثبت این صفحه'}
+      </Button>
     </div>
 
     <div class="mt-3 flex flex-wrap gap-2">
@@ -354,9 +428,10 @@
   <section class="mb-6 rounded-xl border p-4">
     <h2 class="mb-3 text-sm font-bold">صفحه‌های ثبت‌شده</h2>
     <ul class="flex flex-col gap-1 text-sm">
-      {#each pages as page (page.path)}
+      {#each pages as page (page.path + '|' + (page.view || ''))}
         <li class="rounded-lg border px-3 py-1.5">
-          <code class="text-xs">{page.path}</code>
+          <code dir="ltr" class="text-xs">{page.path}</code>
+          {#if page.view}<span class="text-xs text-muted-foreground"> ▸ </span><span class="text-xs font-medium">{page.view}</span>{/if}
           <Badge variant={page.by === 'user' ? 'default' : 'secondary'}>{page.by === 'user' ? 'کاربر' : 'گشت'}</Badge>
           {#if page.purpose}<span> — {page.purpose}</span>{/if}
         </li>

@@ -153,9 +153,9 @@ export async function updateDossier(target, mutate, meta = {}) {
 
 /* ────────────────────────────── صفحه‌ها ────────────────────────────── */
 
-export function readPage(target, routePath) {
+export function readPage(target, routePath, view = '') {
   const key = assertKnowledgeKey(target);
-  const slug = pageSlug(routePath);
+  const slug = pageSlug(routePath, view);
   if (!slug) return null;
   const raw = readJsonOr(path.join(pagesDir(key), `${slug}.json`), null);
   if (!raw) return null;
@@ -169,13 +169,14 @@ export function readPage(target, routePath) {
 export async function writePage(target, page, meta = {}) {
   const key = assertKnowledgeKey(target);
   const normalized = normalizePage(page);
-  const slug = pageSlug(normalized.path);
-  const existed = Boolean(readPage(key, normalized.path));
+  const slug = pageSlug(normalized.path, normalized.view);
+  const existed = Boolean(readPage(key, normalized.path, normalized.view));
 
   await writeJsonAtomic(path.join(pagesDir(key), `${slug}.json`), normalized);
   await appendHistory(knowledgeDir(key), {
     op: existed ? 'update' : 'add',
-    path: `pages[${normalized.path}]`,
+    // نما در نامِ بند می‌آید تا تاریخچه بگوید کدام مودال عوض شد، نه فقط کدام صفحه.
+    path: `pages[${normalized.path}${normalized.view ? ` ▸ ${normalized.view}` : ''}]`,
     by: normalized.by,
     why: meta.why,
     ref: meta.ref,

@@ -232,15 +232,66 @@ export class TourSession extends EventEmitter {
    * ثبت می‌شود (`auto`) تا نقشهٔ صفحه‌های دیده‌شده کامل بماند، ولی آن‌وقت
    * `by: tour` می‌گیرد نه `by: user`.
    */
-  async notePage({ purpose = '', auto = false } = {}) {
+  /**
+   * نمای باز روی صفحه — مودال، کشو، یا هر لایه‌ای که روی محتوا نشسته.
+   *
+   * ── چرا نامِ دستی هم پذیرفته می‌شود ──
+   *
+   * تشخیصِ خودکار به `role="dialog"` و برادرانش تکیه می‌کند، که قرارداد است
+   * نه قانون. لایه‌ای که با یک `div` ساده و `position: fixed` ساخته شده —
+   * و کم نیستند — از این تور رد می‌شود.
+   *
+   * آن حالت نباید بن‌بست باشد: کاربر خودش می‌بیند که چیزی باز است. پس
+   * `view` دستی بر تشخیصِ خودکار می‌چربد و هر لایه‌ای قابلِ ثبت می‌ماند،
+   * حتی اگر ما ندیده باشیمش.
+   */
+  async detectView() {
+    if (!this.page || this.page.isClosed()) return '';
+    return await this.page
+      .evaluate(() => {
+        const visible = (el) => {
+          const style = getComputedStyle(el);
+          if (style.display === 'none' || style.visibility === 'hidden') return false;
+          const box = el.getBoundingClientRect();
+          return box.width > 0 && box.height > 0;
+        };
+
+        const layers = [...document.querySelectorAll('[role="dialog"],[role="alertdialog"],dialog[open]')].filter(visible);
+        if (!layers.length) return '';
+
+        // عمیق‌ترین لایه، نه اولی: مودالی که روی مودال باز شده همان است که
+        // کاربر نگاهش می‌کند.
+        const top = layers[layers.length - 1];
+
+        const labelledBy = top.getAttribute('aria-labelledby');
+        const labelled = labelledBy && document.getElementById(labelledBy);
+        const heading = top.querySelector('h1,h2,h3,[role="heading"]');
+
+        const name =
+          top.getAttribute('aria-label') ||
+          labelled?.textContent ||
+          heading?.textContent ||
+          '';
+
+        return String(name).replace(/\s+/g, ' ').trim().slice(0, 120);
+      })
+      .catch(() => '');
+  }
+
+  async notePage({ purpose = '', view = '', auto = false } = {}) {
     if (!this.page || this.page.isClosed()) return null;
 
     const snapshot = await snapshotPage(this.page).catch(() => null);
     if (!snapshot) return null;
 
+    const named = String(view || '').trim();
+    const detected = named || (await this.detectView());
+
     const url = this.page.url();
     const record = {
       path: safePath(url),
+      view: detected,
+      viewBy: named ? 'user' : detected ? 'auto' : '',
       title: await this.page.title().catch(() => ''),
       purpose: String(purpose || '').trim(),
       headings: snapshot.headings,
@@ -259,12 +310,21 @@ export class TourSession extends EventEmitter {
     }
     record.shot = shot;
 
-    // همان مسیر، دوباره: توضیحِ تازه بر ثبتِ خودکار می‌چربد
-    const existing = this.pages.findIndex((item) => item.path === record.path);
+    /**
+     * هویت = مسیر **و** نما.
+     *
+     * پیش‌تر فقط مسیر بود، و نتیجه‌اش این: کاربری که روی `/contents` سه
+     * مودال را جدا توضیح می‌داد، آخرش فقط توضیحِ سومی را داشت. هرچه بیشتر
+     * کار می‌کرد، کمتر می‌ماند.
+     */
+    const same = (item) => item.path === record.path && (item.view || '') === (record.view || '');
+    const existing = this.pages.findIndex(same);
     if (existing >= 0 && (purpose || !this.pages[existing].purpose)) this.pages[existing] = record;
     else if (existing < 0) this.pages.push(record);
 
-    this.emitEvent('page', { page: { path: record.path, purpose: record.purpose, shot, by: record.by } });
+    this.emitEvent('page', {
+      page: { path: record.path, view: record.view, purpose: record.purpose, shot, by: record.by },
+    });
 
     // ثبتِ دستی یعنی کاربر روی این صفحه ایستاده و منتظر جواب است؛ چکِ فوری
     // اینجا معنا دارد. ثبتِ خودکار از دلِ همان تایمری می‌آید که خودش چک را
