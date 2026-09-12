@@ -117,6 +117,18 @@ export class MapSession extends EventEmitter {
     this.stepIndex = 0;
     this.tried = 0;
     this.skipped = 0;
+
+    /**
+     * کنشی که کلیک نپذیرفت — شمرده، به ازای **توصیف**، نه به ازای حالت.
+     *
+     * ── چرا سراسری ──
+     *
+     * در خزشِ واقعی یک دکمهٔ نوارِ کناری در دوازده حالتِ مختلف امتحان شد و هر
+     * دوازده بار پنج ثانیه timeout خورد: یک دقیقه، برای فکتی که بار دوم
+     * معلوم شده بود. دکمه‌ای که در دو حالت کلیک نپذیرد، در حالتِ سوم هم
+     * نمی‌پذیرد.
+     */
+    this.unclickable = new Map();
   }
 
   emitEvent(type, data = {}) {
@@ -361,6 +373,7 @@ export class MapSession extends EventEmitter {
       if (action.kind === 'avoided' || action.kind === 'input' || action.kind === 'noise') return false;
       if (action.kind === 'destructive' && !this.allowDestructive) return false;
       if (this.navOnly && action.kind !== 'nav') return false;
+      if ((this.unclickable.get(action.key) || 0) >= 2) return false;
       return true;
     });
   }
@@ -514,13 +527,18 @@ export class MapSession extends EventEmitter {
       const { locator } = resolveTarget(this.page, action.descriptor);
       await locator.click({ timeout: CLICK_TIMEOUT });
     } catch (cause) {
-      failure = String(cause.message).replace(/\s+/g, ' ').slice(0, 140);
+      // ۳۰۰ نویسه، نه ۱۴۰: پلی‌رایت در همان call log می‌گوید **چه چیزی** جلوی
+      // کلیک را گرفت، و بی آن، «شکست خورد» فقط یک عدد است نه یک سرنخ
+      failure = String(cause.message).replace(/\s+/g, ' ').slice(0, 300);
     }
     const settled = await this.settle();
 
     action.tried = true;
     action.at = new Date().toISOString();
-    if (failure) action.failed = failure;
+    if (failure) {
+      action.failed = failure;
+      this.unclickable.set(action.key, (this.unclickable.get(action.key) || 0) + 1);
+    }
     this.tried++;
 
     const shot = await this.closeStep(label, started, from);

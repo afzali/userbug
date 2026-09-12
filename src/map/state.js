@@ -72,6 +72,38 @@ const INPUT_ROLES = new Set(['textbox', 'checkbox', 'radio', 'combobox', 'slider
 const NOISE_ROLES = new Set(['status', 'alert', 'progressbar', 'log', 'timer', 'marquee', 'tooltip', 'separator']);
 
 /**
+ * نقش‌هایی که **ظرف**اند، نه کنش.
+ *
+ * ── چرا جدا از بالایی ──
+ *
+ * خودِ قابِ مودال یک `[role="dialog"]` با نام است، پس در snapshot می‌آید و
+ * خزنده صادقانه رویش کلیک می‌کند: پنج ثانیه انتظار برای چیزی که هیچ‌وقت
+ * کنش نبوده. در خزشِ دوم، هر مودال دقیقاً یک شکستِ این‌شکلی داشت.
+ *
+ * `presentation` عمداً اینجا نیست: نپی متنِ کتاب را با همین نقش کلیک‌پذیر
+ * می‌کند و در گشتِ واقعی کاربر بارها زده است.
+ */
+const CONTAINER_ROLES = new Set([
+  'dialog',
+  'alertdialog',
+  'menu',
+  'menubar',
+  'listbox',
+  'tablist',
+  'tabpanel',
+  'toolbar',
+  'navigation',
+  'region',
+  'main',
+  'group',
+  'list',
+  'form',
+  'banner',
+  'contentinfo',
+  'complementary',
+]);
+
+/**
  * مسیر → الگو.
  *
  * روت‌های سورس (که `[param]` دارند) **برنده‌اند**: `[id]`ی که از کد آمده از
@@ -175,7 +207,7 @@ export function actionKeyOf(descriptor) {
 export function classifyAction({ role, name, label, placeholder } = {}) {
   const text = `${name || ''} ${label || ''} ${placeholder || ''}`;
   if (DESTRUCTIVE.some((rx) => rx.test(text))) return 'destructive';
-  if (NOISE_ROLES.has(role)) return 'noise';
+  if (NOISE_ROLES.has(role) || CONTAINER_ROLES.has(role)) return 'noise';
   if (INPUT_ROLES.has(role)) return 'input';
   if (role === 'link') return 'nav';
   return 'unknown';
@@ -194,6 +226,18 @@ export function actionsFrom(snapshot) {
   const actions = [];
   for (const item of items) {
     if (item.disabled) continue;
+
+    /**
+     * عنصرِ پشتِ مودال، کنشِ **این** حالت نیست.
+     *
+     * دیده می‌شود ولی کلیک به آن نمی‌رسد. نگه داشتنش دو خسارت داشت که هر دو
+     * در نخستین خزش دیده شدند: ۲۰ کلیک از ۳۸ با timeoutِ ۵ ثانیه‌ای افتاد،
+     * و همان‌ها «امتحان‌شده» علامت خوردند پس هیچ‌وقت دوباره امتحان نشدند.
+     *
+     * حذف است نه علامت، چون وقتی مودال بسته شود حالتِ دیگری است و فهرستِ
+     * کنشِ خودش را دارد.
+     */
+    if (item.blocked) continue;
     const descriptor = descriptorFor(item, items);
     if (!descriptor) continue;
     const key = actionKeyOf(descriptor);

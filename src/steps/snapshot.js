@@ -80,6 +80,45 @@ export const SNAPSHOT_FN = () => {
     return '';
   };
 
+  /**
+   * «کلیک به این عنصر می‌رسد؟» — با همان معیاری که مرورگر جواب می‌دهد.
+   *
+   * ── چرا لازم شد ──
+   *
+   * وقتی مودالی باز است، عناصرِ پشتش هنوز **دیده می‌شوند** (پوشش نیمه‌شفاف
+   * است) پس از فیلترِ `visible` رد می‌شوند و در فهرست می‌آیند. ولی کلیکشان
+   * ممکن نیست: پوشش، رویداد را می‌گیرد.
+   *
+   * در نخستین خزشِ واقعیِ نقشه **۲۰ کلیک از ۳۸** به همین دلیل افتادند و
+   * هرکدام ۵ ثانیه timeout سوزاندند — ۴۰٪ وقتِ خزش صرفِ زدنِ دکمه‌هایی شد که
+   * قابلِ زدن نبودند، و بدتر: «امتحان‌شده» علامت خوردند بی‌آنکه امتحان شده
+   * باشند.
+   *
+   * ── چرا `elementFromPoint` و نه فهرستِ لایه‌ها ──
+   *
+   * نسخهٔ اول دنبالِ `[role=dialog]` می‌گشت و هرچه بیرونش بود را مسدود
+   * می‌خواند. نصفِ مسئله را حل کرد: منو و کشو هم می‌گیرند، و اجرای بعدی
+   * نشان داد همان کلیکِ افتاده حالا زیرِ `role="menu"` می‌افتد. فهرستِ
+   * نقش‌های «لایه» هیچ‌وقت کامل نمی‌شود، و نقشی مثل `menu` گاهی نوارِ
+   * کناریِ همیشگی است نه پنجرهٔ شناور.
+   *
+   * `elementFromPoint` همان چیزی را می‌پرسد که پلی‌رایت پیش از کلیک می‌سنجد:
+   * در این نقطه، رویداد به چه چیزی می‌رسد. بی فهرست، بی حدس.
+   */
+  const reachable = (el) => {
+    const box = el.getBoundingClientRect();
+    const x = box.left + box.width / 2;
+    const y = box.top + box.height / 2;
+
+    // مرکزِ بیرون از دیدرس یعنی «نمی‌دانیم»، نه «مسدود»: پلی‌رایت پیش از کلیک
+    // اسکرول می‌کند و عنصر ممکن است کاملاً سالم باشد.
+    if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return true;
+
+    const hit = document.elementFromPoint(x, y);
+    if (!hit) return true;
+    return hit === el || el.contains(hit) || hit.contains(el);
+  };
+
   const items = [];
   let ref = 0;
 
@@ -133,6 +172,8 @@ export const SNAPSHOT_FN = () => {
       placeholder,
       testid,
       disabled: el.disabled || el.getAttribute('aria-disabled') === 'true' || undefined,
+      // دیده می‌شود ولی کلیک به آن نمی‌رسد — چیزی رویش نشسته
+      blocked: !reachable(el) || undefined,
       ...Object.fromEntries(Object.entries(state).filter(([, v]) => v !== undefined)),
     });
     if (items.length >= 120) break;

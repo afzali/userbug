@@ -107,6 +107,12 @@ test.describe('دسته‌بندیِ کنش', () => {
     expect(classifyAction({ role: 'presentation', name: 'متنِ کتاب' })).toBe('unknown');
   });
 
+  test('قابِ مودال کنش نیست — هر مودال یک شکستِ ۵ ثانیه‌ای می‌داد', () => {
+    expect(classifyAction({ role: 'dialog', name: 'افزودن کتاب جدید' })).toBe('noise');
+    expect(classifyAction({ role: 'tablist', name: '' })).toBe('noise');
+    expect(classifyAction({ role: 'navigation', name: 'اصلی' })).toBe('noise');
+  });
+
   test('ورودی و پیوند از دکمهٔ نامعلوم جدا می‌شوند', () => {
     expect(classifyAction({ role: 'textbox', label: 'ایمیل' })).toBe('input');
     expect(classifyAction({ role: 'link', name: 'نماز' })).toBe('nav');
@@ -120,6 +126,14 @@ test.describe('فهرستِ کنش', () => {
       items: [item({ ref: 0 }), item({ ref: 1, disabled: true, name: 'غیرفعال' }), { ref: 2 }],
     });
     expect(actions).toHaveLength(1);
+  });
+
+  test('عنصرِ پشتِ مودال کنشِ این حالت نیست', () => {
+    // ۲۰ کلیک از ۳۸ در نخستین خزش به همین دلیل با timeout افتادند
+    const actions = actionsFrom({
+      items: [item({ ref: 0, name: 'ذخیره' }), item({ ref: 1, name: 'نوارِ کناری', blocked: true })],
+    });
+    expect(actions.map((action) => action.label)).toEqual(['ذخیره']);
   });
 
   test('کلیدِ کنش بین دو بازدید یکی است', () => {
