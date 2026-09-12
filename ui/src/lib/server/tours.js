@@ -1,6 +1,46 @@
 import { EventEmitter } from 'node:events';
-import { TourSession } from '../../../../src/tour/session.js';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { ROOT } from './paths.js';
 import { emitTour } from '../../../../src/tour/emit.js';
+
+/**
+ * `TourSession` در زمان اجرا بارگذاری می‌شود، نه هنگام بیلد.
+ *
+ * ── چرا این استثنا لازم است ──
+ *
+ * `session.js` پلی‌رایت را می‌خواند. پلی‌رایت بیرونِ ریشهٔ `ui/` نصب است، پس
+ * ویت آن را «وابستگیِ پیوندی» می‌بیند و اجباراً داخل خروجیِ سرور باندل
+ * می‌کند — نه `ssr.external`، نه `build.rollupOptions.external`، نه
+ * `resolve.alias`، نه پلاگینِ `resolveId` هیچ‌کدام جلویش را نگرفتند (هر بار
+ * همان چانکِ ۷.۵ مگابایتی با همان هش).
+ *
+ * و در آن باندل کردن، `require`های **تنبلِ** داخلِ باندلِ خودِ پلی‌رایت به
+ * `import` واقعیِ ESM تبدیل می‌شوند. یکی از آنها `chromium-bidi` است:
+ * بسته‌ای که اصلاً نصب نیست، چون پلی‌رایت نسخهٔ باندل‌شده‌اش را در دلِ خودش
+ * دارد و هرگز از بیرون نمی‌خواندش. نتیجه: صفحهٔ گشت با
+ * `ERR_MODULE_NOT_FOUND` می‌افتاد، پیش از آنکه حتی یک خط کد اجرا شود.
+ *
+ * ── چرا `@vite-ignore` و مسیرِ ساخته‌شده ──
+ *
+ * با مسیرِ ثابت، ویت باز هم تحلیلش می‌کند و باندل. مسیری که در زمان اجرا
+ * ساخته شود تحلیل‌ناپذیر است، پس نود خودش از دیسک می‌خواندش — دقیقاً مثل
+ * `bin/userbug.js` که زیر نودِ خام اجرا می‌شود و همین کد آنجا سال‌هاست کار
+ * می‌کند. آنجا `require`های تنبل تنبل می‌مانند.
+ *
+ * ── چرا این باگ تا امروز پنهان ماند ──
+ *
+ * در `npm run dev` ویت ماژول‌های نود را بیرونی می‌گذارد و مشکلی نیست. فقط
+ * روی بیلد دیده می‌شد، و هیچ‌کس صفحهٔ گشت را روی بیلد باز نکرده بود.
+ */
+let sessionModule = null;
+async function loadSession() {
+  if (!sessionModule) {
+    const file = path.join(ROOT, 'src', 'tour', 'session.js');
+    sessionModule = await import(/* @vite-ignore */ pathToFileURL(file).href);
+  }
+  return sessionModule.TourSession;
+}
 
 /**
  * گشت‌های زنده، در پروسهٔ رابط.
@@ -55,6 +95,7 @@ export async function startTour({ target, device }) {
     throw new Error('یک گشت روی این پروژه در حال اجراست');
   }
 
+  const TourSession = await loadSession();
   const session = new TourSession({ target, device });
   const handle = new TourHandle(session);
   state.sessions.set(target, handle);
