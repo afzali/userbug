@@ -24,6 +24,7 @@
  * که PDF و تصویر و ZIP فرستاده شود. پس فهرستِ پسوند نداریم؛ محصورسازی و
  * الگوهای راز کار می‌کنند.
  */
+import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { isSecretPath } from '../source-access.js';
@@ -103,8 +104,93 @@ export async function resolveFixture(target, relative) {
 }
 
 /** فهرست fixtureها، برای رابط و برای پیامِ خطای «کدام‌ها هستند». */
+/**
+ * توضیحِ هر fixture — «این فایل برای چیست».
+ *
+ * ── چرا کنارِ خودِ فایل‌ها و نه در پرونده ──
+ *
+ * `fixtures/` در `.gitignore` است، چون دادهٔ حجیمِ همین ماشین است. توضیحی که
+ * در پرونده بنشیند، با هم‌تیمی سفر می‌کند ولی فایلش نه — یعنی فهرستی از
+ * توضیح‌های بی‌فایل. پس توضیح هم همان‌جا می‌ماند که فایل هست.
+ *
+ * ولی **خودِ نامِ فایل شناسه است**: سناریو با `fixtures/<نام>` صدایش می‌کند و
+ * همان رشته در گیت می‌ماند. توضیح برای آدم است، نه برای ماشین.
+ */
+function notesFile(target) {
+  return path.join(fixturesDir(target), '_notes.json');
+}
+
+export function readFixtureNotes(target) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(notesFile(target), 'utf8'));
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function setFixtureNote(target, relative, note) {
+  const key = String(relative || '').replace(/^fixtures\//, '');
+  if (!key) throw new Error('نامِ فایل لازم است');
+
+  const notes = readFixtureNotes(target);
+  const text = String(note ?? '').trim().slice(0, 500);
+  if (text) notes[key] = text;
+  else delete notes[key];
+
+  await fsp.mkdir(fixturesDir(target), { recursive: true });
+  await fsp.writeFile(notesFile(target), JSON.stringify(notes, null, 2) + '\n', 'utf8');
+  return notes;
+}
+
+/**
+ * افزودنِ فایل از رابط.
+ *
+ * ── چرا نامِ فایل دوباره ساخته می‌شود ──
+ *
+ * نامی که از مرورگر می‌آید هرچه می‌خواهد باشد: `../../.env`، نامِ ویندوزیِ
+ * رزرو، یا دویست نویسه. تنها چیزی که از آن نگه می‌داریم حروف و رقم و نقطه
+ * است، و بعد `assertInside` دوباره می‌سنجد — دو لایه، چون این تنها جایی است
+ * که کاربر مستقیم روی دیسکِ پروژه می‌نویسد.
+ */
+export async function saveFixture(target, { name, bytes, note = '' }) {
+  const safe = String(name || '')
+    .replace(/\\/g, '/')
+    .split('/')
+    .pop()
+    .replace(/[^\p{L}\p{N}._-]+/gu, '-')
+    .replace(/^[.-]+/, '')
+    .slice(0, 120);
+  if (!safe) throw new Error('نامِ فایل معتبر نیست');
+  if (isSecretPath(safe)) throw new Error(`این نام شبیهِ فایلِ رازدار است: ${safe}`);
+
+  const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes || []);
+  if (!buffer.length) throw new Error('فایل خالی است');
+  if (buffer.length > MAX_BYTES) {
+    throw new Error(`فایل بزرگ‌تر از ${Math.round(MAX_BYTES / 1024 / 1024)} مگابایت است`);
+  }
+
+  const root = fixturesDir(target);
+  const file = path.join(root, safe);
+  assertInside(root, file);
+
+  await fsp.mkdir(root, { recursive: true });
+  await fsp.writeFile(file, buffer);
+  if (note) await setFixtureNote(target, safe, note);
+
+  return { relative: `fixtures/${safe}`, bytes: buffer.length };
+}
+
+export async function removeFixture(target, relative) {
+  const { file, relative: clean } = await resolveFixture(target, relative);
+  await fsp.rm(file, { force: true });
+  await setFixtureNote(target, clean, '');
+  return { relative: `fixtures/${clean}` };
+}
+
 export async function listFixtures(target) {
   const root = fixturesDir(target);
+  const notes = readFixtureNotes(target);
   const out = [];
 
   async function walk(dir, prefix = '') {
@@ -122,8 +208,10 @@ export async function listFixtures(target) {
         continue;
       }
       if (!entry.isFile() || isSecretPath(relative)) continue;
+      // دفترِ توضیح‌ها خودش fixture نیست و نباید در فهرست بیاید
+      if (relative === '_notes.json') continue;
       const stat = await fsp.stat(path.join(dir, entry.name)).catch(() => null);
-      if (stat) out.push({ relative: `fixtures/${relative}`, bytes: stat.size });
+      if (stat) out.push({ relative: `fixtures/${relative}`, bytes: stat.size, note: notes[relative] || '' });
     }
   }
 

@@ -23,7 +23,10 @@
   // svelte-ignore state_referenced_locally
   let accounts = $state(data.accounts || []);
 
-  let newAccount = $state({ id: '', email: '', passwordEnv: '', note: '' });
+  let newAccount = $state({ id: '', email: '', passwordEnv: '', password: '', note: '' });
+  /** آپلودِ fixture از خودِ صفحه. */
+  let newFixture = $state({ note: '' });
+  let fileInput = $state(null);
   let busy = $state('');
   let feedback = $state('');
   let error = $state('');
@@ -60,11 +63,82 @@
   }
 
   async function saveAccount() {
-    const payload = await send({ action: 'account-save', ...newAccount });
+    /**
+     * رمزِ متنی تأییدِ صریح می‌خواهد — و اینجا همان تأیید است.
+     *
+     * `saveAccount` بی `allowPlain` رمزِ متنی را رد می‌کند. کاربری که در
+     * کادرِ رمز چیزی نوشته، همان کار را خواسته؛ ولی باید **بداند** چه شد،
+     * نه اینکه بعداً در فایل کشفش کند.
+     */
+    const payload = await send({
+      action: 'account-save',
+      ...newAccount,
+      allowPlain: Boolean(newAccount.password),
+    });
     if (!payload) return;
     absorb(payload);
-    newAccount = { id: '', email: '', passwordEnv: '', note: '' };
-    feedback = 'حساب ثبت شد. رمز از متغیر محیطی خوانده می‌شود، نه از این فایل.';
+    const plain = Boolean(newAccount.password);
+    newAccount = { id: '', email: '', passwordEnv: '', password: '', note: '' };
+    feedback = plain
+      ? 'حساب ثبت شد. رمز متنی روی دیسک نشست — در `.gitignore` است و به گیت نمی‌رود.'
+      : 'حساب ثبت شد. رمز از متغیر محیطی خوانده می‌شود، نه از این فایل.';
+  }
+
+  /** آپلود از همین صفحه — نه «فایل را دستی در این مسیر بگذارید». */
+  async function uploadFixture() {
+    const file = fileInput?.files?.[0];
+    if (!file) return;
+
+    busy = 'fixture';
+    error = '';
+    feedback = '';
+    try {
+      const form = new FormData();
+      form.set('target', data.target);
+      form.set('file', file);
+      form.set('note', newFixture.note);
+
+      const response = await fetch('/api/fixtures', {
+        method: 'POST',
+        headers: { 'x-userbug-request': '1' },
+        body: form,
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'آپلود نشد');
+
+      fixtures = payload.fixtures;
+      feedback = `ذخیره شد: ${payload.saved.relative} — در سناریو با همین نام صدایش کنید.`;
+      newFixture = { note: '' };
+      if (fileInput) fileInput.value = '';
+    } catch (cause) {
+      error = cause.message;
+    } finally {
+      busy = '';
+    }
+  }
+
+  async function fixtureAction(action, relative, note = '') {
+    busy = 'fixture';
+    error = '';
+    try {
+      const form = new FormData();
+      form.set('target', data.target);
+      form.set('action', action);
+      form.set('relative', relative);
+      form.set('note', note);
+      const response = await fetch('/api/fixtures', {
+        method: 'POST',
+        headers: { 'x-userbug-request': '1' },
+        body: form,
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'انجام نشد');
+      fixtures = payload.fixtures;
+    } catch (cause) {
+      error = cause.message;
+    } finally {
+      busy = '';
+    }
   }
 
   const kb = (bytes) => (bytes < 1024 ? `${bytes} B` : `${Math.round(bytes / 1024)} KB`);
@@ -110,9 +184,11 @@
     برای حسابی که <strong>داده دارد</strong>، اینجا حساب ثبت کنید و در سناریو با
     <code>{'{{account.<شناسه>.email}}'}</code> استفاده‌اش کنید.
     <br />
-    <strong>رمز اینجا ذخیره نمی‌شود</strong> — فقط نامِ متغیر محیطی که رمز در آن است. این پروژه
-    حاضر نیست <code>.env</code> را بخواند تا به مدل بدهد؛ نوشتنِ رمزِ متنی روی دیسک با همان موضع
-    نمی‌خواند.
+    دو راه برای رمز: <strong>نامِ متغیر محیطی</strong> (پیشنهادی — رمز در
+    <code>.env</code> می‌ماند و اینجا فقط نامش) یا <strong>خودِ رمز</strong>
+    برای حسابِ آزمایشی. دومی متنی روی دیسک می‌نشیند؛ چون
+    <code>credentials.json</code> در <code>.gitignore</code> است به گیت نمی‌رود،
+    ولی هر کسی که به این ماشین دسترسی دارد می‌خواندش. برای حسابِ واقعی، اولی.
   </p>
 
   {#if accounts.length}
@@ -138,10 +214,17 @@
     </ul>
   {/if}
 
-  <div class="grid gap-2 sm:grid-cols-4">
+  <div class="grid gap-2 sm:grid-cols-3">
     <Input bind:value={newAccount.id} placeholder="شناسه (مثلاً admin)" disabled={Boolean(busy)} />
     <Input bind:value={newAccount.email} placeholder="ایمیل یا نام کاربری" disabled={Boolean(busy)} />
-    <Input bind:value={newAccount.passwordEnv} placeholder="نام متغیر محیطی" disabled={Boolean(busy)} />
+    <Input bind:value={newAccount.passwordEnv} placeholder="نام متغیر محیطی (پیشنهادی)" disabled={Boolean(busy)} />
+    <Input
+      type="password"
+      bind:value={newAccount.password}
+      placeholder="یا خودِ رمز — متنی روی دیسک"
+      disabled={Boolean(busy) || Boolean(newAccount.passwordEnv)}
+    />
+    <Input bind:value={newAccount.note} placeholder="این حساب برای چیست؟" disabled={Boolean(busy)} />
     <Button variant="outline" disabled={Boolean(busy) || !newAccount.id.trim()} onclick={saveAccount}>افزودن</Button>
   </div>
 </section>
@@ -149,22 +232,61 @@
 <section class="mb-6 rounded-xl border p-4">
   <h2 class="mb-1 text-sm font-bold">فایل‌های آپلود</h2>
   <p class="mb-3 text-xs leading-6 text-muted-foreground">
-    سناریو فقط از اینجا فایل آپلود می‌کند — چون آن رشته را ممکن است مدل نوشته باشد و مسیرِ آزاد
-    یعنی هر فایلی از دیسک قابل فرستادن است. فایل را در
-    <code class="break-all">{data.fixturesPath}</code> بگذارید تا در فهرست بیاید و مدل نامش را بداند.
+    سناریو <strong>فقط</strong> از اینجا فایل آپلود می‌کند — چون آن رشته را ممکن است
+    مدل نوشته باشد و مسیرِ آزاد یعنی هر فایلی از دیسک قابل فرستادن است. نامِ
+    فایل همان شناسه است: در سناریو با <code>{'file: fixtures/<نام>'}</code>
+    صدایش کنید. خزشِ نقشه هم همین را می‌فهمد، پس می‌شود دادهٔ اولیه را پیش از
+    گشتن به اپ داد.
   </p>
+
+  <div class="mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+    <input
+      bind:this={fileInput}
+      type="file"
+      disabled={Boolean(busy)}
+      class="rounded-md border bg-background px-2 py-1.5 text-xs file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs"
+    />
+    <Input bind:value={newFixture.note} placeholder="این فایل برای چیست؟ (اختیاری)" disabled={Boolean(busy)} />
+    <Button variant="outline" disabled={busy === 'fixture'} onclick={uploadFixture}>
+      {busy === 'fixture' ? 'در حال آپلود…' : 'آپلود'}
+    </Button>
+  </div>
+
   {#if fixtures.length}
-    <ul class="flex flex-wrap gap-2 text-sm">
+    <ul class="flex flex-col gap-1 text-sm">
       {#each fixtures as item (item.relative)}
-        <li class="rounded-lg border px-3 py-1.5">
-          <code>{item.relative}</code>
-          <span class="text-xs text-muted-foreground"> · {kb(item.bytes)}</span>
+        <li class="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-1.5">
+          <code class="text-xs">{item.relative}</code>
+          <span class="text-xs text-muted-foreground">{kb(item.bytes)}</span>
+          <span class="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+            {item.note || '— توضیحی ندارد'}
+          </span>
+          <button
+            class="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            disabled={Boolean(busy)}
+            onclick={() => {
+              const note = prompt('این فایل برای چیست؟', item.note || '');
+              if (note !== null) fixtureAction('note', item.relative, note);
+            }}>توضیح</button
+          >
+          <button
+            class="text-xs text-muted-foreground hover:text-destructive"
+            disabled={Boolean(busy)}
+            onclick={() => {
+              if (confirm(`${item.relative} پاک شود؟`)) fixtureAction('remove', item.relative);
+            }}>حذف</button
+          >
         </li>
       {/each}
     </ul>
   {:else}
-    <p class="text-sm text-muted-foreground">هنوز فایلی نیست. سناریوهای آپلود تا وقتی فایل نباشد اجرا نمی‌شوند.</p>
+    <p class="text-sm text-muted-foreground">
+      هنوز فایلی نیست. سناریوهای آپلود تا وقتی فایل نباشد اجرا نمی‌شوند.
+    </p>
   {/if}
+  <p class="mt-2 text-[11px] text-muted-foreground">
+    روی دیسک: <code class="break-all">{data.fixturesPath}</code>
+  </p>
 </section>
 
 <section class="mb-6 rounded-xl border p-4">

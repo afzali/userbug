@@ -28,6 +28,18 @@ if (!process.env.PORT) {
 
 process.env.ORIGIN ||= `http://127.0.0.1:${process.env.PORT}`;
 
+/**
+ * سقفِ بدنهٔ درخواست — برای آپلودِ fixture.
+ *
+ * پیش‌فرضِ `adapter-node` نیم‌مگابایت است و برای فرم‌های متنی کافی؛ ولی
+ * فایلی که سناریو آپلود می‌کند تا ۲۵ مگابایت مجاز است (`fixtures.js`) و
+ * بی این خط، هر فایلِ بزرگ‌تر از نیم‌مگ با خطای مبهمِ شبکه رد می‌شد.
+ *
+ * کمی بالاتر از سقفِ خودِ fixture، تا مرزِ واقعی همان‌جا باشد که پیامِ
+ * خوانا دارد.
+ */
+process.env.BODY_SIZE_LIMIT ||= String(28 * 1024 * 1024);
+
 await import('../build/index.js');
 const { shutdownJobs } = await import('../src/lib/server/jobs.js');
 
