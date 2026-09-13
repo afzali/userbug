@@ -197,6 +197,17 @@ function mergeFileList(existing = [], incoming = []) {
  * نوشته می‌شود. پرسشی که نگوید، جوابش فقط در فهرست می‌ماند و آدم بعداً
  * جاگذاری‌اش می‌کند.
  */
+/**
+ * «واژه: معنی» → واژه.
+ *
+ * یک تعریف، چون هم برای ساختنِ بند لازم است و هم برای پیدا کردنِ بندی که
+ * جوابِ قبلی ساخته بود. دو تعریف یعنی ویرایشی که بندِ قبلی را پیدا نمی‌کند.
+ */
+function termOf(answer) {
+  const [term, ...rest] = String(answer ?? '').split(/[:：\-—]/);
+  return rest.length ? term.trim() : '';
+}
+
 export function answerQuestion(dossier, question, answer) {
   const base = normalizeDossier(dossier, { target: dossier?.target });
   const text = String(answer ?? '').trim();
@@ -205,6 +216,29 @@ export function answerQuestion(dossier, question, answer) {
   const target = base.openQuestions.find((item) => item.q === question);
   if (!target) throw new Error(`چنین پرسشی در پرونده نیست: «${question}»`);
 
+  /**
+   * جوابِ قبلی — اگر بوده — پاک می‌شود، نه اینکه کنارش بنشیند.
+   *
+   * ── چرا لازم شد ──
+   *
+   * جواب دادن دوباره از اول ممکن بود (همین تابع فقط `answer` را می‌نویسد)،
+   * ولی اثرش نصفه بود: جوابِ تازه یک `risk` یا `glossary`ِ **تازه** می‌ساخت و
+   * قبلی سرِ جایش می‌ماند. یعنی اصلاحِ یک اشتباه، اشتباه را دو تا می‌کرد — و
+   * `risks` مستقیم به `explore.avoid` می‌رود، پس خزنده هم از چیزی دوری
+   * می‌کرد که کاربر پس گرفته بود.
+   *
+   * `summary` این مشکل را نداشت چون جایگزین می‌شد، نه افزوده.
+   */
+  const previous = String(target.answer ?? '').trim();
+  if (previous) {
+    if (target.field === 'risks') {
+      base.risks = base.risks.filter((item) => item.why !== `پاسخ به: ${question}`);
+    } else if (target.field === 'glossary') {
+      const staleTerm = termOf(previous);
+      if (staleTerm) base.glossary = base.glossary.filter((item) => item.term !== staleTerm);
+    }
+  }
+
   target.answer = text;
   target.answeredAt = new Date().toISOString();
 
@@ -212,8 +246,10 @@ export function answerQuestion(dossier, question, answer) {
   else if (target.field === 'risks') {
     base.risks.push({ label: text.slice(0, 120), why: `پاسخ به: ${question}`, by: 'user' });
   } else if (target.field === 'glossary') {
-    const [term, ...rest] = text.split(/[:：\-—]/);
-    if (rest.length) base.glossary.push({ term: term.trim(), meaning: rest.join('-').trim(), by: 'user' });
+    const term = termOf(text);
+    if (term) {
+      base.glossary.push({ term, meaning: text.split(/[:：\-—]/).slice(1).join('-').trim(), by: 'user' });
+    }
   }
 
   return normalizeDossier(base, { target: base.target });

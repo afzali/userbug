@@ -86,8 +86,9 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
                                   شناختی که از این پروژه داریم
       --json                      پروندهٔ خام، برای ابزارهای دیگر
       --history [n]               تاریخچهٔ تغییرِ شناخت، تازه‌ترین اول
-      --questions                 پرسش‌های بی‌جواب، شماره‌دار
-      --answer <شماره> --as <متن> ثبت جواب؛ تنها راهی که چیزی by:user می‌شود
+      --questions                 پرسش‌ها، شماره‌دار — بی‌جواب و جواب‌گرفته
+      --answer <شماره> --as <متن> ثبت یا **اصلاح** جواب؛ تنها راهی که چیزی
+                                  by:user می‌شود
 
   userbug docs <هدف>              مستنداتِ بیرونیِ این پروژه
       --add <آدرس> [--note <چرا>] واکشی و ذخیره؛ by: docs، نه by: user
@@ -118,6 +119,10 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --device <نام>              دستگاه
       --allow-destructive         کنشِ برگشت‌ناپذیر هم زده شود
       --show                      نقشهٔ موجود را نشان بده، بی‌خزش
+      --classify                  هر کنش چه می‌کند: از سورس، و برای باقی‌مانده
+                                  یک فراخوانی به ازای هر گره (کش‌شده)
+      --force                     طبقه‌بندیِ دوباره، حتی اگر مهرها بخورند
+      --model <اسلاگ>             مدلِ طبقه‌بندی؛ بر تنظیمات می‌چربد
 
   userbug checks <هدف>            چکِ همگانی: حالت، برخورد، و سروصدا
       --off <شناسه> --why <متن>   خاموش کردن؛ دلیل اجباری است
@@ -940,6 +945,67 @@ async function cmdMap({ flags, positional }) {
     return;
   }
 
+  /**
+   * طبقه‌بندی، جدا از خزش.
+   *
+   * ── چرا خودکار بعد از خزش انجام نمی‌شود ──
+   *
+   * تنها قدمِ مدل‌دارِ نقشه همین است. هر چیزی که پول خرج کند باید با یک
+   * پرچمِ صریح شروع شود، نه به‌عنوان دنبالهٔ چیزی که کاربر برای کارِ دیگری
+   * زده. همان موضعی که `--author` و تیکِ «سورس خوانده شود» دارند.
+   */
+  if (flags.classify) {
+    const { resolveSourceRoots } = await import('../src/source-access.js');
+    const { classifyMap } = await import('../src/map/classify-run.js');
+    const { mispredictions } = await import('../src/map/classify.js');
+
+    const project = await loadTarget(target);
+    const roots = await resolveSourceRoots({ key: target, source: project.source });
+    if (!roots.length) {
+      throw new Error(
+        `پروژهٔ «${target}» کلید source.root ندارد.\n` +
+          '  طبقه‌بندی از روی سورس است؛ بی سورس فقط حدسِ مدل می‌ماند و آن را نمی‌فروشیم.'
+      );
+    }
+
+    const models = resolveModel({
+      global: await loadGlobalConfig(),
+      role: 'analyze',
+      model: flags.model && flags.model !== true ? assertModelSlug(flags.model) : undefined,
+    });
+
+    console.log(`\n  طبقه‌بندی با ${models.model}\n`);
+    const { map, stats, spent, calls } = await classifyMap({
+      target,
+      roots,
+      models,
+      force: Boolean(flags.force),
+      onState: (event) => {
+        if (event.error) return console.log(`  ! ${event.state.route}: ${event.error.slice(0, 100)}`);
+        console.log(
+          `  ${event.state.route}${event.state.view ? ` ▸ ${event.state.view}` : ''}` +
+            `  قاعده ${event.rules} · مدل ${event.model}`
+        );
+      },
+    });
+
+    console.log(
+      `\n  ${stats.states} گره طبقه‌بندی شد · ${stats.skipped} دست‌نخورده (مهر می‌خورد)` +
+        `\n  قاعده ${stats.byRule} کنش · مدل ${stats.byModel} کنش · ${calls} فراخوانی · ${spent.toFixed(4)}$`
+    );
+    if (stats.failed) console.log(`  ${stats.failed} گره با خطای مدل رد شد`);
+
+    const wrong = mispredictions(map);
+    if (wrong.length) {
+      console.log(`\n  پیش‌بینی با واقعیت نخواند (${wrong.length}):`);
+      for (const row of wrong.slice(0, 10)) {
+        console.log(`    «${row.label.slice(0, 30)}» → پیش‌بینی ${row.predicted} · رسید ${row.actual}`);
+      }
+    }
+    console.log('');
+    return;
+  }
+
   const caps = {};
   for (const [flag, key] of [
     ['states', 'states'],
@@ -1073,27 +1139,56 @@ async function cmdKnowledge({ flags, positional }) {
   if (flags.answer !== undefined) {
     const dossier = readDossier(target);
     const open = dossier.openQuestions.filter((item) => !item.answer);
+    const answered = dossier.openQuestions.filter((item) => item.answer);
     const text = String(flags.as ?? '').trim();
     if (!text) throw new Error('جواب لازم است: --answer <شماره|متن> --as "<جواب>"');
 
+    /**
+     * شماره‌گذاری: اول بی‌جواب‌ها، بعد جواب‌گرفته‌ها.
+     *
+     * ── چرا جواب‌گرفته‌ها هم شماره می‌گیرند ──
+     *
+     * اصلاحِ جوابِ قبلی از اول ممکن بود، ولی فقط با تایپِ **متنِ کاملِ فارسیِ
+     * پرسش** — که یعنی عملاً ممکن نبود. همان استدلالی که شماره را برای
+     * بی‌جواب‌ها آورد، برای اصلاح هم برقرار است.
+     */
+    const all = [...open, ...answered];
     const index = Number(flags.answer);
-    const question = Number.isInteger(index) && index >= 1 ? open[index - 1]?.q : String(flags.answer);
-    if (!question) throw new Error(`پرسشِ شمارهٔ ${flags.answer} وجود ندارد؛ ${open.length} پرسشِ باز هست`);
+    const question = Number.isInteger(index) && index >= 1 ? all[index - 1]?.q : String(flags.answer);
+    if (!question) {
+      throw new Error(
+        `پرسشِ شمارهٔ ${flags.answer} وجود ندارد؛ ${open.length} بی‌جواب و ${answered.length} جواب‌گرفته هست`
+      );
+    }
 
+    const previous = dossier.openQuestions.find((item) => item.q === question)?.answer;
     await writeDossier(target, answerQuestion(dossier, question, text), {
       by: 'user',
-      why: 'پاسخ به پرسش',
+      why: previous ? 'اصلاح پاسخ' : 'پاسخ به پرسش',
     });
-    console.log(`\n  ثبت شد (by: user):\n    ${question}\n    → ${text}\n`);
+    console.log(`\n  ${previous ? 'اصلاح شد' : 'ثبت شد'} (by: user):\n    ${question}`);
+    if (previous) console.log(`    ✗ ${previous}`);
+    console.log(`    → ${text}\n`);
     return;
   }
 
   if (flags.questions) {
-    const open = readDossier(target).openQuestions.filter((item) => !item.answer);
-    if (!open.length) return console.log('\n  پرسشِ بی‌جوابی نیست.\n');
+    const questions = readDossier(target).openQuestions;
+    const open = questions.filter((item) => !item.answer);
+    const answered = questions.filter((item) => item.answer);
+    if (!questions.length) return console.log('\n  هیچ پرسشی در پرونده نیست.\n');
+
     console.log('');
     open.forEach((item, i) => console.log(`  ${String(i + 1).padStart(2)}. ${item.q}`));
-    console.log('\n  جواب: userbug knowledge <هدف> --answer <شماره> --as "<جواب>"\n');
+    if (!open.length) console.log('  پرسشِ بی‌جوابی نیست.');
+
+    if (answered.length) {
+      console.log('\n  جواب‌گرفته‌ها (با همین شماره‌ها قابل اصلاح‌اند):');
+      answered.forEach((item, i) =>
+        console.log(`  ${String(open.length + i + 1).padStart(2)}. ${item.q}\n      → ${item.answer}`)
+      );
+    }
+    console.log('\n  جواب یا اصلاح: userbug knowledge <هدف> --answer <شماره> --as "<جواب>"\n');
     return;
   }
 

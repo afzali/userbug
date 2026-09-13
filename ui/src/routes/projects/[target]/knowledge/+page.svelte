@@ -43,6 +43,8 @@
   let dryResult = $state(null);
   let showHistory = $state(false);
   let answers = $state({});
+  /** پرسشی که همین حالا در حالِ اصلاح است؛ رشتهٔ خالی یعنی هیچ‌کدام. */
+  let editing = $state('');
 
   const SOURCE_LABEL = { user: 'کاربر', tour: 'گشت', source: 'سورس', run: 'اجرا', docs: 'مستند', model: 'مدل' };
   /** کاربر برجسته می‌شود چون تنها منبعی است که قضاوتِ آدم پشتش است. */
@@ -114,14 +116,17 @@
       (payload.spent ? ` · ${payload.spent.toFixed(4)}$` : '');
   }
 
-  async function answer(question) {
+  async function answer(question, { edited = false } = {}) {
     const text = String(answers[question] ?? '').trim();
     if (!text) return;
     const payload = await send({ action: 'answer', question, answer: text });
     if (!payload) return;
     absorb(payload);
     answers = { ...answers, [question]: '' };
-    feedback = 'ثبت شد؛ این بند حالا by: user است و حدسِ مدل عوضش نمی‌کند.';
+    editing = '';
+    feedback = edited
+      ? 'جواب اصلاح شد؛ بندی که از جوابِ قبلی ساخته شده بود هم برداشته شد.'
+      : 'ثبت شد؛ این بند حالا by: user است و حدسِ مدل عوضش نمی‌کند.';
   }
 
 </script>
@@ -361,11 +366,53 @@
 </section>
 
 {#if answeredQuestions.length}
+  <!--
+    جوابِ ثبت‌شده باید قابلِ اصلاح باشد.
+
+    ── چرا فقط دیدن کافی نبود ──
+
+    جوابِ کاربر `by: user` می‌شود و هیچ حلقهٔ خودکاری عوضش نمی‌کند — که درست
+    است، ولی یعنی یک جوابِ عجولانه تا ابد می‌ماند و همه‌چیزِ پایین‌دستش
+    (پیشنهادها، `explore.avoid`، prompt مدل) رویش بنا می‌شود. چیزی که
+    تغییرناپذیر است باید دستِ‌کم به دستِ **خودِ آدم** تغییرپذیر باشد.
+  -->
   <section class="mb-6 rounded-xl border p-4">
-    <h2 class="mb-3 text-sm font-bold">پرسش‌های جواب‌گرفته</h2>
-    <ul class="flex flex-col gap-2 text-sm">
+    <h2 class="mb-1 text-sm font-bold">پرسش‌های جواب‌گرفته</h2>
+    <p class="mb-3 text-xs text-muted-foreground">
+      جوابِ شما <code>by: user</code> است و مدل عوضش نمی‌کند — ولی خودتان
+      می‌توانید. اصلاحِ جواب، بندی را که از جوابِ قبلی ساخته شده بود هم برمی‌دارد.
+    </p>
+    <ul class="flex flex-col gap-3 text-sm">
       {#each answeredQuestions as item (item.q)}
-        <li><span class="text-muted-foreground">{item.q}</span><br />← {item.answer}</li>
+        <li class="rounded-lg border p-3">
+          <span class="block text-muted-foreground">{item.q}</span>
+
+          {#if editing === item.q}
+            <div class="mt-2 flex flex-wrap gap-2">
+              <Input bind:value={answers[item.q]} disabled={Boolean(busy)} class="min-w-60 flex-1" />
+              <Button
+                size="sm"
+                disabled={Boolean(busy) || !String(answers[item.q] ?? '').trim()}
+                onclick={() => answer(item.q, { edited: true })}>ذخیره</Button
+              >
+              <Button size="sm" variant="ghost" disabled={Boolean(busy)} onclick={() => (editing = '')}>انصراف</Button>
+            </div>
+          {:else}
+            <div class="mt-1 flex flex-wrap items-baseline gap-2">
+              <span class="flex-1">← {item.answer}</span>
+              {#if item.answeredAt}
+                <span class="text-[11px] text-muted-foreground">{formatDate(item.answeredAt)}</span>
+              {/if}
+              <button
+                class="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                onclick={() => {
+                  editing = item.q;
+                  answers = { ...answers, [item.q]: item.answer };
+                }}>اصلاح</button
+              >
+            </div>
+          {/if}
+        </li>
       {/each}
     </ul>
   </section>

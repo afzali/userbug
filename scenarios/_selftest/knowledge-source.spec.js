@@ -189,3 +189,47 @@ test('جواب به پرسشی که نیست، بلند می‌شکند', () => 
   const current = normalizeDossier({ openQuestions: [] });
   expect(() => answerQuestion(current, 'نیست', 'چیزی')).toThrow(/پرسشی/);
 });
+
+/**
+ * اصلاحِ جواب — و اینکه جوابِ قبلی ردی از خودش نگذارد.
+ *
+ * ── چرا این مهم‌تر از یک ردیفِ تکراری است ──
+ *
+ * `risks` مستقیم به `explore.avoid` می‌رود. جوابی که کاربر پس گرفته ولی
+ * پاک نشده، یعنی خزنده و کاوشگر تا ابد از چیزی دوری می‌کنند که دیگر خطر
+ * نیست — و هیچ‌کس نمی‌فهمد چرا آن بخش از اپ هرگز آزموده نمی‌شود.
+ */
+test('اصلاحِ جواب، بندِ ساخته‌شده از جوابِ قبلی را هم برمی‌دارد', () => {
+  const current = normalizeDossier({
+    openQuestions: [{ q: 'چه چیزی خطرناک است؟', field: 'risks' }],
+  });
+
+  const first = answerQuestion(current, 'چه چیزی خطرناک است؟', 'ریست کامل');
+  expect(first.risks.map((item) => item.label)).toEqual(['ریست کامل']);
+
+  const fixed = answerQuestion(first, 'چه چیزی خطرناک است؟', 'حذف حساب');
+  expect(fixed.risks.map((item) => item.label)).toEqual(['حذف حساب']);
+  expect(fixed.openQuestions[0].answer).toBe('حذف حساب');
+});
+
+test('همین برای واژه‌نامه هم برقرار است', () => {
+  const current = normalizeDossier({
+    openQuestions: [{ q: 'واژهٔ کلیدی؟', field: 'glossary' }],
+  });
+
+  const first = answerQuestion(current, 'واژهٔ کلیدی؟', 'سند: یک فایل متنی');
+  expect(first.glossary.map((item) => item.term)).toEqual(['سند']);
+
+  const fixed = answerQuestion(first, 'واژهٔ کلیدی؟', 'کتاب: مجموعه‌ای از سندها');
+  expect(fixed.glossary.map((item) => item.term)).toEqual(['کتاب']);
+});
+
+test('و اصلاحِ summary جایگزین می‌شود، نه افزوده', () => {
+  const current = normalizeDossier({
+    summary: 'حدسِ مدل',
+    openQuestions: [{ q: 'این اپ چیست؟', field: 'summary' }],
+  });
+  const first = answerQuestion(current, 'این اپ چیست؟', 'ویرایشگر');
+  const fixed = answerQuestion(first, 'این اپ چیست؟', 'کتابخانه');
+  expect(fixed.summary).toBe('کتابخانه');
+});
