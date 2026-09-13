@@ -22,7 +22,29 @@
    * پروژه شروع کرده بود. ولی خودِ اجرا می‌داند مالِ کدام هدف است، پس همان را
    * می‌خوانیم.
    */
-  let target = $derived(page.params.target || page.data?.run?.target || '');
+  let known = $derived(page.params.target || page.data?.run?.target || '');
+
+  /**
+   * پروژه‌ای که تویش بودیم، روی صفحه‌های سراسری هم یادمان می‌ماند.
+   *
+   * ── چرا لازم شد ──
+   *
+   * `/settings` زیرِ `/projects/` نیست، پس با یک کلیک روی «تنظیمات» کلِ منوی
+   * پروژه ناپدید می‌شد: کاربر می‌رفت مدل را درست کند و راهِ برگشت به «چه باید
+   * آزمود» را گم می‌کرد. همان تلهٔ `/runs/<id>` بود که یک بار با خواندنِ هدف
+   * از خودِ اجرا حل شده بود.
+   *
+   * فقط برای همان صفحه‌های سراسری که از **داخلِ** پروژه باز می‌شوند. صفحهٔ
+   * فهرستِ پروژه‌ها و فرمِ پروژهٔ تازه عمداً بیرون‌اند: آنجا واقعاً از پروژه
+   * بیرون آمده‌ای.
+   */
+  let remembered = $state('');
+  $effect(() => {
+    if (known) remembered = known;
+  });
+
+  const KEEPS_PROJECT = new Set(['/settings']);
+  let target = $derived(known || (KEEPS_PROJECT.has(page.url.pathname) ? remembered : ''));
   let inProject = $derived(Boolean(target));
   let base = $derived(`/projects/${encodeURIComponent(target)}`);
   /** روی صفحهٔ اجرا هیچ‌کدام از ردیف‌ها فعال نیست؛ نشانِ جداگانه‌اش را می‌گذاریم. */

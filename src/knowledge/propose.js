@@ -33,6 +33,7 @@ import { loadScenarios } from '../scenario/load.js';
 import { normalizeRoutePath } from './schema.js';
 import { knowledgeDir, listPages, readDossier } from './store.js';
 import { readMap } from '../map/store.js';
+import { mergeActions } from '../map/state.js';
 
 /**
  * پیشنهادهای ردشده — `knowledge/<کلید>/dismissed.json`.
@@ -166,6 +167,45 @@ function mentionedIn(haystacks, words) {
 }
 
 /**
+ * یک نما، یک پیشنهاد — نه یک پیشنهاد به ازای هر حالتِ داخلی.
+ *
+ * ── چرا لازم شد، و چرا فقط با خطا معلوم شد ──
+ *
+ * مودالِ «تنظیمات هوش مصنوعی» سه تب دارد، و هر تب برای نقشه یک حالتِ جدا
+ * است (نمای نقش‌هایشان فرق می‌کند). ولی شناسهٔ پیشنهاد از `route|view`
+ * ساخته می‌شود، پس هر سه یک شناسه گرفتند.
+ *
+ * نتیجه‌اش در رابط یک شکستِ کامل بود، نه یک ردیفِ تکراری: فهرست با
+ * `{#each … (item.id)}` کلید می‌خورد و Svelte روی کلیدِ تکراری **رندر را
+ * می‌شکند**. آدرس عوض می‌شد و صفحه همان قبلی می‌ماند — که از بیرون شبیه
+ * «لینک کار نمی‌کند» بود.
+ *
+ * ادغام درست‌تر هم هست: کاربر نمی‌خواهد بداند مودال سه حالتِ داخلی دارد،
+ * می‌خواهد یک سناریو برای «افزودن کتاب جدید» داشته باشد. کوتاه‌ترین مسیر
+ * برنده است، چون همان مقدمهٔ سناریو می‌شود.
+ */
+function statesByView(map) {
+  const groups = new Map();
+
+  for (const state of map.states || []) {
+    const key = `${state.route}|${state.view || ''}`;
+    const previous = groups.get(key);
+    if (!previous) {
+      groups.set(key, state);
+      continue;
+    }
+
+    const shorter = (state.path?.length ?? Infinity) < (previous.path?.length ?? Infinity);
+    const merged = shorter ? { ...state } : { ...previous };
+    // کنش‌های همهٔ حالت‌های هم‌نما، یک‌جا: تبِ دوم هم چیزی برای گفتن دارد
+    merged.actions = mergeActions(previous.actions || [], state.actions || []);
+    groups.set(key, merged);
+  }
+
+  return [...groups.values()];
+}
+
+/**
  * پیشنهاد از روی نقشه.
  *
  * ── چرا نقشه چیزی می‌گوید که پرونده نمی‌گوید ──
@@ -185,7 +225,7 @@ function fromMap(target, { touched, haystacks }) {
   const map = readMap(target);
   const out = [];
 
-  for (const state of map.states || []) {
+  for (const state of statesByView(map)) {
     // حالتِ بی‌نما همان صفحه است و بند ۱ سراغش رفته
     if (!state.view) continue;
 

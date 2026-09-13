@@ -337,14 +337,37 @@ test.describe('انبار', () => {
           path: [],
           actions: [{ key: 'k0', kind: 'unknown', label: 'نوارِ کناری' }],
         },
+        /**
+         * همان مودال، با یک تبِ دیگر باز.
+         *
+         * برای نقشه حالتِ جداست (نمای نقش‌هایش فرق دارد) ولی برای پیشنهاد
+         * همان یکی است. نسخهٔ اول دو پیشنهاد با **یک شناسه** می‌ساخت و
+         * رابط با `each_key_duplicate` می‌شکست: آدرس عوض می‌شد و صفحه
+         * همان قبلی می‌ماند.
+         */
+        {
+          id: 'd',
+          route: '/contents',
+          view: 'افزودن کتاب جدید',
+          viewKind: 'dialog',
+          path: [{ click: { role: 'button', name: 'کتاب تازه' } }, { click: { role: 'tab', name: 'پیشرفته' } }],
+          actions: [{ key: 'k9', kind: 'unknown', label: 'آدرس فایل' }],
+        },
       ];
       await writeMap('demo', map);
 
       const { proposals } = proposalsFor('demo');
       const fromMap = proposals.filter((item) => item.kind === 'state');
 
+      // یک نما، یک پیشنهاد — هرچند نقشه دو حالت برایش دارد
       expect(fromMap).toHaveLength(1);
       expect(fromMap[0].title).toContain('افزودن کتاب جدید');
+      // و شناسه‌ها یکتا می‌مانند، وگرنه فهرستِ رابط بلند می‌شکند
+      expect(new Set(proposals.map((item) => item.id)).size).toBe(proposals.length);
+      // کوتاه‌ترین مسیر برنده است، چون همان مقدمهٔ سناریو می‌شود
+      expect(fromMap[0].preamble).toHaveLength(1);
+      // ولی کنشِ حالتِ دوم هم گم نمی‌شود
+      expect(fromMap[0].text).toContain('آدرس فایل');
       // مسیرِ رسیدن، همان‌طور که خزنده رفت
       expect(fromMap[0].preamble).toEqual([{ click: { role: 'button', name: 'کتاب تازه' } }]);
       // برچسبِ کنش‌ها در متن می‌آید تا مدل نامِ دکمه را حدس نزند
