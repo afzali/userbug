@@ -66,6 +66,16 @@
    *
    * «مقایسه» از اینجا رفت: دو اجرا لازم دارد و تا آن روز فقط یک ردیفِ مردهٔ
    * هم‌ردهٔ شناخت بود. جایش کنارِ فهرستِ اجراهاست، جایی که معنا دارد.
+   *
+   * ── چرا هر ردیف زیرنویس دارد ──
+   *
+   * نامِ کوتاه کارِ بخش را نمی‌گوید. «تریاژ»، «چه باید آزمود» و «حساب و چک»
+   * برای کسی که این ابزار را نساخته هیچ معنایی ندارند، و گروه‌بندی فقط
+   * ترتیب را حل کرد نه معنا را.
+   *
+   * دو لایه: `hint` همیشه دیده می‌شود و در سه چهار واژه می‌گوید اینجا چیست؛
+   * `title` روی hover جملهٔ کامل را می‌دهد. زیرنویس از `lg` به بالا می‌آید،
+   * چون روی موبایل منو یک نوارِ افقی است و آنجا جا ندارد.
    */
   let nav = $derived(
     inProject
@@ -73,31 +83,100 @@
           {
             label: 'شناختن',
             items: [
-              { href: `${base}/tour`, label: 'گشت زنده', icon: '◉' },
-              { href: `${base}/map`, label: 'نقشهٔ اپ', icon: '⬡' },
-              { href: `${base}/knowledge`, label: 'شناخت', icon: '◈' },
+              {
+                href: `${base}/tour`,
+                label: 'گشت زنده',
+                icon: '◉',
+                hint: 'با هم در اپ بگردیم',
+                title: 'مرورگر باز می‌شود و شما می‌رانید؛ ابزار تماشا می‌کند، صفحه‌ها را ثبت می‌کند و قدم‌ها را یاد می‌گیرد.',
+              },
+              {
+                href: `${base}/map`,
+                label: 'نقشهٔ اپ',
+                icon: '⬡',
+                hint: 'هر جا که می‌شود رفت',
+                title: 'مرورگر خودش هر دکمهٔ امن را می‌زند و می‌نویسد از کجا به کجا می‌رسد — صفحه‌ها، و مودال‌هایی که آدرس ندارند. بی هوش مصنوعی.',
+              },
+              {
+                href: `${base}/knowledge`,
+                label: 'شناخت',
+                icon: '◈',
+                hint: 'آنچه از اپ می‌دانیم',
+                title: 'مسیرها، واژه‌ها، کارهای خطرناک و پرسش‌های بی‌جواب — با اینکه هر بند از کجا آمده: کاربر، گشت، سورس یا مدل.',
+              },
             ],
           },
           {
             label: 'آزمودن',
             items: [
-              { href: `${base}/proposals`, label: 'چه باید آزمود', icon: '◎' },
-              { href: `${base}/files`, label: 'سناریوها', icon: '⌘' },
-              { href: base, label: 'اجرا', icon: '▶', exact: true },
+              {
+                href: `${base}/proposals`,
+                label: 'چه باید آزمود',
+                icon: '◎',
+                hint: 'شکافِ آزموده‌نشده',
+                title: 'آنچه می‌دانیم، منهای آنچه سناریوهای موجود لمس می‌کنند. هیچ مدلی اینجا صدا زده نمی‌شود؛ مدل وقتی می‌آید که «بساز» بزنید.',
+              },
+              {
+                href: `${base}/files`,
+                label: 'سناریوها',
+                icon: '⌘',
+                hint: 'نوشتن و ویرایش',
+                title: 'فایل‌های سناریو و کانفیگ پروژه — دیدن، ویرایش، و ساختِ سناریوی تازه از متنِ ساده.',
+              },
+              {
+                href: base,
+                label: 'اجرا',
+                icon: '▶',
+                exact: true,
+                hint: 'اجرا و جریان زنده',
+                title: 'شروعِ اجرا، دیدنِ قدم‌به‌قدم با عکس و خطا، و تاریخچهٔ اجراهای این پروژه.',
+              },
             ],
           },
-          { label: 'یافته‌ها', items: [{ href: `${base}/triage`, label: 'تریاژ', icon: '◇' }] },
+          {
+            label: 'یافته‌ها',
+            items: [
+              {
+                href: `${base}/triage`,
+                label: 'تریاژ',
+                icon: '◇',
+                hint: 'ایرادها و وضعیتشان',
+                title: 'هر نقص یک ردیف، ادغام‌شده در همهٔ اجراها: باز، پذیرفته‌شده، رفع‌شده یا نادیده. قضاوتِ شما به شناخت هم برمی‌گردد.',
+              },
+            ],
+          },
           {
             label: 'پیکربندی',
-            items: [{ href: `${base}/config`, label: 'حساب و چک', icon: '⚒' }],
+            items: [
+              {
+                href: `${base}/config`,
+                label: 'حساب و چک',
+                icon: '⚒',
+                hint: 'تنظیماتِ این پروژه',
+                title: 'حساب‌های ذخیره‌شده، فایل‌هایی که سناریو آپلود می‌کند، و چک‌هایی که روی هر اجرا اجرا می‌شوند.',
+              },
+            ],
           },
         ]
       : [
           {
             label: '',
             items: [
-              { href: '/', label: 'پروژه‌ها', icon: '◫', exact: true },
-              { href: '/projects/new', label: 'پروژهٔ تازه', icon: '＋' },
+              {
+                href: '/',
+                label: 'پروژه‌ها',
+                icon: '◫',
+                exact: true,
+                hint: 'همهٔ اپ‌های تحت تست',
+                title: 'فهرست پروژه‌ها، با آخرین اجرای هرکدام.',
+              },
+              {
+                href: '/projects/new',
+                label: 'پروژهٔ تازه',
+                icon: '＋',
+                hint: 'وصل کردن اپِ تازه',
+                title: 'آدرس فرانت و API، محیط، دستگاه، مسیر لاگ‌ها و پوشهٔ سورس.',
+              },
             ],
           },
         ]
@@ -109,7 +188,13 @@
    * زیرِ «یافته‌ها» نشسته بود و آن غلط بود. ولی از منو هم نمی‌شود برداشتش:
    * خطای مدل وسطِ کار پیدا می‌شود، نه در صفحهٔ اولِ فهرست پروژه‌ها.
    */
-  const settingsLink = { href: '/settings', label: 'تنظیمات', icon: '⚙' };
+  const settingsLink = {
+    href: '/settings',
+    label: 'تنظیمات',
+    icon: '⚙',
+    hint: 'کلید و مدلِ هوش مصنوعی',
+    title: 'کلید OpenRouter، مدلِ هر نقش، و سقفِ بودجه — برای همهٔ پروژه‌ها.',
+  };
 
   onMount(() => {
     dark = document.documentElement.classList.contains('dark');
@@ -126,13 +211,42 @@
   }
 </script>
 
+<!--
+  یک ردیفِ منو.
+
+  `title` جملهٔ کامل است و `hint` سه چهار واژه — و هر دو لازم‌اند: اولی روی
+  hover می‌آید و روی لمس هیچ‌وقت، دومی همیشه هست ولی جا برای توضیح ندارد.
+-->
+{#snippet row(item)}
+  <a
+    href={item.href}
+    title={item.title}
+    class={`flex shrink-0 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${isActive(item) ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`}
+    aria-current={isActive(item) ? 'page' : undefined}
+  >
+    <span class="grid size-6 shrink-0 place-items-center text-base" aria-hidden="true">{item.icon}</span>
+    <span class="min-w-0">
+      {item.label}
+      {#if item.hint}
+        <span class="hidden truncate text-[11px] font-normal opacity-70 lg:block">{item.hint}</span>
+      {/if}
+    </span>
+  </a>
+{/snippet}
+
 <svelte:head>
   <title>userbug · رابط آزمون کاربر</title>
   <meta name="description" content="رابط محلی اجرای سناریوها و تریاژ یافته‌های userbug" />
 </svelte:head>
 
 <div class="min-h-screen bg-background lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
-  <aside class="z-20 border-b bg-sidebar text-sidebar-foreground lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-l">
+  <!--
+    ستون، تا منو بتواند اسکرول شود.
+
+    با زیرنویسِ هر ردیف، منو بلندتر از یک صفحه می‌شود و بی این، کارتِ پایین
+    از صفحه بیرون می‌زد.
+  -->
+  <aside class="z-20 border-b bg-sidebar text-sidebar-foreground lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-b-0 lg:border-l">
     <div class="flex items-center justify-between gap-3 px-4 py-4 lg:px-5 lg:py-6">
       <a href="/" class="flex items-center gap-3">
         <span class="grid size-10 place-items-center rounded-xl bg-sidebar-primary text-lg font-black text-sidebar-primary-foreground shadow-sm">u</span>
@@ -161,7 +275,7 @@
       روی موبایل یک نوارِ افقی است و عنوانِ گروه جا نمی‌گیرد؛ آنجا گروه‌ها
       فقط با فاصله از هم جدا می‌شوند. عنوان از `lg` به بالا می‌آید.
     -->
-    <nav class="scroll-thin flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:gap-0 lg:overflow-visible lg:px-4">
+    <nav class="scroll-thin flex gap-1 overflow-x-auto px-3 pb-3 lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-0 lg:overflow-y-auto lg:px-4">
       {#each nav as group (group.label)}
         {#if group.label}
           <p class="mt-3 mb-1 hidden px-3 text-[11px] font-medium tracking-wide text-muted-foreground/70 first:mt-0 lg:block">
@@ -169,15 +283,11 @@
           </p>
         {/if}
         {#each group.items as item (item.href)}
-          <a href={item.href} class={`flex shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive(item) ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`} aria-current={isActive(item) ? 'page' : undefined}>
-            <span class="grid size-6 place-items-center text-base" aria-hidden="true">{item.icon}</span>{item.label}
-          </a>
+          {@render row(item)}
         {/each}
       {/each}
 
-      <a href={settingsLink.href} class={`mt-1 flex shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors lg:mt-3 lg:border-t lg:pt-3 ${isActive(settingsLink) ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`} aria-current={isActive(settingsLink) ? 'page' : undefined}>
-        <span class="grid size-6 place-items-center text-base" aria-hidden="true">{settingsLink.icon}</span>{settingsLink.label}
-      </a>
+      <div class="shrink-0 lg:mt-3 lg:border-t lg:pt-3">{@render row(settingsLink)}</div>
     </nav>
 
     <div class="mx-4 mt-auto hidden rounded-xl border bg-background/60 p-4 text-xs leading-6 text-muted-foreground lg:block">
