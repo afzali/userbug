@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "path": "/lock",
+  "title": "قفل شده",
+  "purpose": "",
+  "domSignature": "",
+  "stale": false,
+  "shot": "shots/30--lock.png",
+  "contract": {
+    "mode": "watch",
+    "must": [
+      {
+        "role": "button",
+        "name": "آفلاین",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "label": "رمز عبور",
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "باز کردن قفل",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "خروج (ورود با حساب دیگر)",
+        "exact": true,
+        "visible": true
+      }
+    ],
+    "seenIn": 1,
+    "lastSeen": "2026-09-13T06:23:50.654Z",
+    "approvedBy": null
+  },
+  "by": "tour"
+}

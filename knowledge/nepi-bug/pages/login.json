@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "path": "/login",
+  "title": "",
+  "purpose": "",
+  "domSignature": "",
+  "stale": false,
+  "shot": "shots/04--login.png",
+  "contract": {
+    "mode": "watch",
+    "must": [
+      {
+        "role": "button",
+        "name": "نپی",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "فراموشی رمز عبور؟",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "کپی کد",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "دانلود به‌شکل فایل",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "label": "کد بازیابی را در جای مطمئنی ذخیره کردم.",
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "ادامه",
+        "exact": true,
+        "visible": true
+      }
+    ],
+    "seenIn": 1,
+    "lastSeen": "2026-09-13T06:23:50.576Z",
+    "approvedBy": null
+  },
+  "by": "tour"
+}

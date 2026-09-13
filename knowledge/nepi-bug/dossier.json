@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "target": "nepi-bug",
+  "updatedAt": "2026-09-13T06:29:53.449Z",
+  "summary": "",
+  "stack": {
+    "framework": "",
+    "language": "",
+    "backend": "",
+    "db": "",
+    "by": "model"
+  },
+  "auth": {
+    "kind": "unknown",
+    "loginPath": "",
+    "signupOpen": null,
+    "logoutLabel": "",
+    "sessionStore": "",
+    "by": "model"
+  },
+  "routes": [
+    {
+      "path": "/login",
+      "title": "",
+      "purpose": "",
+      "requiresAuth": null,
+      "sourceFile": "",
+      "by": "tour"
+    },
+    {
+      "path": "/contents",
+      "title": "مدیریت فایل‌ها :: نپی",
+      "purpose": "",
+      "requiresAuth": null,
+      "sourceFile": "",
+      "by": "tour"
+    },
+    {
+      "path": "/content/d3110258d4",
+      "title": "خاطرات",
+      "purpose": "",
+      "requiresAuth": null,
+      "sourceFile": "",
+      "by": "tour"
+    },
+    {
+      "path": "/content/8869f8b6db",
+      "title": "گزيده نهج البلاغه",
+      "purpose": "",
+      "requiresAuth": null,
+      "sourceFile": "",
+      "by": "tour"
+    },
+    {
+      "path": "/lock",
+      "title": "قفل شده",
+      "purpose": "",
+      "requiresAuth": null,
+      "sourceFile": "",
+      "by": "tour"
+    },
+    {
+      "path": "/",
+      "title": "",
+      "purpose": "",
+      "requiresAuth": null,
+      "sourceFile": "",
+      "by": "run"
+    }
+  ],
+  "glossary": [],
+  "entities": [],
+  "flows": [],
+  "files": {
+    "uploads": [],
+    "downloads": []
+  },
+  "risks": [],
+  "openQuestions": [
+    {
+      "q": "صفحهٔ / برای چیست؟",
+      "answer": null,
+      "field": "",
+      "askedAt": "2026-09-13T06:29:53.447Z",
+      "answeredAt": "",
+      "asked": 1
+    }
+  ],
+  "sources": [
+    {
+      "kind": "tour",
+      "id": "2026-09-13T06-16-51_nepi-bug_3cd800c7",
+      "at": "2026-09-13T06:23:50.688Z",
+      "note": "55 قدم"
+    }
+  ]
+}
