@@ -59,6 +59,48 @@
    */
   let blank = $derived(!project.scenarios?.length && !runs.length && !job);
 
+  let runSearch = $state('');
+  let runKind = $state('all');
+  let runFindings = $state('all');
+  let runSort = $state('new');
+
+  let filtered = $derived(
+    Boolean(runSearch.trim()) || runKind !== 'all' || runFindings !== 'all' || runSort !== 'new'
+  );
+
+  function resetRunFilters() {
+    runSearch = '';
+    runKind = 'all';
+    runFindings = 'all';
+    runSort = 'new';
+  }
+
+  /**
+   * فیلتر و مرتب‌سازی روی همان داده‌ای که از قبل هست.
+   *
+   * `kind` برای اجراهای قدیمی نیست؛ نبودش یعنی «اجرای سناریو»، چون تا پیش
+   * از آمدنِ گشت و خزش همه همین بودند.
+   */
+  let visibleRuns = $derived.by(() => {
+    const needle = runSearch.trim().toLowerCase();
+    const rows = runs.filter((run) => {
+      if (runKind !== 'all' && (run.kind || 'run') !== runKind) return false;
+      if (runFindings === 'with' && !run.findings) return false;
+      if (runFindings === 'without' && run.findings) return false;
+      if (!needle) return true;
+      return `${run.runId} ${(run.scenarios || []).join(' ')}`.toLowerCase().includes(needle);
+    });
+
+    const at = (run) => Date.parse(run.startedAt || '') || 0;
+    const order = {
+      new: (a, b) => at(b) - at(a),
+      old: (a, b) => at(a) - at(b),
+      findings: (a, b) => (b.findings || 0) - (a.findings || 0) || at(b) - at(a),
+      steps: (a, b) => (b.steps || 0) - (a.steps || 0) || at(b) - at(a),
+    };
+    return rows.toSorted(order[runSort] || order.new);
+  });
+
   /**
    * پنج قدمِ مسیر، با وضعیتِ واقعی‌شان.
    *
@@ -541,14 +583,65 @@
               مقایسهٔ دو اجرا
             </Button>
           {/if}
-          <Badge variant="outline">{formatNumber(runs.length)} اجرا</Badge>
+          <Badge variant="outline">
+            {visibleRuns.length === runs.length
+              ? `${formatNumber(runs.length)} اجرا`
+              : `${formatNumber(visibleRuns.length)} از ${formatNumber(runs.length)}`}
+          </Badge>
         </div>
       </div>
+
+      <!--
+        فیلتر و مرتب‌سازی.
+
+        ── چرا لازم شد ──
+
+        فهرست فقط از نو به کهنه ریخته می‌شد و بس. با چهل اجرا — که بعد از چند
+        روز کارِ عادی است — پیدا کردنِ «آن گشتی که دیروز رفتم» یعنی اسکرول
+        کردن و خواندنِ شناسه‌ها.
+
+        محورها همان‌هایی‌اند که آدم واقعاً با آن‌ها می‌گردد: **نوع** (اجرا،
+        گشت، خزش)، **یافته داشت یا نه**، و جست‌وجو روی شناسه و سناریو. همه
+        سمتِ کلاینت، روی داده‌ای که از قبل بارگذاری شده — پس فیلتر کردن
+        درخواستی به سرور نمی‌زند.
+      -->
+      {#if runs.length > 3}
+        <div class="mb-4 flex flex-wrap items-center gap-2">
+          <Input bind:value={runSearch} placeholder="جست‌وجو در شناسه یا سناریو…" class="h-8 w-52" />
+          <select bind:value={runKind} class="h-8 rounded-md border bg-background px-2 text-xs">
+            <option value="all">همهٔ انواع</option>
+            <option value="run">اجرای سناریو</option>
+            <option value="tour">گشت</option>
+            <option value="map">خزشِ نقشه</option>
+          </select>
+          <select bind:value={runFindings} class="h-8 rounded-md border bg-background px-2 text-xs">
+            <option value="all">با و بی یافته</option>
+            <option value="with">فقط یافته‌دارها</option>
+            <option value="without">فقط بی‌یافته‌ها</option>
+          </select>
+          <select bind:value={runSort} class="h-8 rounded-md border bg-background px-2 text-xs">
+            <option value="new">تازه‌ترین اول</option>
+            <option value="old">قدیمی‌ترین اول</option>
+            <option value="findings">پریافته‌ترین اول</option>
+            <option value="steps">پرقدم‌ترین اول</option>
+          </select>
+          {#if filtered}
+            <button class="text-xs text-muted-foreground underline underline-offset-2" onclick={resetRunFilters}>
+              پاک کردن فیلترها
+            </button>
+          {/if}
+        </div>
+      {/if}
+
       <div class="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-        {#each runs as run (run.runId)}
+        {#each visibleRuns as run (run.runId)}
           <!-- حذف در همان لحظه از فهرست برداشته می‌شود، نه با بارگذاری دوبارهٔ صفحه -->
           <RunCard {run} onRemoved={(id) => (runs = runs.filter((item) => item.runId !== id))} />
-        {:else}<p class="rounded-xl border border-dashed p-10 text-center text-muted-foreground md:col-span-2">هنوز اجرایی ثبت نشده است.</p>{/each}
+        {:else}
+          <p class="rounded-xl border border-dashed p-10 text-center text-muted-foreground md:col-span-2">
+            {runs.length ? 'هیچ اجرایی با این فیلترها نیست.' : 'هنوز اجرایی ثبت نشده است.'}
+          </p>
+        {/each}
       </div>
     </div>
   </section>

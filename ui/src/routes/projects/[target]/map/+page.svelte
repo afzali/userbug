@@ -259,10 +259,19 @@
           <Card.Title class="text-sm">قدم بعد</Card.Title>
         </Card.Header>
         <Card.Content class="space-y-2">
-          <Button href={`${base}/proposals`} class="w-full" size="sm">ببین چه باید آزمود</Button>
+          <Button href={`${base}/proposals`} class="w-full" size="sm">
+            {data.fromMap
+              ? `${data.fromMap} سناریوی پیشنهادی از این نقشه`
+              : 'ببین چه باید آزمود'}
+          </Button>
           <p class="text-[11px] leading-5 text-muted-foreground">
-            هر نمایی که نقشه پیدا کرده و هیچ سناریویی سراغش نمی‌رود، یک
-            پیشنهاد می‌شود — با مسیرِ واقعیِ رسیدن به آن، نه حدسِ مدل.
+            {#if data.fromMap}
+              هر کدام با <strong>مسیرِ واقعیِ رسیدن</strong> ساخته می‌شود، نه حدسِ
+              مدل — پس سناریویی که درمی‌آید واقعاً به آن نما می‌رسد.
+            {:else}
+              هر نمایی که نقشه پیدا کند و هیچ سناریویی سراغش نرود، یک پیشنهاد
+              می‌شود. فعلاً همه پوشش دارند.
+            {/if}
           </p>
         </Card.Content>
       </Card.Root>

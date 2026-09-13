@@ -284,7 +284,11 @@ function fromMap(target, { touched, haystacks }) {
       kind: 'state',
       title: `«${state.view}» آزموده نمی‌شود`,
       why: `نقشه این نما را روی ${state.route} دیده و هیچ سناریویی سراغش نمی‌رود.`,
-      evidence: `${actions.length} کنش، ${tried} امتحان‌شده · ${state.path?.length || 0} قدم تا اینجا`,
+      evidence:
+        `${actions.length} کنش، ${tried} امتحان‌شده · ${state.path?.length || 0} قدم تا اینجا` +
+        // «از کجا آمده» همان‌قدر لازم است که خودِ پیشنهاد: بی آن، کاربر
+        // نمی‌داند این ردیف حاصلِ کدام خزش است و چقدر تازه
+        (map.updatedAt ? ` · از خزشِ ${map.updatedAt.slice(0, 10)}` : ''),
       routes: [state.route],
       // مسیرِ قطعی، نه متن: مصرف‌کننده‌اش `scenarioFromText` است
       preamble: state.path || [],

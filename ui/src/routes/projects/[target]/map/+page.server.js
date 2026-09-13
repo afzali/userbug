@@ -2,6 +2,7 @@ import { readMap } from '../../../../../../src/map/store.js';
 import { extraRoutes, stuckAtLogin, unreachedRoutes } from '../../../../../../src/map/render.js';
 import { mispredictions } from '../../../../../../src/map/classify.js';
 import { readDossier } from '../../../../../../src/knowledge/store.js';
+import { proposalsFor } from '../../../../../../src/knowledge/propose.js';
 import { listScenarios } from '$lib/server/projects.js';
 import { loadScenario } from '../../../../../../src/scenario/load.js';
 import { unsupportedVerbs } from '../../../../../../src/map/replay.js';
@@ -57,6 +58,13 @@ export async function load({ params }) {
      * می‌کند اپش همین‌قدر است.
      */
     stuck: map ? safely(() => stuckAtLogin(map, { loginPath }), false) : false,
+    /**
+     * چند پیشنهاد از **همین نقشه** درآمده.
+     *
+     * پیوندِ خنثی به «چه باید آزمود» چیزی نمی‌گفت. عدد می‌گوید خزش واقعاً
+     * چه چیزی تولید کرده — و اگر صفر باشد، همان صفر هم یک خبر است.
+     */
+    fromMap: safely(() => proposalsFor(target).proposals.filter((item) => item.kind === 'state').length, 0),
     /**
      * کدام سناریو **واقعاً** می‌تواند مسیرِ ورود باشد.
      *
