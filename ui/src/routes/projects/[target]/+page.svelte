@@ -473,7 +473,22 @@
       <Card.Root class="overflow-hidden gap-0 py-0">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
           <div class="flex items-center gap-3"><StatusBadge status={job.status === 'finished' ? job.outcome : job.status} /><span class="code-value text-muted-foreground">{job.id}</span></div>
-          {#if activeRun}<Button href={`/runs/${encodeURIComponent(activeRun)}`} variant="outline" size="sm">صفحهٔ اجرا</Button>{/if}
+          <div class="flex items-center gap-2">
+            <!--
+              اجرا که تمام شد، قدمِ بعد تریاژ است.
+
+              پیش‌تر فقط «صفحهٔ اجرا» بود — که روایتِ همین یک اجراست. ولی
+              کارِ بعدی خواندنِ روایت نیست، قضاوت دربارهٔ یافته‌هاست؛ و آن
+              قضاوت به شناخت برمی‌گردد. دکمه فقط وقتی می‌آید که واقعاً
+              یافته‌ای باشد.
+            -->
+            {#if !busy && liveFindings.length}
+              <Button href={`/projects/${encodeURIComponent(target)}/triage`} size="sm">
+                تریاژِ {formatNumber(liveFindings.length)} یافته
+              </Button>
+            {/if}
+            {#if activeRun}<Button href={`/runs/${encodeURIComponent(activeRun)}`} variant="outline" size="sm">صفحهٔ اجرا</Button>{/if}
+          </div>
         </div>
         <div class="grid gap-0 md:grid-cols-[minmax(0,1fr)_18rem]">
           <div class="min-h-80 p-5">

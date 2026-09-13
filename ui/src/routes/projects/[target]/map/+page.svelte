@@ -177,6 +177,26 @@
     </Card.Root>
 
     {#if hasMap}
+      <!--
+        قدمِ بعد.
+
+        نقشه تا امروز هیچ پایانی نداشت: عدد نشان می‌داد و رها می‌کرد. ولی
+        ارزشش در چیزی است که بعدش ممکن می‌شود — هر مودالی که پیدا شده، یک
+        پیشنهادِ سناریو با مسیرِ رسیدنش.
+      -->
+      <Card.Root>
+        <Card.Header class="pb-3">
+          <Card.Title class="text-sm">قدم بعد</Card.Title>
+        </Card.Header>
+        <Card.Content class="space-y-2">
+          <Button href={`${base}/proposals`} class="w-full" size="sm">ببین چه باید آزمود</Button>
+          <p class="text-[11px] leading-5 text-muted-foreground">
+            هر نمایی که نقشه پیدا کرده و هیچ سناریویی سراغش نمی‌رود، یک
+            پیشنهاد می‌شود — با مسیرِ واقعیِ رسیدن به آن، نه حدسِ مدل.
+          </p>
+        </Card.Content>
+      </Card.Root>
+
       <Card.Root>
         <Card.Header><Card.Title class="text-sm">عددها</Card.Title></Card.Header>
         <Card.Content class="space-y-2 text-sm">

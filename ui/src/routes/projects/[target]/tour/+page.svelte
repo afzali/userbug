@@ -287,16 +287,28 @@
       </p>
 
       <!--
-        قدمِ بعد، صریح.
+        قدمِ بعد، صریح — و از آمدنِ نقشه، **نقشه**.
 
-        تا امروز گشت اینجا تمام می‌شد: گزارش می‌داد و رها می‌کرد. ولی کلِ
-        ارزشِ گشت در چیزی است که **بعدش** ممکن می‌شود — شناختی که حالا پر
-        شده، به فهرستِ «چه باید آزمود» تبدیل می‌شود.
+        این بلوک پیش از نقشه نوشته شده بود و مستقیم به «چه باید آزمود»
+        می‌فرستاد. حالا آن پرش یک قدم را جا می‌اندازد: گشت فقط جایی را
+        می‌شناسد که کاربر برد، و پیشنهادها روی همان شناختِ ناقص بنا می‌شوند.
+        نقشه بقیهٔ اپ را پیدا می‌کند و پیشنهادها را چند برابر می‌کند — و
+        هیچ هزینهٔ مدلی هم ندارد.
+
+        و مسیرِ ورودِ نقشه دقیقاً از همین‌جا می‌آید: سناریویی که همین گشت
+        ضبط کرد.
       -->
-      <div class="mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
-        <span class="text-xs text-muted-foreground">قدم بعد:</span>
-        <Button href={`/projects/${data.target}/proposals`} size="sm">ببین چه باید آزمود</Button>
-        <Button href={`/projects/${data.target}/knowledge`} size="sm" variant="outline">شناختِ ساخته‌شده</Button>
+      <div class="mt-4 border-t pt-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs text-muted-foreground">قدم بعد:</span>
+          <Button href={`/projects/${data.target}/map`} size="sm">نقشهٔ اپ را بکش</Button>
+          <Button href={`/projects/${data.target}/knowledge`} size="sm" variant="outline">شناختِ ساخته‌شده</Button>
+        </div>
+        <p class="mt-2 text-xs leading-6 text-muted-foreground">
+          گشت آن‌جایی را می‌شناسد که <strong>شما</strong> بردید. نقشه بقیه را
+          خودش می‌گردد — بی هوش مصنوعی — و بعد «چه باید آزمود» فهرستِ کامل‌تری
+          می‌دهد.
+        </p>
       </div>
     {/if}
   </section>

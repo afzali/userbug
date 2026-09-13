@@ -145,6 +145,13 @@
     <Button disabled={Boolean(busy)} onclick={() => digest({ dry: false })}>
       {busy === 'digest' ? 'در حال خواندن…' : started ? 'به‌روزرسانی از سورس' : 'ساختِ شناخت از سورس'}
     </Button>
+    <!--
+      قدمِ بعد از شناخت، «چه باید آزمود» است.
+
+      این صفحه می‌گوید چه می‌دانیم؛ آن یکی می‌گوید از آنچه می‌دانیم، چه چیزی
+      آزموده نشده. بی این دکمه، صفحه در خودش تمام می‌شد.
+    -->
+    <Button href={`/projects/${encodeURIComponent(data.target)}/proposals`} variant="outline">چه باید آزمود</Button>
     <!-- حساب‌ها، fixtureها و چک‌ها از این صفحه رفتند؛ راهِ رسیدن نباید برود -->
     <Button href={`/projects/${encodeURIComponent(data.target)}/config`} variant="ghost">حساب و چک</Button>
   {/snippet}

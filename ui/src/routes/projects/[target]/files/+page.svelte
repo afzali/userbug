@@ -199,7 +199,16 @@
   description={data.kind === 'target'
     ? 'آدرس فرانت و API، محیط، دستگاه، مسیر لاگ‌ها و پوشهٔ سورس — همه در همین فایل.'
     : 'ویرایش روی فایل واقعی انجام می‌شود؛ YAML و JavaScript پیش از rename اعتبارسنجی می‌شوند.'}>
-  {#snippet actions()}<Button href={`/projects/${encodeURIComponent(data.target)}`} variant="outline">بازگشت به اجرا</Button>{/snippet}
+  <!--
+    سناریو که نوشته شد، قدمِ بعد اجرای آن است — نه «بازگشت».
+
+    «بازگشت به اجرا» همان مقصد را داشت ولی اسمش کار را نمی‌گفت. و قاعدهٔ
+    خودِ پروژه این است: پیش‌نویسی که یک بار اجرا نشده، سناریو نیست.
+  -->
+  {#snippet actions()}
+    <Button href={`/projects/${encodeURIComponent(data.target)}`}>اجرایش کن</Button>
+    <Button href={`/projects/${encodeURIComponent(data.target)}/proposals`} variant="ghost">چه باید آزمود</Button>
+  {/snippet}
 </PageHeader>
 
 <div class="grid gap-6 lg:grid-cols-[19rem_minmax(0,1fr)]">
