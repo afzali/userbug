@@ -21,7 +21,7 @@
    * چند دقیقه ماشین — و این دو نباید یک‌جور پرسیده شوند.
    */
   async function remove() {
-    const what = run.kind === 'tour' ? 'گشت' : run.kind === 'map' ? 'خزشِ نقشه' : 'اجرا';
+    const what = run.kind === 'tour' ? 'گشت' : run.kind === 'map' ? 'خزشِ نقشه' : run.kind === 'quest' ? 'کاوشِ هدف‌دار' : 'اجرا';
     if (!confirm(`این ${what} با همهٔ عکس‌ها و traceهایش پاک شود؟\n${run.runId}`)) return;
 
     busy = true;

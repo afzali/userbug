@@ -5,6 +5,7 @@
   import * as Card from '$lib/components/ui/card/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import { pickState } from '../../../../../../src/map/quest.js';
 
   let { data } = $props();
 
@@ -27,6 +28,22 @@
   let focus = $state('');
   let busy = $state(false);
   let error = $state('');
+
+  /** هدفِ کاوش. نقشه مسیرِ رسیدن را می‌دهد، مدل فقط همان‌جا فکر می‌کند. */
+  let goal = $state('');
+  let questBusy = $state(false);
+  let questError = $state('');
+
+  /**
+   * کدام نما، همین حالا که دارد تایپ می‌کند.
+   *
+   * ── چرا پیش از اجرا نشان داده می‌شود ──
+   *
+   * کاوش چند دقیقه طول می‌کشد و پول خرج می‌کند. اگر هدف به هیچ نمایی نخورد،
+   * از صفحهٔ اول شروع می‌شود و همان کاوشِ آزادِ گران است — و کاربر تازه در
+   * پایان می‌فهمد. `pickState` خالص است، پس همین‌جا در مرورگر جواب می‌دهد.
+   */
+  let questTarget = $derived(goal.trim().length >= 3 ? pickState(map, goal) : null);
 
   /**
    * برچسبِ دسته‌ها به فارسی، یک جا.
@@ -74,6 +91,25 @@
     const counts = {};
     for (const action of state.actions || []) counts[action.kind] = (counts[action.kind] || 0) + 1;
     return Object.entries(counts).sort(([, a], [, b]) => b - a);
+  }
+
+  async function startQuest(event) {
+    event.preventDefault();
+    questError = '';
+    questBusy = true;
+    try {
+      const response = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({ target, kind: 'quest', goal, from, headed }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'کاوش شروع نشد');
+      await goto(`/projects/${encodeURIComponent(target)}`);
+    } catch (cause) {
+      questError = cause.message;
+      questBusy = false;
+    }
   }
 
   async function start(event) {
@@ -273,6 +309,59 @@
               می‌شود. فعلاً همه پوشش دارند.
             {/if}
           </p>
+        </Card.Content>
+      </Card.Root>
+
+      <!--
+        کاوشِ هدف‌دار.
+
+        ── چرا اینجا و نه در صفحهٔ اجرا ──
+
+        ارزشِ این کار از نقشه می‌آید: بی نقشه، کاوش از صفحهٔ اول شروع می‌کند و
+        نیمی از فراخوانی‌هایش خرجِ رسیدن می‌شود نه گشتن. پس همان‌جا که نقشه
+        هست پیشنهاد می‌شود، نه جایی که کاربر باید یادش بیفتد نقشه‌ای دارد.
+      -->
+      <Card.Root>
+        <Card.Header class="pb-3">
+          <Card.Title class="text-sm">این یکی را بررسی کن</Card.Title>
+          <Card.Description>
+            نقشه رایگان می‌بردت آنجا؛ مدل فقط همان‌جا فکر می‌کند.
+          </Card.Description>
+        </Card.Header>
+        <Card.Content>
+          <form class="space-y-3" onsubmit={startQuest}>
+            <label class="block space-y-1">
+              <span class="text-xs text-muted-foreground">چه چیزی را بررسی کنم</span>
+              <Input bind:value={goal} placeholder="مثلاً: آپلودِ فایلِ تکراری چه می‌کند" />
+            </label>
+
+            {#if goal.trim().length >= 3}
+              {#if questTarget}
+                <p class="rounded-lg border bg-muted/30 p-2 text-[11px] leading-5">
+                  می‌رود به
+                  <strong>{questTarget.state.route}{questTarget.state.view ? ` ▸ ${questTarget.state.view}` : ''}</strong>
+                  در {questTarget.depth} قدمِ قطعی، بعد از آنجا می‌گردد.
+                </p>
+              {:else}
+                <p class="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2 text-[11px] leading-5">
+                  هیچ نمایی در نقشه با این هدف نخواند، پس از صفحهٔ اول شروع
+                  می‌شود و گران‌تر درمی‌آید. واژه‌ای بنویسید که در خودِ اپ دیده
+                  می‌شود.
+                </p>
+              {/if}
+            {/if}
+
+            {#if questError}<p class="text-xs text-destructive">{questError}</p>{/if}
+
+            <Button type="submit" variant="secondary" class="w-full" size="sm" disabled={questBusy || goal.trim().length < 5}>
+              {questBusy ? 'در حال شروع…' : 'برو بررسی کن'}
+            </Button>
+            <p class="text-[11px] leading-5 text-muted-foreground">
+              خروجی‌اش یک <strong>پیش‌نویسِ سناریو</strong>ست با مقدمهٔ آماده —
+              همان مسیری که نقشه بلد بود. مسیرِ ورود و «مرورگر دیده شود» از
+              فرمِ بالا برداشته می‌شوند.
+            </p>
+          </form>
         </Card.Content>
       </Card.Root>
 

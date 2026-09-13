@@ -25,11 +25,32 @@ const CLOSERS = /^(بستن|بعداً|نشان نده|انصراف|باشه|م�
  * @param {object} [o]
  * @param {RegExp[]} [o.expected] عنوان‌هایی که انتظارشان را داریم و خبر نمی‌خواهند
  * @param {(title: string) => Promise<void>|void} [o.onBlocker] یک بار به ازای هر عنوانِ تازه
+ * @param {'alert'} [o.only] فقط لایهٔ `alertdialog`؛ `dialog`ها دست‌نخورده می‌مانند
+ * @param {number} [o.wait] تا این‌قدر میلی‌ثانیه منتظرِ **آمدنِ** پنجره بماند
  * @returns {Promise<string[]>} عنوانِ هر پنجره‌ای که دیده شد
  */
-export async function dismissBlockers(page, { expected = [], onBlocker } = {}) {
+export async function dismissBlockers(page, { expected = [], onBlocker, only, wait = 0 } = {}) {
   const found = [];
   const noted = new Set();
+
+  /**
+   * ── چرا انتظار، و چرا اختیاری ──
+   *
+   * پنجره‌ای که با بارگذاری می‌آید، وقتی این تابع صدا می‌شود آنجاست. ولی
+   * نپی یکی دارد که چند ثانیه بعد می‌نشیند — و دقیقاً همان است که کلیک را
+   * می‌خورد، چون کاربر تا آن لحظه رسیده به دکمه. بدون انتظار، این تابع
+   * «چیزی نبود» برمی‌گرداند و قدمِ بعد پشتِ پنجره می‌ماند.
+   *
+   * پیش‌فرض صفر است چون در حینِ خزش، هر انتظارِ بی‌دلیل ضربدر صدها کنش
+   * می‌شود؛ کسی که مسیرِ ورود را می‌رود خودش می‌گوید چقدر صبر کند.
+   */
+  if (wait > 0) {
+    await page
+      .locator(only === 'alert' ? '[role="alertdialog"]' : '[role="alertdialog"], [role="dialog"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: wait })
+      .catch(() => {});
+  }
 
   for (let guard = 0; guard < 8; guard++) {
     // ترتیب مهم است: alertdialog لایهٔ بالاتری دارد و تا بسته نشود، کلیک روی
@@ -38,6 +59,17 @@ export async function dismissBlockers(page, { expected = [], onBlocker } = {}) {
     let top = page.locator('[role="alertdialog"]').first();
     let visible = (await top.count()) > 0 && (await top.isVisible().catch(() => false));
     if (!visible) {
+      /**
+       * ── چرا `only: 'alert'` لازم شد ──
+       *
+       * گاهی دو پنجره روی هم‌اند و **پایینی همان است که سناریو می‌خواهد**:
+       * در نپی، `alertdialog`ِ «بروزرسانی دیتابیس» روی گفت‌وگوی «کد بازیابی»
+       * می‌نشیند و تیکش را می‌خورد. بستنِ کورِ هر دو، قدمِ بعدی را بی هیچ
+       * خطایی بی‌معنا می‌کند — سناریو روی پنجره‌ای کار می‌کند که خودمان بستیم.
+       *
+       * پس مصرف‌کننده می‌تواند بگوید «فقط آنکه رویش نشسته».
+       */
+      if (only === 'alert') break;
       top = page.locator('[role="dialog"]').first();
       visible = (await top.count()) > 0 && (await top.isVisible().catch(() => false));
     }

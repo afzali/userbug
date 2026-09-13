@@ -447,7 +447,8 @@ export async function startJob(rawOptions = {}) {
      * بی یک خط تغییر کار می‌کنند. و هر دو مرورگر باز می‌کنند، پس هم‌زمانی‌شان
      * هم نباید ممکن باشد — که با همین slotِ مشترک خودبه‌خود رعایت می‌شود.
      */
-    kind: rawOptions?.kind === 'map' ? 'map' : 'run',
+    kind: ['map', 'quest'].includes(rawOptions?.kind) ? rawOptions.kind : 'run',
+    goal: rawOptions?.goal ? String(rawOptions.goal).slice(0, 300) : '',
     from: rawOptions?.from ? String(rawOptions.from).slice(0, 300) : '',
     states: toCap(rawOptions?.states),
     minutes: toCap(rawOptions?.minutes),
@@ -505,6 +506,10 @@ export async function startJob(rawOptions = {}) {
     const projects = await listProjects();
     const project = projects.find((item) => item.key === target);
     if (!project) throw new Error(`هدف «${target}» وجود ندارد`);
+    if (options.kind === 'quest' && options.goal.trim().length < 5) {
+      // بی هدف، quest همان کاوشِ آزاد است با نامی که خلافش را می‌گوید
+      throw new Error('هدفِ کاوش را بنویسید؛ دست‌کم چند کلمه');
+    }
     if (options.kind === 'run' && options.grep && !project.scenarios.some((scenario) => scenario.runnable && scenario.name === options.grep)) {
       throw new Error('سناریوی انتخاب‌شده در این هدف نیست');
     }
@@ -531,6 +536,13 @@ export async function startJob(rawOptions = {}) {
     if (options.remember) args.push('--remember', options.remember);
     if (options.profile) args.push('--profile');
     if (options.focus) args.push('--focus', options.focus);
+    if (options.headed) args.push('--headed');
+  } else if (options.kind === 'quest') {
+    // هدف positional است، نه flag — همان‌طور که آدم در خطِ فرمان می‌نویسد
+    args.push(options.goal);
+    if (options.from) args.push('--from', options.from);
+    if (options.depth) args.push('--depth', String(options.depth));
+    if (options.model) args.push('--model', options.model);
     if (options.headed) args.push('--headed');
   } else {
     if (options.grep) args.push('--grep', options.grep);

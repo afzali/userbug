@@ -38,57 +38,10 @@
         "name": "فایل‌های منتخب",
         "exact": true,
         "visible": true
-      },
-      {
-        "role": "button",
-        "name": "شخصی",
-        "exact": true,
-        "visible": true,
-        "nth": 0
-      },
-      {
-        "role": "button",
-        "name": "شخصی",
-        "exact": true,
-        "visible": true,
-        "nth": 1
-      },
-      {
-        "role": "button",
-        "name": "نبوت و امامت",
-        "exact": true,
-        "visible": true,
-        "nth": 0
-      },
-      {
-        "role": "button",
-        "name": "اخلاقی و عرفانی",
-        "exact": true,
-        "visible": true
-      },
-      {
-        "role": "button",
-        "name": "More",
-        "exact": true,
-        "visible": true,
-        "nth": 0
-      },
-      {
-        "role": "button",
-        "name": "اعتقادی",
-        "exact": true,
-        "visible": true
-      },
-      {
-        "role": "button",
-        "name": "More",
-        "exact": true,
-        "visible": true,
-        "nth": 1
       }
     ],
-    "seenIn": 1,
-    "lastSeen": "2026-09-13T06:23:50.667Z",
+    "seenIn": 2,
+    "lastSeen": "2026-09-13T10:10:44.065Z",
     "approvedBy": null
   },
   "by": "tour"

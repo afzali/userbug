@@ -15,6 +15,16 @@ export default async function globalSetup() {
     environment: target.environment,
     device: process.env.UB_DEVICE || target.device,
     isolation: target.isolation?.mode,
+
+    /**
+     * نوعِ اجرا، برای آنکه فهرستِ اجراها بتواند بگوید این چه بوده.
+     *
+     * خزش و گشت چون اجراگرِ خودشان را دارند، `kind` را مستقیم می‌نویسند.
+     * اجرایی که از `playwright test` رد می‌شود تنها از همین‌جا می‌گذرد، پس
+     * تنها راهِ متمایز کردنش همین متغیر است. بی این، کاوشِ هدف‌دار در فهرست
+     * از یک اجرای معمولی جدا نمی‌شد و کاربر نمی‌فهمید پیش‌نویس از کجا آمد.
+     */
+    kind: process.env.UB_RUN_KIND || 'run',
   });
   // فقط pointer «آخرین اجرا» را تازه می‌کند؛ هویت workerها از UB_RUN_ID است.
   setCurrentRun(runId);

@@ -415,9 +415,13 @@ async function execute({ page, ub, ctx, step }) {
       return;
 
     case 'dismissBlockers':
-      await ub.dismissBlockers(
-        body && body.expected ? { expected: body.expected.map((r) => new RegExp(r)) } : {}
-      );
+      await ub.dismissBlockers({
+        ...(body?.expected ? { expected: body.expected.map((r) => new RegExp(r)) } : {}),
+        // `only: alert` یعنی گفت‌وگوی زیرین دست‌نخورده بماند
+        ...(body?.only ? { only: body.only } : {}),
+        // `wait` برای پنجره‌ای که چند ثانیه بعد می‌نشیند
+        ...(Number.isFinite(body?.wait) ? { wait: body.wait } : {}),
+      });
       return;
 
     /** متن یک عنصر را در متغیر بگذار، تا قدم‌های بعد بتوانند استفاده کنند. */

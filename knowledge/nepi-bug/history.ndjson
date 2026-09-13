@@ -72,3 +72,9 @@
 {"at":"2026-09-13T07:20:49.844Z","op":"promote","path":"openQuestions[آیا مسیر /ai-chat نیاز به احراز هویت دارد؟]","by":"user","why":"پاسخ از رابط"}
 {"at":"2026-09-13T07:21:34.933Z","op":"promote","path":"openQuestions[محتوای مسیر /content و /contents چه تفاوتی دارند؟]","by":"user","why":"پاسخ از رابط"}
 {"at":"2026-09-13T07:21:43.529Z","op":"promote","path":"openQuestions[آیا دکمه خروج یا حذف داده‌ای در اپ وجود دارد؟]","by":"user","why":"پاسخ از رابط"}
+{"at":"2026-09-13T10:00:41.575Z","op":"update","path":"pages[/login]","by":"tour","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-09-13T10:01:16.833Z","op":"update","path":"pages[/login]","by":"tour","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-09-13T10:02:39.951Z","op":"update","path":"pages[/login]","by":"tour","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-09-13T10:03:16.122Z","op":"update","path":"pages[/login]","by":"tour","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-09-13T10:05:00.798Z","op":"update","path":"pages[/login]","by":"tour","why":"تقویتِ قرارداد در اجرا"}
+{"at":"2026-09-13T10:10:44.077Z","op":"update","path":"pages[/contents]","by":"tour","why":"تقویتِ قرارداد در اجرا"}

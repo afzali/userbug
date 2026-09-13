@@ -301,9 +301,11 @@ export const test = base.extend({
        * بساز.** در سناریو، پنجره‌ای که کلیک را گرفته یک نقص است حتی وقتی
        * بسته شد.
        */
-      async dismissBlockers({ expected = [] } = {}) {
+      async dismissBlockers({ expected = [], only, wait } = {}) {
         return await dismissBlockers(page, {
           expected,
+          only,
+          wait,
           onBlocker: (title) =>
             ub.note({
               source: 'blocker',

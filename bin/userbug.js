@@ -137,6 +137,13 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --watch <شناسه>             یافته ثبت کن، ولی نشکن (پیش‌فرض)
       --expect <شناسه>            سخت بشکن — یعنی «این قاعده است»
 
+  userbug quest <هدف> "<چه را بررسی کنم>"
+                                  کاوشِ هدف‌دار: نقشه رایگان می‌بردت آنجا،
+                                  بعد مدل همان‌جا می‌گردد و پیش‌نویس می‌نویسد
+      --from <سناریو>             مسیرِ ورود
+      --depth <n>                 سقفِ قدمِ کاوش
+      --model <اسلاگ> --headed
+
   userbug ai                      تنظیمات هوش مصنوعی: کلید، مدلِ هر نقش، بودجه
       --check                     هر مدل را با ارزان‌ترین درخواست بسنج
       --role <نقش>=<اسلاگ>        مدلِ یک نقش (resolve|author|analyze|default)
@@ -350,18 +357,6 @@ function cmdRun({ flags, positional }) {
   // چون یک اجرا باید یک روایت باشد و مخلوط کردن دستگاه‌ها گزارش را بی‌معنا می‌کند.
   const runs = devices.length ? devices : [null];
   const results = [];
-
-  const classifyExit = (result, runId) => {
-    if (result.error || !Number.isInteger(result.status)) return 2;
-    if (result.status === 0) return 0;
-    try {
-      const run = readRun(runId);
-      if (result.status === 1 && run.status !== 'running' && Number(run.findings || 0) > 0) return 1;
-    } catch {
-      // config/globalSetup ممکن است پیش از ساخت artifact شکسته باشد.
-    }
-    return 2;
-  };
 
   for (const device of runs) {
     // مستقیم CLI پلی‌رایت با node، نه از راه npx و پوسته.
@@ -888,6 +883,136 @@ async function cmdTour({ flags, positional }) {
   if (written.scenario) console.log(`  پیش‌نویس: scenarios/${name}/${written.scenario}`);
   console.log(`  پرونده: ${written.dossier.replaced} تازه · ${written.dossier.conflicts} تعارض`);
   console.log('\n  پیش‌نویس را بازبینی و اجرا کنید؛ تا اجرا نشده، سناریو نیست.\n');
+}
+
+/**
+ * کاوشِ هدف‌دار — نقشه راه را می‌برد، کاوش فکر می‌کند.
+ *
+ * ── چرا این با `map` و با `run --author` فرق دارد ──
+ *
+ * نقشه کامل است ولی بی‌هدف. کاوش هدف دارد ولی از صفحهٔ اول و کور شروع
+ * می‌کند، پس نیمی از فراخوانی‌هایش خرجِ رسیدن می‌شود نه گشتن.
+ *
+ * quest مسیرِ رسیدن را از نقشه برمی‌دارد (رایگان و قطعی) و فقط همان‌جا مدل
+ * را صدا می‌زند. و چون قدم‌های ناوبری **پیش از** فعلِ `explore` می‌نشینند،
+ * `ctx.executed` خودش آن‌ها را به‌عنوان مقدمهٔ پیش‌نویس می‌دهد.
+ *
+ * ── چرا اجراگرِ تازه‌ای ساخته نمی‌شود ──
+ *
+ * یک سناریوی کوچک نوشته می‌شود و از همان `playwright test` رد می‌شود که هر
+ * اجرای دیگری. پس داور، چکِ همگانی، trace و گزارش همه بی یک خط کارِ اضافه
+ * کار می‌کنند.
+ */
+/**
+ * کدِ خروج: ۱ فقط وقتی یافتهٔ واقعی هست.
+ *
+ * در سطحِ ماژول است چون `run` و `quest` هر دو همان اجراگر را صدا می‌زنند و
+ * باید همان‌طور خوانده شوند؛ دو نسخه یعنی روزی یکی‌شان «خطای اجراگر» را
+ * «یافته» بخواند و CI سبز بماند.
+ */
+function classifyExit(result, runId) {
+  if (result.error || !Number.isInteger(result.status)) return 2;
+  if (result.status === 0) return 0;
+  try {
+    const run = readRun(runId);
+    if (result.status === 1 && run.status !== 'running' && Number(run.findings || 0) > 0) return 1;
+  } catch {
+    // config/globalSetup ممکن است پیش از ساخت artifact شکسته باشد.
+  }
+  return 2;
+}
+
+async function cmdQuest({ flags, positional }) {
+  const target = positional[0];
+  const goal = positional.slice(1).join(' ').trim() || (flags.goal && flags.goal !== true ? String(flags.goal) : '');
+  if (!target) throw new Error('نام هدف لازم است: userbug quest <هدف> "<چه چیزی را بررسی کنم>"');
+  if (goal.length < 5) throw new Error('هدف را بنویسید: userbug quest <هدف> "آپلودِ فایلِ تکراری چه می‌کند"');
+
+  const YAML = (await import('yaml')).default;
+  const { readMap } = await import('../src/map/store.js');
+  const { pickState, questScenario, questSlug } = await import('../src/map/quest.js');
+  const { scenarioDir, loadScenario } = await import('../src/scenario/load.js');
+
+  const map = readMap(target);
+  const found = pickState(map, goal);
+
+  if (!map.states?.length) {
+    console.log('\n  نقشه‌ای نیست، پس کاوش از صفحهٔ اول شروع می‌کند.');
+    console.log('  برای شروعِ نزدیک‌تر اول نقشه را بسازید: userbug map ' + target + '\n');
+  } else if (found) {
+    const view = found.state.view ? ' ▸ ' + found.state.view : '';
+    console.log('\n  نزدیک‌ترین نما: ' + found.state.route + view);
+    console.log('  چون: ' + found.hits.join('، ') + ' · ' + found.depth + ' قدمِ قطعی تا آنجا');
+  } else {
+    console.log('\n  هیچ نمایی با این هدف نخواند؛ کاوش از صفحهٔ اول شروع می‌شود.');
+  }
+
+  /**
+   * مسیرِ ورود — و چرا نبودنش سکوت نیست.
+   *
+   * `state.path` که نقشه ضبط کرده، **نسبت به ورود** است نه از هیچ‌جا: خزنده
+   * اول `entryPath` را می‌رود و بعد این قدم‌ها را. نخستین اجرای quest بی این،
+   * روی `about:blank` کلیک کرد و چکِ همگانی درست گفت «صفحهٔ blank چیزی برای
+   * کلیک ندارد» — یعنی مسیرِ نقشه بی مبدأ، مسیر نیست.
+   *
+   * و اگر کاربر `--from` ندهد، همان سناریویی برداشته می‌شود که خودِ نقشه با
+   * آن ساخته شده؛ چون مسیرها فقط نسبت به همان معنا دارند.
+   */
+  const fromFlag = flags.from && flags.from !== true ? String(flags.from) : map.entry?.scenario || '';
+  let entrySteps = [];
+  if (fromFlag) {
+    const file = path.resolve(fromFlag);
+    if (!fs.existsSync(file)) throw new Error('سناریوی مسیرِ ورود پیدا نشد: ' + file);
+    entrySteps = loadScenario(file).steps;
+    console.log('  مسیرِ ورود: ' + fromFlag);
+  }
+
+  const depth = parseDepth(flags.depth);
+  const scenario = questScenario({ goal, entrySteps, path: found?.state.path || [], depth });
+  const slug = questSlug(goal);
+  /**
+   * چرا در `_quests/` و نه `_drafts/`:
+   *
+   * `_drafts/` جای **خروجی** است — آنچه کاوش نوشته و آدم باید بازبینی کند.
+   * این فایل ورودی است. اگر کنار هم می‌نشستند، اسلاگِ هم‌نام می‌توانست
+   * رانندهٔ اجرا را با پیش‌نویسِ همان اجرا عوض کند.
+   */
+  const relative = '_quests/' + slug + '.yml';
+  const file = path.join(scenarioDir(target), relative);
+
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(
+    file,
+    '# رانندهٔ کاوشِ هدف‌دار — ساختهٔ `userbug quest`.\n' +
+      '#\n' +
+      '# این فایل **خروجی نیست، موتور است**: قدم‌های ناوبری از نقشه آمده‌اند\n' +
+      '# (رایگان و قطعی) و فعلِ explore از همان‌جا به بعد را می‌گردد.\n' +
+      '# آنچه باید بازبینی کنید، پیش‌نویسی است که این اجرا می‌نویسد.\n' +
+      YAML.stringify(scenario),
+    'utf8'
+  );
+
+  console.log('  رانندهٔ کاوش: scenarios/' + target + '/' + relative);
+  console.log('  ' + (scenario.steps.length - 1) + ' قدمِ قطعی، بعد کاوشِ هدف‌دار\n');
+
+  const runId = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '_' + target + '_quest';
+  const env = { ...process.env, UB_TARGET: target, UB_RUN_ID: runId, UB_AUTHOR: '1', UB_RUN_KIND: 'quest' };
+  if (depth) env.UB_DEPTH = String(depth);
+  if (flags.model && flags.model !== true) env.UB_MODEL = assertModelSlug(flags.model);
+
+  /**
+   * چرا `UB_SCENARIO_FILE` و نه `--grep`:
+   *
+   * `loadScenarios` فقط ریشهٔ پوشهٔ سناریوها را می‌خواند، نه زیرپوشه‌ها را —
+   * پس grep روی نامی که در `_quests/` است هیچ تستی پیدا نمی‌کرد و اجرا
+   * «۰ تست» می‌شد؛ خطایی که شبیهِ «چیزی نشکست» به نظر می‌رسد.
+   */
+  env.UB_SCENARIO_FILE = file;
+  const args = [PLAYWRIGHT_CLI, 'test', 'scenarios/yaml.spec.js'];
+  if (flags.headed) args.push('--headed');
+
+  const processResult = spawnSync(process.execPath, args, { cwd: ROOT, stdio: 'inherit', env });
+  process.exit(classifyExit(processResult, runId));
 }
 
 /**
@@ -1474,6 +1599,9 @@ try {
       break;
     case 'ai':
       await cmdAi(parsed);
+      break;
+    case 'quest':
+      await cmdQuest(parsed);
       break;
     case 'checks':
       cmdChecks(parsed);

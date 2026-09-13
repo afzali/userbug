@@ -79,7 +79,12 @@ export async function load({ params }) {
      * (`unsupportedVerbs`)، وگرنه دو تعریف از «اجراشدنی» می‌داشتیم.
      */
     scenarios: await Promise.all(
-      (await listScenarios(target).catch(() => [])).map(async (scenario) => {
+      (await listScenarios(target).catch(() => []))
+        // رانندهٔ کاوشِ هدف‌دار مسیرِ ورود نیست، خروجیِ همین صفحه است. در
+        // کشویی بودنش یعنی کاربر می‌تواند خزش را با فایلی شروع کند که خودش
+        // `explore` دارد — حلقه‌ای که هیچ‌کس نمی‌خواست.
+        .filter((scenario) => !scenario.path.startsWith('_quests/'))
+        .map(async (scenario) => {
         const blockers = safely(
           () => unsupportedVerbs(loadScenario(path.join(scenarioDir(target), scenario.path)).steps),
           ['ناخوانا']
