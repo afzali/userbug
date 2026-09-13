@@ -282,6 +282,12 @@
   {#snippet actions()}
     <Button href={`/projects/${encodeURIComponent(data.target)}`}>اجرایش کن</Button>
     <Button href={`/projects/${encodeURIComponent(data.target)}/proposals`} variant="ghost">چه باید آزمود</Button>
+    <!--
+      «حساب و چک» از منو برداشته شد و اینجا نشست: حساب و فایلِ آپلودی چیزی
+      نیستند که آدم سراغشان برود، چیزی‌اند که **وسطِ نوشتنِ سناریو** لازم
+      می‌شوند — همان‌جا که `{{account.…}}` یا `fixtures/…` می‌نویسد.
+    -->
+    <Button href={`/projects/${encodeURIComponent(data.target)}/config`} variant="ghost">حساب و فایل</Button>
   {/snippet}
 </PageHeader>
 

@@ -6,6 +6,7 @@
   import { Input } from '$lib/components/ui/input/index.js';
   import ModelPicker from '$lib/components/ModelPicker.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import CommandBar from '$lib/components/CommandBar.svelte';
   import RunCard from '$lib/components/RunCard.svelte';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import { formatNumber, sourceLabel } from '$lib/format.js';
@@ -237,8 +238,14 @@
     if (response.ok) runs = (await response.json()).runs;
   }
 
-  async function start(event) {
-    event.preventDefault();
+  /**
+   * شروعِ هر کاری، یک راه.
+   *
+   * فرمِ کناری و نوارِ فرمان هر دو از اینجا می‌گذرند. دو مسیرِ شروع یعنی
+   * روزی یکی‌شان `resetLive` را فراموش کند و جریانِ زندهٔ اجرای قبلی روی
+   * اجرای تازه بماند.
+   */
+  async function startJob(options) {
     error = '';
     submitting = true;
     resetLive();
@@ -246,19 +253,7 @@
       const response = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({
-          target,
-          grep: scenario,
-          only: [...picked],
-          bench,
-          device,
-          persona,
-          depth,
-          model,
-          repeat,
-          headed,
-          author,
-        }),
+        body: JSON.stringify({ target, ...options }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'اجرا شروع نشد');
@@ -269,6 +264,22 @@
     } finally {
       submitting = false;
     }
+  }
+
+  async function start(event) {
+    event.preventDefault();
+    await startJob({
+      grep: scenario,
+      only: [...picked],
+      bench,
+      device,
+      persona,
+      depth,
+      model,
+      repeat,
+      headed,
+      author,
+    });
   }
 
   async function cancel() {
@@ -341,11 +352,19 @@
   });
 </script>
 
-<PageHeader eyebrow={`${project.environment} · ${project.baseURL}`} title={project.name} description="سناریو را انتخاب کنید؛ قدم، عکس، خطای مرورگر و لاگ سرور در همان لحظه اینجا می‌آیند.">
+<PageHeader eyebrow={`${project.environment} · ${project.baseURL}`} title={project.name} description="بگویید چه می‌خواهید، یا از فرمِ کناری دقیق انتخاب کنید.">
   {#snippet actions()}
     <Button href={`/projects/${encodeURIComponent(target)}/files`} variant="outline">سناریوها</Button>
   {/snippet}
 </PageHeader>
+
+<!--
+  درِ ورودی، بالای همه‌چیز.
+
+  نوارِ پیشرفتِ زیرش وضعیت را می‌گوید («۲۷٪ · ۱۱ پیشنهاد») و آن تابلوی
+  وضعیت است نه قدمِ بعد. این یکی قدمِ بعد را می‌گیرد و می‌زند.
+-->
+<CommandBar {target} busy={busy || submitting} onRun={startJob} />
 
 <!--
   نوارِ مسیر — همیشه، نه فقط روی پروژهٔ خالی.
@@ -392,7 +411,8 @@
     <p class="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
       این پروژه هنوز سناریویی ندارد، و نوشتنِ سناریو از صفر کارِ سختی است.
       راهِ کوتاه‌تر این است که یک بار با هم در اپ بگردیم، بعد ابزار خودش بقیهٔ
-      اپ را بگردد؛ آن‌وقت می‌داند چه چیزهایی باید آزموده شوند.
+      اپ را بگردد؛ آن‌وقت می‌داند چه چیزهایی باید آزموده شوند. یا همان بالا
+      بنویسید چه می‌خواهید.
     </p>
 
     <ol class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
