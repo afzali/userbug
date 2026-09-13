@@ -9,6 +9,7 @@
   let { data } = $props();
 
   let target = $derived(data.target);
+  let base = $derived(`/projects/${encodeURIComponent(target)}`);
   let map = $derived(data.map);
   let states = $derived(map?.states || []);
   let hasMap = $derived(states.length > 0);
