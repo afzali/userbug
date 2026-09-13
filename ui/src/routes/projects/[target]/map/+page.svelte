@@ -19,6 +19,8 @@
   let minutes = $state(20);
   let fresh = $state(false);
   let headed = $state(false);
+  /** شناسهٔ حسابی که خزش می‌سازد و به خاطر می‌سپارد. خالی یعنی هویتِ تازه هر بار. */
+  let remember = $state('crawler');
   let busy = $state(false);
   let error = $state('');
 
@@ -86,6 +88,7 @@
           minutes,
           fresh,
           headed,
+          remember,
         }),
       });
       const payload = await response.json();
@@ -122,6 +125,31 @@
   </section>
 {/if}
 
+<!--
+  خزشی که پشتِ صفحهٔ ورود مانده، «موفق» به نظر می‌رسد: صف تمام می‌شود و چند
+  گره پیدا می‌شود. بی این هشدار، کاربر نقشهٔ چهار گره‌ای می‌بیند و فکر می‌کند
+  اپش همین‌قدر است — همان شکستِ خاموشی که این ابزار برای شکارش ساخته شده،
+  این بار در خودش.
+-->
+{#if data.stuck}
+  <section class="mb-6 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm leading-7">
+    <p class="font-semibold text-destructive">خزش وارد نشد.</p>
+    <p class="mt-1 text-muted-foreground">
+      همهٔ حالت‌ها پشتِ صفحهٔ ورود ماندند؛ این نقشه صفحهٔ ورود است، نه اپ. یک
+      <strong>سناریوی ورود</strong> در فرمِ کناری انتخاب کنید و
+      <strong>حسابی که به خاطر بسپارد</strong> را پر بگذارید — بارِ اول کاربر
+      می‌سازد، دفعه‌های بعد با همان وارد می‌شود.
+    </p>
+    {#if !data.scenarios.length}
+      <p class="mt-1 text-muted-foreground">
+        هنوز سناریویی ندارید: یک <a class="underline underline-offset-2" href={`${base}/tour`}>گشت</a>
+        بروید تا قدم‌های ورود ضبط شود، یا در
+        <a class="underline underline-offset-2" href={`${base}/files`}>سناریوها</a> یکی بنویسید.
+      </p>
+    {/if}
+  </section>
+{/if}
+
 <div class="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
   <div class="space-y-4">
     <Card.Root>
@@ -154,6 +182,15 @@
               <Input type="number" min="1" max="1000" bind:value={minutes} />
             </label>
           </div>
+
+          <label class="block space-y-1">
+            <span class="text-xs text-muted-foreground">حسابی که به خاطر بسپارد</span>
+            <Input bind:value={remember} placeholder="crawler — خالی یعنی هر بار کاربر تازه" />
+            <span class="block text-[11px] leading-5 text-muted-foreground">
+              بارِ اول با سناریوی ورود کاربر می‌سازد و ذخیره‌اش می‌کند؛ دفعهٔ بعد با
+              همان وارد می‌شود. حسابی که خزشِ قبلی پُرش کرده، نقشهٔ عمیق‌تری می‌دهد.
+            </span>
+          </label>
 
           <label class="flex items-center gap-2 text-xs">
             <input type="checkbox" bind:checked={fresh} />

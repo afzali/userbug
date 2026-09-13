@@ -1,5 +1,5 @@
 import { readMap } from '../../../../../../src/map/store.js';
-import { extraRoutes, unreachedRoutes } from '../../../../../../src/map/render.js';
+import { extraRoutes, stuckAtLogin, unreachedRoutes } from '../../../../../../src/map/render.js';
 import { mispredictions } from '../../../../../../src/map/classify.js';
 import { readDossier } from '../../../../../../src/knowledge/store.js';
 import { listScenarios } from '$lib/server/projects.js';
@@ -29,6 +29,7 @@ export async function load({ params }) {
   };
 
   const map = safely(() => readMap(target), null);
+  const loginPath = safely(() => readDossier(target).auth?.loginPath || '', '');
   const knownRoutes = safely(
     () => (readDossier(target).routes || []).map((route) => route.path).filter(Boolean),
     []
@@ -46,6 +47,12 @@ export async function load({ params }) {
      * هیچ چکِ همگانی نمی‌گیرد.
      */
     mispredicted: map ? safely(() => mispredictions(map), []) : [],
+    /**
+     * خزشی که پشتِ صفحهٔ ورود مانده، **موفق** گزارش می‌شود: صف تمام می‌شود و
+     * چند گره پیدا می‌شود. بی این پرچم، کاربر نقشهٔ چهار گره‌ای می‌بیند و فکر
+     * می‌کند اپش همین‌قدر است.
+     */
+    stuck: map ? safely(() => stuckAtLogin(map, { loginPath }), false) : false,
     scenarios: await listScenarios(target).catch(() => []),
   };
 }

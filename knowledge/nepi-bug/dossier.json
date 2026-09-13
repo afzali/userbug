@@ -1,18 +1,18 @@
 {
   "version": 1,
   "target": "nepi-bug",
-  "updatedAt": "2026-09-13T06:29:53.449Z",
-  "summary": "",
+  "updatedAt": "2026-09-13T07:21:43.527Z",
+  "summary": "این یک اپ وب مبتنی بر SvelteKit با بک‌اند PHP و پایگاه داده SQLite است. به نظر می‌رسد یک سیستم مدیریت محتوا باشد که امکاناتی مانند چت هوش مصنوعی، مشاهده محتوا و احراز هویت کاربر را ارائه می‌دهد. کاربر احتمالاً می‌خواهد محتوا را مرور و مطالعه کند و شاید از دستیار هوش مصنوعی استفاده کند.",
   "stack": {
-    "framework": "",
-    "language": "",
-    "backend": "",
-    "db": "",
-    "by": "model"
+    "framework": "sveltekit",
+    "language": "ts",
+    "backend": "php",
+    "db": "sqlite",
+    "by": "source"
   },
   "auth": {
-    "kind": "unknown",
-    "loginPath": "",
+    "kind": "form",
+    "loginPath": "/login",
     "signupOpen": null,
     "logoutLabel": "",
     "sessionStore": "",
@@ -25,7 +25,14 @@
       "purpose": "",
       "requiresAuth": null,
       "sourceFile": "",
-      "by": "tour"
+      "by": "tour",
+      "conflict": [
+        {
+          "by": "model",
+          "note": "path: /login · purpose: صفحه ورود · sourceFile: src/routes/login/+page.svelte",
+          "at": "2026-09-13T07:17:30.439Z"
+        }
+      ]
     },
     {
       "path": "/contents",
@@ -33,7 +40,14 @@
       "purpose": "",
       "requiresAuth": null,
       "sourceFile": "",
-      "by": "tour"
+      "by": "tour",
+      "conflict": [
+        {
+          "by": "model",
+          "note": "path: /contents · purpose: فهرست محتواها · sourceFile: src/routes/contents/+page.svelte",
+          "at": "2026-09-13T07:17:30.439Z"
+        }
+      ]
     },
     {
       "path": "/content/d3110258d4",
@@ -57,7 +71,14 @@
       "purpose": "",
       "requiresAuth": null,
       "sourceFile": "",
-      "by": "tour"
+      "by": "tour",
+      "conflict": [
+        {
+          "by": "model",
+          "note": "path: /lock · purpose: صفحه قفل (احتمالاً قفل صفحه) · sourceFile: src/routes/lock/+page.svelte",
+          "at": "2026-09-13T07:17:30.439Z"
+        }
+      ]
     },
     {
       "path": "/",
@@ -65,11 +86,87 @@
       "purpose": "",
       "requiresAuth": null,
       "sourceFile": "",
-      "by": "run"
+      "by": "run",
+      "conflict": [
+        {
+          "by": "model",
+          "note": "path: / · purpose: صفحه اصلی · sourceFile: src/routes/+page.svelte",
+          "at": "2026-09-13T07:17:30.438Z"
+        }
+      ]
+    },
+    {
+      "path": "/ai-chat",
+      "title": "",
+      "purpose": "چت با هوش مصنوعی",
+      "requiresAuth": null,
+      "sourceFile": "src/routes/ai-chat/+page.js",
+      "by": "model"
+    },
+    {
+      "path": "/content/[id_book]",
+      "title": "",
+      "purpose": "نمایش محتوای یک کتاب خاص",
+      "requiresAuth": null,
+      "sourceFile": "src/routes/content/[id_book]/+page.svelte",
+      "by": "model"
+    },
+    {
+      "path": "/content",
+      "title": "",
+      "purpose": "صفحه محتوا (احتمالاً فهرست یا جزئیات)",
+      "requiresAuth": null,
+      "sourceFile": "src/routes/content/+page.svelte",
+      "by": "model"
+    },
+    {
+      "path": "/features",
+      "title": "",
+      "purpose": "صفحه ویژگی‌ها",
+      "requiresAuth": null,
+      "sourceFile": "src/routes/features/+page.svelte",
+      "by": "model"
+    },
+    {
+      "path": "/help",
+      "title": "",
+      "purpose": "صفحه راهنما",
+      "requiresAuth": null,
+      "sourceFile": "src/routes/help/+page.svelte",
+      "by": "model"
+    },
+    {
+      "path": "/list",
+      "title": "",
+      "purpose": "صفحه فهرست (مشخص نیست)",
+      "requiresAuth": null,
+      "sourceFile": "src/routes/list/+page.svelte",
+      "by": "model"
+    },
+    {
+      "path": "/sqlite",
+      "title": "",
+      "purpose": "صفحه مرتبط با پایگاه داده SQLite",
+      "requiresAuth": null,
+      "sourceFile": "src/routes/sqlite/+page.svelte",
+      "by": "model"
     }
   ],
   "glossary": [],
-  "entities": [],
+  "entities": [
+    {
+      "name": "book",
+      "label": "کتاب",
+      "where": "/content/[id_book]",
+      "by": "model"
+    },
+    {
+      "name": "content",
+      "label": "محتوا",
+      "where": "/content و /contents",
+      "by": "model"
+    }
+  ],
   "flows": [],
   "files": {
     "uploads": [],
@@ -79,10 +176,74 @@
   "openQuestions": [
     {
       "q": "صفحهٔ / برای چیست؟",
-      "answer": null,
+      "answer": "روت برنامه که همه کتب و ... رو ببینه",
       "field": "",
       "askedAt": "2026-09-13T06:29:53.447Z",
-      "answeredAt": "",
+      "answeredAt": "2026-09-13T07:19:27.331Z",
+      "asked": 1
+    },
+    {
+      "q": "هدف دقیق مسیر /sqlite چیست؟ آیا یک نمایشگر پایگاه داده است؟",
+      "answer": "بله و برای دولوپر هست و برای همین پسورد دارد",
+      "field": "",
+      "askedAt": "2026-09-13T07:17:30.431Z",
+      "answeredAt": "2026-09-13T07:18:58.501Z",
+      "asked": 1
+    },
+    {
+      "q": "مسیر /lock چه عملکردی دارد؟ آیا برای قفل کردن صفحه است؟",
+      "answer": "بله برای قفل هست که اگر پشت سیتم نبود قفل شود",
+      "field": "",
+      "askedAt": "2026-09-13T07:17:30.431Z",
+      "answeredAt": "2026-09-13T07:19:14.609Z",
+      "asked": 1
+    },
+    {
+      "q": "روش احراز هویت دقیقاً چیست؟ آیا فرم ورود با نام کاربری و رمز عبور است یا OAuth؟",
+      "answer": "فرم است و اوکال ذخیره میشه و نه آنلاین",
+      "field": "",
+      "askedAt": "2026-09-13T07:17:30.431Z",
+      "answeredAt": "2026-09-13T07:19:44.825Z",
+      "asked": 1
+    },
+    {
+      "q": "آیا ثبت‌نام کاربر جدید باز است؟ مسیر /signup وجود ندارد.",
+      "answer": "بله محل ورود و ثبت نام یکی است و فقط با لوکال چک می شود",
+      "field": "",
+      "askedAt": "2026-09-13T07:17:30.431Z",
+      "answeredAt": "2026-09-13T07:20:06.213Z",
+      "asked": 1
+    },
+    {
+      "q": "مسیر /list چه چیزی را فهرست می‌کند؟",
+      "answer": "لیست کتابهاست یا همان طراحی قدیمی صفحه اصلی که نیازی نیست بهش دیگه",
+      "field": "",
+      "askedAt": "2026-09-13T07:17:30.431Z",
+      "answeredAt": "2026-09-13T07:20:25.060Z",
+      "asked": 1
+    },
+    {
+      "q": "آیا مسیر /ai-chat نیاز به احراز هویت دارد؟",
+      "answer": "تنظیمات رو خود کاربر باید انجام بده و توکن openrouter رو واد کنه و ...",
+      "field": "",
+      "askedAt": "2026-09-13T07:17:30.431Z",
+      "answeredAt": "2026-09-13T07:20:49.839Z",
+      "asked": 1
+    },
+    {
+      "q": "محتوای مسیر /content و /contents چه تفاوتی دارند؟",
+      "answer": "نسخه contents اصلی است و اون یکی نیازی نیست",
+      "field": "",
+      "askedAt": "2026-09-13T07:17:30.431Z",
+      "answeredAt": "2026-09-13T07:21:34.930Z",
+      "asked": 1
+    },
+    {
+      "q": "آیا دکمه خروج یا حذف داده‌ای در اپ وجود دارد؟",
+      "answer": "بله هر دو هستند",
+      "field": "",
+      "askedAt": "2026-09-13T07:17:30.431Z",
+      "answeredAt": "2026-09-13T07:21:43.525Z",
       "asked": 1
     }
   ],
@@ -92,6 +253,12 @@
       "id": "2026-09-13T06-16-51_nepi-bug_3cd800c7",
       "at": "2026-09-13T06:23:50.688Z",
       "note": "55 قدم"
+    },
+    {
+      "kind": "source",
+      "id": "nepi",
+      "at": "2026-09-13T07:16:57.765Z",
+      "note": "788 فایل"
     }
   ]
 }

@@ -452,6 +452,7 @@ export async function startJob(rawOptions = {}) {
     states: toCap(rawOptions?.states),
     minutes: toCap(rawOptions?.minutes),
     fresh: Boolean(rawOptions?.fresh),
+    remember: rawOptions?.remember ? String(rawOptions.remember).slice(0, 60) : '',
   };
 
   if (state.activeId) {
@@ -525,6 +526,7 @@ export async function startJob(rawOptions = {}) {
     if (options.states) args.push('--states', String(options.states));
     if (options.minutes) args.push('--minutes', String(options.minutes));
     if (options.fresh) args.push('--fresh');
+    if (options.remember) args.push('--remember', options.remember);
     if (options.headed) args.push('--headed');
   } else {
     if (options.grep) args.push('--grep', options.grep);

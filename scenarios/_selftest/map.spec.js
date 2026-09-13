@@ -417,3 +417,41 @@ test.describe('انبار', () => {
     expect(map.states[0].path).toHaveLength(1);
   });
 });
+
+/**
+ * «خزش وارد نشد» — تشخیصی که نبودش یک شکستِ خاموش بود.
+ *
+ * خزشی که پشتِ صفحهٔ ورود بماند، موفق گزارش می‌شود: صف تمام می‌شود و چند
+ * گره پیدا می‌شود. کاربر نقشهٔ چهار گره‌ای می‌بیند و فکر می‌کند اپش
+ * همین‌قدر است. دقیقاً همان شکستی که این ابزار برای شکارش ساخته شده.
+ */
+test.describe('پشتِ درِ ورود', () => {
+  const onlyLogin = { states: [{ route: '/login' }, { route: '/login' }, { route: '/login' }] };
+
+  test('همهٔ گره‌ها روی روتِ ورود یعنی وارد نشدیم', async () => {
+    const { stuckAtLogin } = await import('../../src/map/render.js');
+    expect(stuckAtLogin(onlyLogin, { loginPath: '/login' })).toBe(true);
+    // بی پرونده هم، الگوی محافظه‌کارانه همین را می‌گیرد
+    expect(stuckAtLogin(onlyLogin)).toBe(true);
+  });
+
+  test('ولی یک گرهِ بیرون از ورود یعنی وارد شدیم', async () => {
+    const { stuckAtLogin } = await import('../../src/map/render.js');
+    const got = { states: [{ route: '/login' }, { route: '/contents' }] };
+    expect(stuckAtLogin(got, { loginPath: '/login' })).toBe(false);
+  });
+
+  test('و نقشه‌ای که فقط یک روتِ معمولی دارد، «وارد نشده» نیست', async () => {
+    const { stuckAtLogin } = await import('../../src/map/render.js');
+    // ادعای نادرستِ «وارد نشدی» از نگفتن بدتر است
+    expect(stuckAtLogin({ states: [{ route: '/contents' }] })).toBe(false);
+    expect(stuckAtLogin({ states: [] })).toBe(false);
+  });
+
+  test('پرونده بر حدس می‌چربد', async () => {
+    const { stuckAtLogin } = await import('../../src/map/render.js');
+    // اپی که صفحهٔ ورودش `/` است — الگوی نامی این را نمی‌گیرد، پرونده می‌گیرد
+    expect(stuckAtLogin({ states: [{ route: '/' }] }, { loginPath: '/' })).toBe(true);
+    expect(stuckAtLogin({ states: [{ route: '/login' }] }, { loginPath: '/' })).toBe(false);
+  });
+});

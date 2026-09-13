@@ -39,3 +39,36 @@
 {"at":"2026-09-13T06:23:50.693Z","op":"add","path":"routes[/lock]","by":"tour","why":"گشت 2026-09-13T06-16-51_nepi-bug_3cd800c7"}
 {"at":"2026-09-13T06:29:53.454Z","op":"add","path":"routes[/]","by":"run","why":"اجرای 2026-09-13T06-29-17_nepi-bug_6b1931b7","ref":"2026-09-13T06-29-17_nepi-bug_6b1931b7"}
 {"at":"2026-09-13T06:29:53.454Z","op":"add","path":"openQuestions[صفحهٔ / برای چیست؟]","by":"model","why":"اجرای 2026-09-13T06-29-17_nepi-bug_6b1931b7","ref":"2026-09-13T06-29-17_nepi-bug_6b1931b7"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"summary","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"update","path":"stack","by":"source","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"update","path":"auth","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"update","path":"routes[/login]","by":"tour","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"update","path":"routes[/contents]","by":"tour","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"update","path":"routes[/lock]","by":"tour","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"update","path":"routes[/]","by":"run","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"routes[/ai-chat]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"routes[/content/[id_book]]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"routes[/content]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"routes[/features]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"routes[/help]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"routes[/list]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"routes[/sqlite]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"entities[book]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"entities[content]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"openQuestions[هدف دقیق مسیر /sqlite چیست؟ آیا یک نمایشگر پایگاه داده است؟]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"openQuestions[مسیر /lock چه عملکردی دارد؟ آیا برای قفل کردن صفحه است؟]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"openQuestions[روش احراز هویت دقیقاً چیست؟ آیا فرم ورود با نام کاربری و رمز عبور است یا OAuth؟]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"openQuestions[آیا ثبت‌نام کاربر جدید باز است؟ مسیر /signup وجود ندارد.]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"openQuestions[مسیر /list چه چیزی را فهرست می‌کند؟]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"openQuestions[آیا مسیر /ai-chat نیاز به احراز هویت دارد؟]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"openQuestions[محتوای مسیر /content و /contents چه تفاوتی دارند؟]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:17:30.454Z","op":"add","path":"openQuestions[آیا دکمه خروج یا حذف داده‌ای در اپ وجود دارد؟]","by":"model","why":"هضم سورس از رابط"}
+{"at":"2026-09-13T07:18:58.510Z","op":"promote","path":"openQuestions[هدف دقیق مسیر /sqlite چیست؟ آیا یک نمایشگر پایگاه داده است؟]","by":"user","why":"پاسخ از رابط"}
+{"at":"2026-09-13T07:19:14.617Z","op":"promote","path":"openQuestions[مسیر /lock چه عملکردی دارد؟ آیا برای قفل کردن صفحه است؟]","by":"user","why":"پاسخ از رابط"}
+{"at":"2026-09-13T07:19:27.335Z","op":"promote","path":"openQuestions[صفحهٔ / برای چیست؟]","by":"user","why":"پاسخ از رابط"}
+{"at":"2026-09-13T07:19:44.827Z","op":"promote","path":"openQuestions[روش احراز هویت دقیقاً چیست؟ آیا فرم ورود با نام کاربری و رمز عبور است یا OAuth؟]","by":"user","why":"پاسخ از رابط"}
+{"at":"2026-09-13T07:20:06.215Z","op":"promote","path":"openQuestions[آیا ثبت‌نام کاربر جدید باز است؟ مسیر /signup وجود ندارد.]","by":"user","why":"پاسخ از رابط"}
+{"at":"2026-09-13T07:20:25.064Z","op":"promote","path":"openQuestions[مسیر /list چه چیزی را فهرست می‌کند؟]","by":"user","why":"پاسخ از رابط"}
+{"at":"2026-09-13T07:20:49.844Z","op":"promote","path":"openQuestions[آیا مسیر /ai-chat نیاز به احراز هویت دارد؟]","by":"user","why":"پاسخ از رابط"}
+{"at":"2026-09-13T07:21:34.933Z","op":"promote","path":"openQuestions[محتوای مسیر /content و /contents چه تفاوتی دارند؟]","by":"user","why":"پاسخ از رابط"}
+{"at":"2026-09-13T07:21:43.529Z","op":"promote","path":"openQuestions[آیا دکمه خروج یا حذف داده‌ای در اپ وجود دارد؟]","by":"user","why":"پاسخ از رابط"}

@@ -36,6 +36,7 @@ import { readChecksConfig } from '../checks/config.js';
 import { readDossier } from '../knowledge/store.js';
 import { avoidFrom } from '../knowledge/select.js';
 import { freshIdentity } from '../data/persian.js';
+import { listAccounts, readAccounts, saveAccount } from '../knowledge/credentials.js';
 
 import { actionsFrom, profileOf, routePatternOf, sampleActions, stateIdOf } from './state.js';
 import {
@@ -101,6 +102,7 @@ export class MapSession extends EventEmitter {
     entryLabel = '',
     fresh = false,
     allowDestructive = false,
+    rememberAs = '',
   } = {}) {
     super();
     this.targetName = target;
@@ -111,6 +113,7 @@ export class MapSession extends EventEmitter {
     this.entryLabel = entryLabel;
     this.fresh = fresh;
     this.allowDestructive = allowDestructive;
+    this.rememberAs = rememberAs;
 
     this.status = 'starting';
     this.events = [];
@@ -191,12 +194,30 @@ export class MapSession extends EventEmitter {
       );
     }
 
-    this.identity = freshIdentity(this.runId);
+    /**
+     * هویتِ خزش — تازه، یا همانی که بارِ قبل ساخته شد.
+     *
+     * ── چرا «به خاطر سپردن» مهم است ──
+     *
+     * هویتِ تازه در هر خزش یعنی **حسابِ خالی** در هر خزش: نه کتابی، نه
+     * یادداشتی، نه پوشه‌ای. نقشه‌ای که از حسابِ خالی درمی‌آید، پوستهٔ اپ را
+     * می‌بیند و محتوا را نه — و بیشترِ باگ‌ها آن‌جایند که داده هست.
+     *
+     * پس بارِ اول کاربر ساخته می‌شود و در همان انبارِ حساب‌های پروژه ذخیره
+     * (`credentials.json`)، و دفعهٔ بعد با همان وارد می‌شویم. حسابی که
+     * خزشِ قبلی پُرش کرده، خزشِ بعدی را عمیق‌تر می‌کند.
+     *
+     * سناریوی ورود عوض نمی‌شود: همان `{{identity.email}}` می‌ماند و فقط
+     * مقدارش از انبار می‌آید.
+     */
+    this.identity = this.rememberAs ? this.recallIdentity() : freshIdentity(this.runId);
     this.entryPath = this.entrySteps.length ? this.entrySteps : [{ go: '/' }];
     this.checksConfig = readChecksConfig(this.targetName);
 
     const dossier = readDossier(this.targetName);
     this.knownRoutes = (dossier.routes || []).map((route) => route.path).filter(Boolean);
+    // برای تشخیصِ «وارد نشدیم» و برای اینکه حسابِ نساخته ذخیره نشود
+    this.loginPath = dossier.auth?.loginPath ? routePatternOf(dossier.auth.loginPath) : '';
 
     /**
      * فهرستِ ممنوع، از دو جا و ادغام‌شده — همان قاعدهٔ `explore.js`.
@@ -240,6 +261,55 @@ export class MapSession extends EventEmitter {
     this.status = 'running';
     this.emitEvent('started', { runId: this.runId, baseURL: target.baseURL });
     return this;
+  }
+
+  /**
+   * حسابِ ذخیره‌شده، یا یکی تازه که بعداً ذخیره می‌شود.
+   *
+   * رمز اینجا **متنی** روی دیسک می‌نشیند و این یک استثناست، نه قاعده: حسابی
+   * که خودِ ابزار ساخته، رازِ کسی نیست و متغیر محیطی برایش یعنی کاربر باید
+   * دستی چیزی را که ندیده جایی بگذارد. `saveAccount` همین را با
+   * `allowPlain` صریح می‌خواهد، و روی محیطِ تولیدی اصلاً اجازه نمی‌دهد.
+   */
+  recallIdentity() {
+    const saved = listAccounts(this.targetName).find((item) => item.id === this.rememberAs);
+    const secret = readAccounts(this.targetName).find((item) => item.id === this.rememberAs);
+
+    if (saved && secret?.password && saved.email) {
+      this.recalled = true;
+      this.emitEvent('warning', { message: `با حسابِ ذخیره‌شدهٔ «${this.rememberAs}» وارد می‌شود.` });
+      return { ...freshIdentity(this.runId), email: saved.email, password: secret.password };
+    }
+    return freshIdentity(this.runId);
+  }
+
+  /**
+   * هویتِ تازه را فقط وقتی ذخیره کن که **واقعاً وارد شده باشیم**.
+   *
+   * ذخیرهٔ حسابی که ثبت‌نامش نگرفته، بدترین حالت است: خزشِ بعدی با آن تلاش
+   * می‌کند، می‌افتد، و کسی نمی‌فهمد چرا. پس شرطش این است که حالتِ آغاز روی
+   * صفحهٔ ورود نمانده باشد.
+   */
+  async rememberIdentity(root) {
+    if (!this.rememberAs || this.recalled || !root) return;
+    if (this.loginPath && root.route === this.loginPath) return;
+
+    try {
+      saveAccount({
+        target: this.targetName,
+        environment: this.target.environment,
+        id: this.rememberAs,
+        email: this.identity.email,
+        password: this.identity.password,
+        allowPlain: true,
+        note: `ساختهٔ خزشِ نقشه — ${this.runId}`,
+      });
+      this.emitEvent('warning', {
+        message: `حسابِ «${this.rememberAs}» ذخیره شد؛ خزشِ بعدی با همین وارد می‌شود.`,
+      });
+    } catch (cause) {
+      this.emitEvent('warning', { message: `ذخیرهٔ حساب نشد: ${cause.message}` });
+    }
   }
 
   /* ─────────────────────────── حالت ─────────────────────────── */
@@ -446,12 +516,30 @@ export class MapSession extends EventEmitter {
       });
     }
 
-    await replayPath({
-      page: this.page,
-      steps: this.entryPath.slice(1),
-      ctx: { identity: this.identity },
-      baseURL: this.target.baseURL,
-    });
+    const rest = this.entryPath.slice(1);
+    try {
+      await replayPath({ page: this.page, steps: rest, ctx: { identity: this.identity }, baseURL: this.target.baseURL });
+    } catch (cause) {
+      /**
+       * مزاحمی که **وسطِ** مسیرِ ورود می‌آید.
+       *
+       * سه دورِ بستن در ابتدای ورود، پنجره‌ای را می‌گیرد که با بارگذاری
+       * می‌آید. ولی نپی یک `alertdialog` دارد که چند ثانیه بعد می‌نشیند —
+       * و همان‌جا روی دکمهٔ «ورود / ثبت‌نام» می‌افتد و کلیک را می‌خورد.
+       *
+       * پس شکستِ کلیک در مسیرِ ورود یک بار بخشیده می‌شود: می‌بندیم و دوباره
+       * از اولِ همان قدم‌ها می‌رویم. بارِ دوم اگر باز شکست، واقعاً شکست است.
+       *
+       * فقط در مسیرِ ورود، نه در خزش: آنجا بستنِ خودکارِ پنجره یعنی مودال‌ها
+       * هرگز نقشه نشوند.
+       */
+      if (!/Timeout|intercepts pointer events/i.test(String(cause.message))) throw cause;
+
+      this.emitEvent('warning', { message: 'مسیرِ ورود پشتِ یک پنجره ماند؛ بسته شد و دوباره رفت.' });
+      await this.settle();
+      await dismissBlockers(this.page).catch(() => {});
+      await replayPath({ page: this.page, steps: rest, ctx: { identity: this.identity }, baseURL: this.target.baseURL });
+    }
     return await this.settle();
   }
 
@@ -684,6 +772,7 @@ export class MapSession extends EventEmitter {
 
     const root = await this.observeState([], settled);
     if (!root) throw new Error('حالتِ آغاز خوانده نشد — صفحه بالا نیامد؟');
+    await this.rememberIdentity(root);
     await writeMap(this.targetName, this.map);
 
     /**

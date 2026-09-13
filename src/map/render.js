@@ -69,7 +69,33 @@ export function extraRoutes(map, knownRoutes = []) {
     .filter((route, index, all) => all.indexOf(route) === index);
 }
 
-export function renderMap(map, { knownRoutes = [] } = {}) {
+/**
+ * آیا خزش اصلاً وارد نشد؟
+ *
+ * ── چرا این تشخیص لازم است ──
+ *
+ * خزشی که پشتِ صفحهٔ ورود بماند، **موفق** گزارش می‌شود: صف تمام می‌شود،
+ * چند حالت پیدا می‌شود، و پیام می‌گوید «صف تمام شد». کاربر نقشه‌ای می‌بیند
+ * با چهار گره و فکر می‌کند اپش همین‌قدر است.
+ *
+ * دقیقاً همان شکستِ خاموشی که این ابزار برای شکارش ساخته شده — این بار در
+ * خودش.
+ *
+ * تشخیص با `loginPath`ِ پرونده است، نه با حدس روی نام. نبودش به یک الگوی
+ * محافظه‌کارانه برمی‌گردد، و اگر هیچ‌کدام نبود سکوت می‌کند: ادعای نادرستِ
+ * «وارد نشدی» بدتر از نگفتن است.
+ */
+export function stuckAtLogin(map, { loginPath = '' } = {}) {
+  const routes = [...new Set((map?.states || []).map((state) => state.route).filter(Boolean))];
+  if (routes.length !== 1) return false;
+
+  const only = routes[0];
+  const wanted = loginPath ? routePatternOf(loginPath) : '';
+  if (wanted) return only === wanted;
+  return /^\/(login|signin|sign-in|auth|account\/login)$/i.test(only);
+}
+
+export function renderMap(map, { knownRoutes = [], loginPath = '' } = {}) {
   const lines = [];
   const stats = map.stats || {};
 
@@ -84,6 +110,16 @@ export function renderMap(map, { knownRoutes = [] } = {}) {
   if (!map.states.length) {
     lines.push('\n  خالی است. `userbug map <هدف>` را بزنید.');
     return lines.join('\n');
+  }
+
+  if (stuckAtLogin(map, { loginPath })) {
+    lines.push(
+      '\n  ⚠ خزش وارد نشد — همهٔ حالت‌ها پشتِ صفحهٔ ورود ماندند.',
+      '    این نقشه فقط صفحهٔ ورود است، نه اپ. برای دیدنِ داخل:',
+      '      userbug map <هدف> --from <سناریوی ورود> --remember crawler',
+      '    `--remember` بارِ اول کاربر می‌سازد و به خاطر می‌سپارد؛ دفعهٔ بعد',
+      '    با همان وارد می‌شود، پس حسابِ خالی هر بار از نو ساخته نمی‌شود.'
+    );
   }
 
   /** گروه‌بندی بر خانوادهٔ روت، و درونش بر نما. */

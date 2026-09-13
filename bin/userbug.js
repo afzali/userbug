@@ -118,6 +118,8 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --headed                     مرورگر دیده شود
       --device <نام>              دستگاه
       --allow-destructive         کنشِ برگشت‌ناپذیر هم زده شود
+      --remember <شناسه>          بارِ اول کاربر بساز و ذخیره کن؛ دفعهٔ بعد با
+                                  همان وارد شو (رمز متنی، فقط غیرِتولیدی)
       --show                      نقشهٔ موجود را نشان بده، بی‌خزش
       --classify                  هر کنش چه می‌کند: از سورس، و برای باقی‌مانده
                                   یک فراخوانی به ازای هر گره (کش‌شده)
@@ -961,10 +963,12 @@ async function cmdMap({ flags, positional }) {
 
   const { readMap } = await import('../src/map/store.js');
   const { renderMap } = await import('../src/map/render.js');
-  const knownRoutes = (readDossier(target).routes || []).map((route) => route.path).filter(Boolean);
+  const dossier = readDossier(target);
+  const knownRoutes = (dossier.routes || []).map((route) => route.path).filter(Boolean);
+  const loginPath = dossier.auth?.loginPath || '';
 
   if (flags.show) {
-    console.log('\n' + renderMap(readMap(target), { knownRoutes }) + '\n');
+    console.log('\n' + renderMap(readMap(target), { knownRoutes, loginPath }) + '\n');
     return;
   }
 
@@ -1070,6 +1074,7 @@ async function cmdMap({ flags, positional }) {
     entryLabel,
     fresh: Boolean(flags.fresh),
     allowDestructive: Boolean(flags['allow-destructive']),
+    rememberAs: flags.remember && flags.remember !== true ? String(flags.remember) : '',
   });
 
   session.on('event', (event) => {
@@ -1088,7 +1093,7 @@ async function cmdMap({ flags, positional }) {
     await session.stop();
   }
 
-  console.log('\n' + renderMap(map, { knownRoutes }));
+  console.log('\n' + renderMap(map, { knownRoutes, loginPath }));
   console.log(`\n  یافته‌ها: ${session.findings.length} ثبت‌شده از ${session.seenFindings.size} یکتا`);
   console.log(`  نقشه: knowledge/${target}/map.json  ·  اجرا: runs/${session.runId}/report.html\n`);
 }
