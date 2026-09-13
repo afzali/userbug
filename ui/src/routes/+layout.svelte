@@ -28,27 +28,62 @@
   /** روی صفحهٔ اجرا هیچ‌کدام از ردیف‌ها فعال نیست؛ نشانِ جداگانه‌اش را می‌گذاریم. */
   let onRunPage = $derived(page.url.pathname.startsWith('/runs/'));
 
+  /**
+   * منو به **ترتیبِ کار**، و گروه‌بندی‌شده.
+   *
+   * ── چرا فهرستِ تخت کافی نبود ──
+   *
+   * نُه آیتمِ هم‌وزن، هیچ نمی‌گفتند از کجا شروع کن. این را از قبل می‌دانستیم:
+   * کارتِ «از کجا شروع کنیم» دقیقاً برای همین ساخته شد و کامنتش نوشته بود
+   * «چهار آیتمِ هم‌وزن در منوی کناری» مشکل است. ولی آن کارت فقط روی پروژهٔ
+   * خالی دیده می‌شود، پس درمان با نخستین اجرا ناپدید می‌شد.
+   *
+   * سه گروه، همان سه کاری که آدم واقعاً می‌کند: اول اپ را می‌شناسی، بعد
+   * می‌آزمایی، بعد یافته‌ها را می‌خوانی. ترتیبِ درونِ هر گروه هم ترتیبِ
+   * واقعیِ قدم‌هاست، نه الفبا.
+   *
+   * «مقایسه» از اینجا رفت: دو اجرا لازم دارد و تا آن روز فقط یک ردیفِ مردهٔ
+   * هم‌ردهٔ شناخت بود. جایش کنارِ فهرستِ اجراهاست، جایی که معنا دارد.
+   */
   let nav = $derived(
     inProject
       ? [
-          { href: base, label: 'اجرا', icon: '▶', exact: true },
-          { href: `${base}/tour`, label: 'گشت زنده', icon: '◉' },
-          { href: `${base}/map`, label: 'نقشهٔ اپ', icon: '⬡' },
-          { href: `${base}/knowledge`, label: 'شناخت', icon: '◈' },
-          { href: `${base}/triage`, label: 'تریاژ', icon: '◇' },
-          { href: `${base}/compare`, label: 'مقایسه', icon: '⇄' },
-          { href: `${base}/files`, label: 'سناریوها', icon: '⌘' },
-          { href: `${base}/proposals`, label: 'چه باید آزمود', icon: '◎' },
-          // سراسری است، ولی از داخلِ پروژه هم باید در دسترس باشد: خطای مدل
-          // وسطِ کار پیدا می‌شود، نه در صفحهٔ اولِ فهرست پروژه‌ها
-          { href: '/settings', label: 'تنظیمات', icon: '⚙' },
+          {
+            label: 'شناختن',
+            items: [
+              { href: `${base}/tour`, label: 'گشت زنده', icon: '◉' },
+              { href: `${base}/map`, label: 'نقشهٔ اپ', icon: '⬡' },
+              { href: `${base}/knowledge`, label: 'شناخت', icon: '◈' },
+            ],
+          },
+          {
+            label: 'آزمودن',
+            items: [
+              { href: `${base}/proposals`, label: 'چه باید آزمود', icon: '◎' },
+              { href: `${base}/files`, label: 'سناریوها', icon: '⌘' },
+              { href: base, label: 'اجرا', icon: '▶', exact: true },
+            ],
+          },
+          { label: 'یافته‌ها', items: [{ href: `${base}/triage`, label: 'تریاژ', icon: '◇' }] },
         ]
       : [
-          { href: '/', label: 'پروژه‌ها', icon: '◫', exact: true },
-          { href: '/projects/new', label: 'پروژهٔ تازه', icon: '＋' },
-          { href: '/settings', label: 'تنظیمات', icon: '⚙' },
+          {
+            label: '',
+            items: [
+              { href: '/', label: 'پروژه‌ها', icon: '◫', exact: true },
+              { href: '/projects/new', label: 'پروژهٔ تازه', icon: '＋' },
+            ],
+          },
         ]
   );
+
+  /**
+   * تنظیمات در هیچ گروهی نیست، چون قدمی از مسیر نیست.
+   *
+   * زیرِ «یافته‌ها» نشسته بود و آن غلط بود. ولی از منو هم نمی‌شود برداشتش:
+   * خطای مدل وسطِ کار پیدا می‌شود، نه در صفحهٔ اولِ فهرست پروژه‌ها.
+   */
+  const settingsLink = { href: '/settings', label: 'تنظیمات', icon: '⚙' };
 
   onMount(() => {
     dark = document.documentElement.classList.contains('dark');
@@ -96,12 +131,27 @@
       </div>
     {/if}
 
-    <nav class="scroll-thin flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:overflow-visible lg:px-4">
-      {#each nav as item (item.href)}
-        <a href={item.href} class={`flex shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive(item) ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`} aria-current={isActive(item) ? 'page' : undefined}>
-          <span class="grid size-6 place-items-center text-base" aria-hidden="true">{item.icon}</span>{item.label}
-        </a>
+    <!--
+      روی موبایل یک نوارِ افقی است و عنوانِ گروه جا نمی‌گیرد؛ آنجا گروه‌ها
+      فقط با فاصله از هم جدا می‌شوند. عنوان از `lg` به بالا می‌آید.
+    -->
+    <nav class="scroll-thin flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:gap-0 lg:overflow-visible lg:px-4">
+      {#each nav as group (group.label)}
+        {#if group.label}
+          <p class="mt-3 mb-1 hidden px-3 text-[11px] font-medium tracking-wide text-muted-foreground/70 first:mt-0 lg:block">
+            {group.label}
+          </p>
+        {/if}
+        {#each group.items as item (item.href)}
+          <a href={item.href} class={`flex shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive(item) ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`} aria-current={isActive(item) ? 'page' : undefined}>
+            <span class="grid size-6 place-items-center text-base" aria-hidden="true">{item.icon}</span>{item.label}
+          </a>
+        {/each}
       {/each}
+
+      <a href={settingsLink.href} class={`mt-1 flex shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors lg:mt-3 lg:border-t lg:pt-3 ${isActive(settingsLink) ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`} aria-current={isActive(settingsLink) ? 'page' : undefined}>
+        <span class="grid size-6 place-items-center text-base" aria-hidden="true">{settingsLink.icon}</span>{settingsLink.label}
+      </a>
     </nav>
 
     <div class="mx-4 mt-auto hidden rounded-xl border bg-background/60 p-4 text-xs leading-6 text-muted-foreground lg:block">

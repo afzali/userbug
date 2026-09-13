@@ -58,6 +58,65 @@
    * تاریخچه دارد، کاربرِ تازه‌کار نیست و نباید راهنمای شروع ببیند.
    */
   let blank = $derived(!project.scenarios?.length && !runs.length && !job);
+
+  /**
+   * پنج قدمِ مسیر، با وضعیتِ واقعی‌شان.
+   *
+   * `done` عمداً سخت‌گیر نیست: «یک بار انجام شده» را می‌گوید، نه «کامل است».
+   * ادعای کامل بودن همان چیزی است که این ابزار جای دیگر هم از آن پرهیز
+   * می‌کند — عددِ کنارش خودش می‌گوید چقدر مانده.
+   */
+  let steps = $derived.by(() => {
+    const p = data.progress || {};
+    const runnable = (project.scenarios || []).filter((item) => item.runnable).length;
+    const base = `/projects/${encodeURIComponent(target)}`;
+    const percent = p.coverage === null || p.coverage === undefined ? null : Math.round(p.coverage * 100);
+
+    return [
+      {
+        index: '۱',
+        label: 'گشت',
+        href: `${base}/tour`,
+        done: p.pages > 0,
+        state: p.pages ? `${p.pages} صفحه ثبت شد` : 'با هم در اپ بگردیم',
+      },
+      {
+        index: '۲',
+        label: 'نقشه',
+        href: `${base}/map`,
+        done: p.states > 0,
+        state: p.states ? `${p.states} حالت · ${p.frontier} کنش در صف` : 'بقیه را خودش بگردد',
+      },
+      {
+        index: '۳',
+        label: 'شناخت',
+        href: `${base}/knowledge`,
+        done: percent !== null && percent > 0,
+        state:
+          percent === null || percent === 0
+            ? 'هنوز چیزی نمی‌دانیم'
+            : `${percent}٪${p.questions ? ` · ${p.questions} پرسشِ بی‌جواب` : ''}`,
+      },
+      {
+        index: '۴',
+        label: 'سناریو',
+        href: runnable ? `${base}/files` : `${base}/proposals`,
+        done: runnable > 0,
+        state: runnable
+          ? `${runnable} سناریو${p.proposals ? ` · ${p.proposals} پیشنهادِ باز` : ''}`
+          : p.proposals
+            ? `${p.proposals} پیشنهاد آماده است`
+            : 'هنوز سناریویی نیست',
+      },
+      {
+        index: '۵',
+        label: 'اجرا',
+        href: base,
+        done: runs.length > 0,
+        state: runs.length ? `${runs.length} اجرا` : 'هنوز اجرا نشده',
+      },
+    ];
+  });
   let busy = $derived(ACTIVE_JOB_STATUSES.has(job?.status));
   let canCancel = $derived(['starting', 'running'].includes(job?.status));
   let latestStep = $derived(liveSteps.at(-1));
@@ -196,16 +255,48 @@
 <PageHeader eyebrow={`${project.environment} · ${project.baseURL}`} title={project.name} description="سناریو را انتخاب کنید؛ قدم، عکس، خطای مرورگر و لاگ سرور در همان لحظه اینجا می‌آیند.">
   {#snippet actions()}
     <Button href={`/projects/${encodeURIComponent(target)}/files`} variant="outline">سناریوها</Button>
-    <Button href={`/projects/${encodeURIComponent(target)}/compare`} variant="outline">مقایسهٔ اجراها</Button>
   {/snippet}
 </PageHeader>
+
+<!--
+  نوارِ مسیر — همیشه، نه فقط روی پروژهٔ خالی.
+
+  ── چرا ──
+
+  کارتِ «از کجا شروع کنیم» فقط وقتی می‌آمد که پروژه هیچ نداشت، پس دقیقاً
+  وقتی ناپدید می‌شد که کار تازه جدی شده بود: کسی که یک اجرا داشت، دیگر
+  هیچ‌جا نمی‌دید که نقشه نکشیده و شناختش نصفه مانده.
+
+  این نوار همان پنج قدم است با **عدد**، و عددها از منبعِ خودشان می‌آیند.
+  قدمی که هنوز انجام نشده، دعوت است؛ قدمی که انجام شده، وضعیت.
+-->
+<section class="mb-6 overflow-hidden rounded-xl border">
+  <ol class="grid divide-y sm:grid-cols-5 sm:divide-x sm:divide-y-0 sm:divide-x-reverse">
+    {#each steps as step (step.href)}
+      <li>
+        <a
+          href={step.href}
+          class="flex h-full flex-col gap-1 p-3 transition-colors hover:bg-accent/60 {step.done ? '' : 'bg-muted/30'}"
+        >
+          <span class="flex items-center gap-2 text-xs font-medium">
+            <span class="grid size-5 shrink-0 place-items-center rounded-full border text-[10px] {step.done ? 'border-primary/40 bg-primary/10 text-primary' : 'text-muted-foreground'}">
+              {step.done ? '✓' : step.index}
+            </span>
+            {step.label}
+          </span>
+          <span class="text-[11px] leading-5 text-muted-foreground">{step.state}</span>
+        </a>
+      </li>
+    {/each}
+  </ol>
+</section>
 
 {#if blank}
   <!--
     مسیرِ شروع، نه فهرستِ امکانات.
 
-    سه قدم به ترتیبِ واقعی‌شان، و فقط قدمِ اول دکمهٔ برجسته دارد. اگر هر سه
-    برجسته بودند، دوباره همان «چهار آیتمِ هم‌وزن» می‌شد که مشکل بود.
+    نوارِ بالا وضعیت را می‌گوید؛ این یکی **چرا** را می‌گوید، و فقط یک بار
+    لازم است. پس با نخستین قدمِ واقعی می‌رود.
   -->
   <section class="mb-6 rounded-xl border bg-muted/30 p-6">
     <h2 class="text-base font-semibold">از کجا شروع کنیم</h2>
@@ -419,7 +510,25 @@
     {/if}
 
     <div>
-      <div class="mb-4 flex items-end justify-between"><div><h2 class="text-xl font-bold">اجراهای اخیر</h2><p class="mt-1 text-sm text-muted-foreground">تاریخچه مستقیماً از پوشهٔ runs خوانده می‌شود.</p></div><Badge variant="outline">{formatNumber(runs.length)} اجرا</Badge></div>
+      <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 class="text-xl font-bold">اجراهای اخیر</h2>
+          <p class="mt-1 text-sm text-muted-foreground">تاریخچه مستقیماً از پوشهٔ runs خوانده می‌شود.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <!--
+            «مقایسه» از منوی کناری به اینجا آمد: دو اجرا لازم دارد، پس تا
+            وقتی اجرایی نیست فقط یک ردیفِ مرده بود کنارِ شناخت. با کمتر از دو
+            اجرا اصلاً نشان داده نمی‌شود.
+          -->
+          {#if runs.length > 1}
+            <Button href={`/projects/${encodeURIComponent(target)}/compare`} variant="outline" size="sm">
+              مقایسهٔ دو اجرا
+            </Button>
+          {/if}
+          <Badge variant="outline">{formatNumber(runs.length)} اجرا</Badge>
+        </div>
+      </div>
       <div class="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
         {#each runs as run (run.runId)}<RunCard {run} />{:else}<p class="rounded-xl border border-dashed p-10 text-center text-muted-foreground md:col-span-2">هنوز اجرایی ثبت نشده است.</p>{/each}
       </div>
