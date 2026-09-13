@@ -87,6 +87,10 @@
             ],
           },
           { label: 'یافته‌ها', items: [{ href: `${base}/triage`, label: 'تریاژ', icon: '◇' }] },
+          {
+            label: 'پیکربندی',
+            items: [{ href: `${base}/config`, label: 'حساب و چک', icon: '⚒' }],
+          },
         ]
       : [
           {
