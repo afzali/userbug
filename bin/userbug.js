@@ -119,7 +119,11 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --device <نام>              دستگاه
       --allow-destructive         کنشِ برگشت‌ناپذیر هم زده شود
       --remember <شناسه>          بارِ اول کاربر بساز و ذخیره کن؛ دفعهٔ بعد با
-                                  همان وارد شو (رمز متنی، فقط غیرِتولیدی)
+                                  همان وارد شو. حسابی که خودتان در «حساب و چک»
+                                  ساخته‌اید هم با همین شناسه استفاده می‌شود.
+      --profile                   مرورگر را با پروفایلِ خزشِ قبلی باز کن —
+                                  نشست و کش می‌مانند، پس ورود یک‌بار است
+      --fresh-profile             پروفایل را اول پاک کن
       --show                      نقشهٔ موجود را نشان بده، بی‌خزش
       --classify                  هر کنش چه می‌کند: از سورس، و برای باقی‌مانده
                                   یک فراخوانی به ازای هر گره (کش‌شده)
@@ -1075,6 +1079,8 @@ async function cmdMap({ flags, positional }) {
     fresh: Boolean(flags.fresh),
     allowDestructive: Boolean(flags['allow-destructive']),
     rememberAs: flags.remember && flags.remember !== true ? String(flags.remember) : '',
+    profile: Boolean(flags.profile || flags['fresh-profile']),
+    freshProfile: Boolean(flags['fresh-profile']),
   });
 
   session.on('event', (event) => {

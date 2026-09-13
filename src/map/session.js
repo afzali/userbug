@@ -33,7 +33,7 @@ import { snapshotPage } from '../steps/snapshot.js';
 import { resolveTarget } from '../scenario/resolve.js';
 import { runUniversalChecks } from '../checks/run.js';
 import { readChecksConfig } from '../checks/config.js';
-import { readDossier } from '../knowledge/store.js';
+import { knowledgeDir, readDossier } from '../knowledge/store.js';
 import { avoidFrom } from '../knowledge/select.js';
 import { freshIdentity } from '../data/persian.js';
 import { listAccounts, readAccounts, saveAccount } from '../knowledge/credentials.js';
@@ -103,6 +103,8 @@ export class MapSession extends EventEmitter {
     fresh = false,
     allowDestructive = false,
     rememberAs = '',
+    profile = false,
+    freshProfile = false,
   } = {}) {
     super();
     this.targetName = target;
@@ -114,6 +116,8 @@ export class MapSession extends EventEmitter {
     this.fresh = fresh;
     this.allowDestructive = allowDestructive;
     this.rememberAs = rememberAs;
+    this.profile = profile;
+    this.freshProfile = freshProfile;
 
     this.status = 'starting';
     this.events = [];
@@ -235,12 +239,50 @@ export class MapSession extends EventEmitter {
       throw new Error(`دستگاهِ ناشناخته: «${this.deviceName}»`);
     }
 
-    this.browser = await chromium.launch({ headless: this.headless });
-    this.context = await this.browser.newContext({
-      locale: target.locale || undefined,
-      acceptDownloads: true,
-      ...emulation,
-    });
+    /**
+     * پروفایلِ ماندگار — اگر خواسته شده باشد.
+     *
+     * ── چرا ارزش دارد ──
+     *
+     * contextِ تازه یعنی هر خزش از صفر: نه کوکی، نه localStorage، نه کش. پس
+     * مسیرِ ورود در **هر** خزش دوباره طی می‌شود، با همهٔ شکنندگی‌اش. با
+     * پروفایلِ ماندگار، نشستِ خزشِ قبلی زنده می‌ماند و شرط‌های `when` در
+     * سناریوی ورود خودشان رد می‌شوند — یعنی ورود از «هر بار» به «یک بار»
+     * تبدیل می‌شود.
+     *
+     * ── و چرا پیش‌فرض نیست ──
+     *
+     * حالتِ ماندگار یعنی خزشِ امروز به خزشِ دیروز وابسته است: پروفایلی که
+     * خراب شود یا نشستی که منقضی شود، شکستی می‌سازد که علتش در این اجرا
+     * نیست. پس صریح خواسته می‌شود و `--fresh-profile` پاکش می‌کند.
+     *
+     * جایش کنارِ شناختِ پروژه است و در `.gitignore`: نشستِ لاگین‌شده روی
+     * دیسک، دادهٔ همین ماشین است.
+     */
+    if (this.profile) {
+      this.profileDir = path.join(knowledgeDir(this.targetName), 'profile');
+      if (this.freshProfile) await fsp.rm(this.profileDir, { recursive: true, force: true }).catch(() => {});
+      await fsp.mkdir(this.profileDir, { recursive: true });
+
+      this.context = await chromium.launchPersistentContext(this.profileDir, {
+        headless: this.headless,
+        locale: target.locale || undefined,
+        acceptDownloads: true,
+        ...emulation,
+      });
+      this.emitEvent('warning', {
+        message: this.freshProfile
+          ? 'پروفایلِ مرورگر از صفر ساخته شد.'
+          : 'پروفایلِ مرورگرِ خزشِ قبلی باز شد — نشست و کش سرِ جایشان‌اند.',
+      });
+    } else {
+      this.browser = await chromium.launch({ headless: this.headless });
+      this.context = await this.browser.newContext({
+        locale: target.locale || undefined,
+        acceptDownloads: true,
+        ...emulation,
+      });
+    }
     /**
      * trace برای خزش هم — به همان دلیلِ گشت.
      *
@@ -255,7 +297,7 @@ export class MapSession extends EventEmitter {
     await this.context.addInitScript(INIT_SCRIPT);
 
     this.collectors = await startAll(createServerCollectors(target.logs));
-    this.page = await this.context.newPage();
+    this.page = this.context.pages()[0] || (await this.context.newPage());
     attachClientObservers(this.page, (raw) => this.events.push({ ...raw, at: new Date().toISOString() }));
 
     this.status = 'running';
@@ -275,10 +317,31 @@ export class MapSession extends EventEmitter {
     const saved = listAccounts(this.targetName).find((item) => item.id === this.rememberAs);
     const secret = readAccounts(this.targetName).find((item) => item.id === this.rememberAs);
 
-    if (saved && secret?.password && saved.email) {
+    /**
+     * رمز از متغیر محیطی **یا** از فایل.
+     *
+     * ── چرا هر دو ──
+     *
+     * حسابی که خودِ خزش ساخته، رمزش متنی روی دیسک است و رازِ کسی نیست. ولی
+     * حسابی که **کاربر** تعریف کرده — همان‌جا در صفحهٔ «حساب و چک» — رمزش
+     * در متغیر محیطی است، چون قاعدهٔ این پروژه همان است.
+     *
+     * نسخهٔ اول فقط رمزِ متنی را می‌خواند، پس حسابِ واقعیِ کاربر بی‌صدا
+     * نادیده گرفته می‌شد و خزش کاربرِ تازه می‌ساخت: دقیقاً برعکسِ چیزی که
+     * کاربر خواسته بود.
+     */
+    const password = secret?.passwordEnv ? process.env[secret.passwordEnv] : secret?.password;
+
+    if (saved && password && (saved.email || saved.username)) {
       this.recalled = true;
       this.emitEvent('warning', { message: `با حسابِ ذخیره‌شدهٔ «${this.rememberAs}» وارد می‌شود.` });
-      return { ...freshIdentity(this.runId), email: saved.email, password: secret.password };
+      return { ...freshIdentity(this.runId), email: saved.email || saved.username, password };
+    }
+
+    if (saved && !password) {
+      this.emitEvent('warning', {
+        message: `حسابِ «${this.rememberAs}» رمز در دسترس ندارد (${secret?.passwordEnv || '—'})؛ کاربرِ تازه ساخته می‌شود.`,
+      });
     }
     return freshIdentity(this.runId);
   }
@@ -484,6 +547,7 @@ export class MapSession extends EventEmitter {
       steps: [this.entryPath[0]],
       ctx: { identity: this.identity },
       baseURL: this.target.baseURL,
+      target: this.targetName,
     });
 
     /**
@@ -518,7 +582,7 @@ export class MapSession extends EventEmitter {
 
     const rest = this.entryPath.slice(1);
     try {
-      await replayPath({ page: this.page, steps: rest, ctx: { identity: this.identity }, baseURL: this.target.baseURL });
+      await replayPath({ page: this.page, steps: rest, ctx: { identity: this.identity }, baseURL: this.target.baseURL, target: this.targetName });
     } catch (cause) {
       /**
        * مزاحمی که **وسطِ** مسیرِ ورود می‌آید.
@@ -538,7 +602,7 @@ export class MapSession extends EventEmitter {
       this.emitEvent('warning', { message: 'مسیرِ ورود پشتِ یک پنجره ماند؛ بسته شد و دوباره رفت.' });
       await this.settle();
       await dismissBlockers(this.page).catch(() => {});
-      await replayPath({ page: this.page, steps: rest, ctx: { identity: this.identity }, baseURL: this.target.baseURL });
+      await replayPath({ page: this.page, steps: rest, ctx: { identity: this.identity }, baseURL: this.target.baseURL, target: this.targetName });
     }
     return await this.settle();
   }
@@ -551,6 +615,7 @@ export class MapSession extends EventEmitter {
       steps: state.path || [],
       ctx: { identity: this.identity },
       baseURL: this.target.baseURL,
+      target: this.targetName,
     });
     const current = await this.settle();
     return current?.id === state.id;

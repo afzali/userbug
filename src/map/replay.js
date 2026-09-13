@@ -14,6 +14,7 @@
  */
 import { resolveTarget } from '../scenario/resolve.js';
 import { interpolate } from '../scenario/interpolate.js';
+import { resolveFixture } from '../knowledge/fixtures.js';
 
 /** فعل‌هایی که ضبط‌کنندهٔ گشت و خودِ نقشه تولید می‌کنند. */
 export const REPLAY_VERBS = [
@@ -28,6 +29,7 @@ export const REPLAY_VERBS = [
   'wait',
   'clearState',
   'when',
+  'upload',
 ];
 
 const TIMEOUT = 8000;
@@ -64,7 +66,7 @@ export function unsupportedVerbs(steps = []) {
  * @param {object} [o.ctx] برای جای‌گذاری `{{identity.…}}`
  * @param {string} [o.baseURL] برای `go`ِ نسبی
  */
-export async function replayStep({ page, step, ctx = {}, baseURL = '' }) {
+export async function replayStep({ page, step, ctx = {}, baseURL = '', target = '' }) {
   const verb = verbOf(step);
   if (!verb) return { verb: '', skipped: true };
   if (!REPLAY_VERBS.includes(verb)) throw new Error(`فعلِ بی‌پشتیبانی در بازپخشِ نقشه: «${verb}»`);
@@ -87,7 +89,7 @@ export async function replayStep({ page, step, ctx = {}, baseURL = '' }) {
      */
     case 'when': {
       if (await conditionHolds(page, body)) {
-        for (const sub of step.then || []) await replayStep({ page, step: sub, ctx, baseURL });
+        for (const sub of step.then || []) await replayStep({ page, step: sub, ctx, baseURL, target });
       }
       break;
     }
@@ -100,6 +102,39 @@ export async function replayStep({ page, step, ctx = {}, baseURL = '' }) {
     case 'wait':
       await page.waitForTimeout(Math.min(Number(body) || 0, 10_000));
       break;
+
+    /**
+     * دادنِ فایل به اپ — تا خزش بتواند اپِ **پُر** را ببیند، نه خالی.
+     *
+     * ── چرا اضافه شد ──
+     *
+     * پیش‌نویسِ گشت `upload` دارد (کاربر یک فایل وارد کرده بود) و همین یک
+     * فعل، آن سناریو را به‌عنوان مسیرِ ورود غیرقابل‌استفاده می‌کرد. و
+     * مهم‌تر: نقشه‌ای که از حسابِ خالی درمی‌آید، صفحه‌های داده‌دار را اصلاً
+     * نمی‌بیند.
+     *
+     * مسیر از `resolveFixture` می‌گذرد — همان دروازه‌ای که مفسرِ سناریو
+     * استفاده می‌کند — پس فقط از `knowledge/<کلید>/fixtures/` خوانده می‌شود
+     * و رشتهٔ آزاد نمی‌تواند هر فایلی از دیسک را بفرستد.
+     */
+    case 'upload': {
+      const names = [].concat(body.file ?? body.files ?? []);
+      if (!names.length) throw new Error('upload بدون `file` معنا ندارد');
+
+      const resolved = [];
+      for (const name of names) resolved.push((await resolveFixture(target, name)).file);
+
+      if (body.trigger) {
+        const chooser = page.waitForEvent('filechooser', { timeout: body.timeout ?? 15_000 });
+        await resolveTarget(page, body.trigger).locator.click();
+        await (await chooser).setFiles(resolved);
+      } else if (body.to) {
+        await resolveTarget(page, body.to).locator.setInputFiles(resolved);
+      } else {
+        throw new Error('upload باید `to` (خودِ input) یا `trigger` (دکمه) داشته باشد');
+      }
+      break;
+    }
     case 'press':
       await page.keyboard.press(String(body || 'Enter'));
       break;
@@ -170,9 +205,9 @@ async function conditionHolds(page, cond = {}) {
 }
 
 /** زنجیره. اولین شکست، کلِ بازپخش را می‌شکند — مسیرِ نیمه‌طی‌شده بی‌معناست. */
-export async function replayPath({ page, steps = [], ctx = {}, baseURL = '', settle = 400 }) {
+export async function replayPath({ page, steps = [], ctx = {}, baseURL = '', target = '', settle = 400 }) {
   for (const step of steps) {
-    await replayStep({ page, step, ctx, baseURL });
+    await replayStep({ page, step, ctx, baseURL, target });
     if (settle) await page.waitForTimeout(settle);
   }
 }

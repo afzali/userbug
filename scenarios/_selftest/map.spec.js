@@ -225,7 +225,9 @@ test.describe('ادغامِ بازدیدها', () => {
 test.describe('بازپخش', () => {
   test('فعلِ ناشناس بلند می‌شکند، نه بی‌صدا', () => {
     expect(unsupportedVerbs([{ go: '/' }, { click: {} }])).toEqual([]);
-    expect(unsupportedVerbs([{ upload: {} }, { query: 'select 1' }])).toEqual(['upload', 'query']);
+    // `upload` پشتیبانی می‌شود تا بشود اپِ پُر را خزید، نه خالی
+    expect(unsupportedVerbs([{ upload: {} }])).toEqual([]);
+    expect(unsupportedVerbs([{ query: 'select 1' }, { request: {} }])).toEqual(['query', 'request']);
   });
 
   test('`as` برچسب است نه فعل', () => {

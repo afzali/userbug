@@ -3,6 +3,10 @@ import { extraRoutes, stuckAtLogin, unreachedRoutes } from '../../../../../../sr
 import { mispredictions } from '../../../../../../src/map/classify.js';
 import { readDossier } from '../../../../../../src/knowledge/store.js';
 import { listScenarios } from '$lib/server/projects.js';
+import { loadScenario } from '../../../../../../src/scenario/load.js';
+import { unsupportedVerbs } from '../../../../../../src/map/replay.js';
+import { scenarioDir } from '../../../../../../src/scenario/load.js';
+import path from 'node:path';
 
 /**
  * نقشهٔ اپ.
@@ -53,6 +57,27 @@ export async function load({ params }) {
      * می‌کند اپش همین‌قدر است.
      */
     stuck: map ? safely(() => stuckAtLogin(map, { loginPath }), false) : false,
-    scenarios: await listScenarios(target).catch(() => []),
+    /**
+     * کدام سناریو **واقعاً** می‌تواند مسیرِ ورود باشد.
+     *
+     * ── چرا لازم شد ──
+     *
+     * کشویی همهٔ سناریوها را نشان می‌داد، از جمله پیش‌نویسِ گشت که ۵۷ قدم و
+     * یک `upload` دارد. کاربر انتخابش می‌کرد، خزش شروع می‌شد و با «فعلی دارد
+     * که خزش اجرا نمی‌کند: upload» می‌افتاد — یعنی خطا را **بعد** از شروع
+     * می‌فهمید، نه موقعِ انتخاب.
+     *
+     * سنجش همان‌جایی انجام می‌شود که خودِ خزش انجامش می‌دهد
+     * (`unsupportedVerbs`)، وگرنه دو تعریف از «اجراشدنی» می‌داشتیم.
+     */
+    scenarios: await Promise.all(
+      (await listScenarios(target).catch(() => [])).map(async (scenario) => {
+        const blockers = safely(
+          () => unsupportedVerbs(loadScenario(path.join(scenarioDir(target), scenario.path)).steps),
+          ['ناخوانا']
+        );
+        return { ...scenario, blockers };
+      })
+    ),
   };
 }

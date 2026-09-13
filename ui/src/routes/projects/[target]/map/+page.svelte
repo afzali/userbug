@@ -21,6 +21,8 @@
   let headed = $state(false);
   /** شناسهٔ حسابی که خزش می‌سازد و به خاطر می‌سپارد. خالی یعنی هویتِ تازه هر بار. */
   let remember = $state('crawler');
+  /** پروفایلِ ماندگار: نشستِ خزشِ قبلی می‌ماند، پس ورود یک‌بار است. */
+  let profile = $state(true);
   let busy = $state(false);
   let error = $state('');
 
@@ -89,6 +91,7 @@
           fresh,
           headed,
           remember,
+          profile,
         }),
       });
       const payload = await response.json();
@@ -163,7 +166,13 @@
             <select bind:value={from} class="h-9 w-full rounded-md border bg-background px-2 text-sm">
               <option value="">— بدون ورود؛ از صفحهٔ اول —</option>
               {#each data.scenarios as scenario (scenario.path)}
-                <option value={`scenarios/${target}/${scenario.path}`}>{scenario.name}</option>
+                <!-- سناریویی که خزش نمی‌تواند بازپخشش کند، انتخاب‌شدنی نیست -->
+                <option
+                  value={`scenarios/${target}/${scenario.path}`}
+                  disabled={scenario.blockers.length > 0}
+                >
+                  {scenario.name}{scenario.blockers.length ? ` — ${scenario.blockers.join('، ')} ندارد` : ''}
+                </option>
               {/each}
             </select>
             <span class="block text-[11px] leading-5 text-muted-foreground">
@@ -189,6 +198,16 @@
             <span class="block text-[11px] leading-5 text-muted-foreground">
               بارِ اول با سناریوی ورود کاربر می‌سازد و ذخیره‌اش می‌کند؛ دفعهٔ بعد با
               همان وارد می‌شود. حسابی که خزشِ قبلی پُرش کرده، نقشهٔ عمیق‌تری می‌دهد.
+            </span>
+          </label>
+
+          <label class="flex items-start gap-2 text-xs">
+            <input type="checkbox" bind:checked={profile} class="mt-0.5" />
+            <span>
+              همان مرورگرِ خزشِ قبلی
+              <span class="block text-[11px] leading-5 text-muted-foreground">
+                نشست و کش می‌مانند، پس بعد از بارِ اول ورود لازم نیست.
+              </span>
             </span>
           </label>
 
