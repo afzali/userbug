@@ -12,9 +12,12 @@
  * مدل است. تا آن روز، این نما جوابِ «چند شاخه داریم» را می‌دهد.
  */
 import { routePatternOf } from './state.js';
+import { mispredictions } from './classify.js';
 
 const KIND_LABEL = {
   nav: 'ناوبری',
+  mutate: 'جهش',
+  inert: 'بی‌اثر',
   unknown: 'نامعلوم',
   input: 'ورودی',
   noise: 'نمایشی',
@@ -109,6 +112,14 @@ export function renderMap(map, { knownRoutes = [] } = {}) {
   }
 
   if (map.frontier?.length) lines.push(`\n  صفِ باقی‌مانده: ${map.frontier.length} کنش`);
+
+  const wrong = mispredictions(map);
+  if (wrong.length) {
+    lines.push(`\n  پیش‌بینی نخواند (${wrong.length}) — سورس یک چیز گفت، کلیک چیز دیگری:`);
+    for (const row of wrong.slice(0, 8)) {
+      lines.push(`    «${row.label.slice(0, 28)}» ${row.predicted} → ${row.actual}`);
+    }
+  }
 
   const unreached = unreachedRoutes(map, knownRoutes);
   if (unreached.length) {

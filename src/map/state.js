@@ -277,7 +277,22 @@ export function actionsFrom(snapshot) {
  * نمونهٔ دیگری می‌گرفت و هیچ‌وقت تمام نمی‌شد.
  */
 export function sampleActions(actions = [], { perRole = 3, family = 20, max = 25 } = {}) {
-  const eligible = (action) => action.kind === 'unknown' || action.kind === 'nav';
+  /**
+   * `mutate` هم خزیدنی است، `inert` نه.
+   *
+   * ── چرا این خط بعد از فاز ۲ لازم شد ──
+   *
+   * پیش از طبقه‌بندی، همه‌چیز `unknown` بود و خودبه‌خود سهمیه می‌گرفت. با
+   * آمدنِ فاز ۲، همان دکمه‌ها `mutate` می‌شوند — و اگر این‌جا نیایند، خزشِ
+   * بعدی **کم‌عمق‌تر** از خزشِ قبلی می‌شد: طبقه‌بندی، که قرار بود کمک کند،
+   * نیمی از اپ را از نقشه بیرون می‌انداخت.
+   *
+   * `inert` عمداً بیرون است: کنشی که خودِ کد می‌گوید اثری ندارد، کلیکش فقط
+   * بودجه می‌خورد. `destructive` هم در `untriedOf` جدا گرفته می‌شود، چون
+   * آنجا پرچمِ صریحِ کاربر تصمیم می‌گیرد.
+   */
+  const eligible = (action) =>
+    action.kind === 'unknown' || action.kind === 'nav' || action.kind === 'mutate';
 
   const population = new Map();
   for (const action of actions) {

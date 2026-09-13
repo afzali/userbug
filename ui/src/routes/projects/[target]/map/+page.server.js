@@ -1,5 +1,6 @@
 import { readMap } from '../../../../../../src/map/store.js';
 import { extraRoutes, unreachedRoutes } from '../../../../../../src/map/render.js';
+import { mispredictions } from '../../../../../../src/map/classify.js';
 import { readDossier } from '../../../../../../src/knowledge/store.js';
 import { listScenarios } from '$lib/server/projects.js';
 
@@ -38,6 +39,13 @@ export async function load({ params }) {
     knownRoutes,
     unreached: map ? safely(() => unreachedRoutes(map, knownRoutes), []) : [],
     extra: map ? safely(() => extraRoutes(map, knownRoutes), []) : [],
+    /**
+     * جایی که سورس یک چیز گفت و کلیک چیز دیگری نشان داد.
+     *
+     * صفر هزینه دارد چون هر دو عدد از قبل در نقشه‌اند، و جنسِ باگی است که
+     * هیچ چکِ همگانی نمی‌گیرد.
+     */
+    mispredicted: map ? safely(() => mispredictions(map), []) : [],
     scenarios: await listScenarios(target).catch(() => []),
   };
 }

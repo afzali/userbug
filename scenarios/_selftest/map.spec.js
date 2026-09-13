@@ -184,6 +184,20 @@ test.describe('فهرستِ کنش', () => {
     const sampled = sampleActions(actions);
     expect(sampled.filter((action) => action.sampled).map((action) => action.key)).toEqual(['c']);
   });
+
+  test('`mutate` بعد از طبقه‌بندی از نقشه بیرون نمی‌افتد', () => {
+    /**
+     * پیش از فاز ۲ همه‌چیز `unknown` بود و سهمیه می‌گرفت. اگر `mutate` اینجا
+     * نیاید، طبقه‌بندی — که قرار بود کمک کند — خزشِ بعدی را کم‌عمق‌تر می‌کند.
+     */
+    const actions = [
+      { key: 'a', role: 'button', kind: 'mutate' },
+      { key: 'b', role: 'button', kind: 'inert' },
+      { key: 'c', role: 'button', kind: 'nav' },
+    ];
+    const sampled = sampleActions(actions);
+    expect(sampled.filter((action) => action.sampled).map((action) => action.key)).toEqual(['a', 'c']);
+  });
 });
 
 test.describe('ادغامِ بازدیدها', () => {

@@ -30,6 +30,8 @@
    */
   const KIND = {
     nav: 'ناوبری',
+    mutate: 'جهش',
+    inert: 'بی‌اثر',
     unknown: 'نامعلوم',
     input: 'ورودی',
     noise: 'نمایشی',
@@ -199,6 +201,31 @@
         صفحه‌ای که در کد هست و از رابط به آن نمی‌رسند، یا یتیم است یا
         نیازمندِ حالتی که نساختیم؛ هر دو یک پرسشِ واقعی‌اند.
       -->
+      <!--
+        پیش‌بینیِ سورس در برابرِ آنچه واقعاً شد.
+
+        این کارت عمداً بالای تفاضلِ روت‌هاست: آن یکی «کجا نرفتیم» را می‌گوید
+        و این یکی «جایی رفتیم که نباید» — و دومی احتمالِ باگ بودنش بیشتر است.
+      -->
+      {#if data.mispredicted?.length}
+        <Card.Root>
+          <Card.Header>
+            <Card.Title class="text-sm">پیش‌بینی نخواند ({data.mispredicted.length})</Card.Title>
+            <Card.Description>سورس یک چیز گفت، کلیک چیز دیگری نشان داد.</Card.Description>
+          </Card.Header>
+          <Card.Content class="space-y-2">
+            {#each data.mispredicted.slice(0, 8) as row (row.label + row.predicted)}
+              <div class="rounded-lg border p-2 text-xs">
+                <span class="block font-medium">{row.label}</span>
+                <span dir="ltr" class="mt-1 block font-mono text-[11px] text-muted-foreground">
+                  {row.predicted} → {row.actual}
+                </span>
+              </div>
+            {/each}
+          </Card.Content>
+        </Card.Root>
+      {/if}
+
       {#if data.unreached.length}
         <Card.Root>
           <Card.Header><Card.Title class="text-sm">در سورس هست، نرسیدیم ({data.unreached.length})</Card.Title></Card.Header>
