@@ -321,3 +321,32 @@ export async function runAsset(runId, relative) {
   const resolved = await resolveRunId(runId);
   return existingFileInside(path.join(RUNS_DIR, resolved), relative);
 }
+
+/**
+ * حذفِ یک اجرا.
+ *
+ * ── چرا تا امروز نبود، و چرا باید باشد ──
+ *
+ * تنها راهِ خلاص شدن از یک اجرای بی‌ارزش، حذفِ **کلِ پروژه** بود — که
+ * همه‌چیزِ دیگر را هم می‌برد. یعنی کاربر یا با انبوهی اجرای آزمایشی زندگی
+ * می‌کرد، یا چیزی را می‌برید که نمی‌خواست.
+ *
+ * ── سه محافظ ──
+ *
+ * شناسه از `resolveRunId` می‌گذرد (پس پیشوندِ مبهم حذف نمی‌کند)، مسیر از
+ * `resolveInside` (پس `..` بیرون نمی‌زند)، و اجرای **در جریان** حذف نمی‌شود:
+ * پاک کردنِ پوشه‌ای که همین حالا در آن نوشته می‌شود، اجرای زنده را با خطای
+ * نامفهوم می‌شکند.
+ *
+ * وضعیتِ تریاژ دست نمی‌خورد. آن بر پایهٔ اثرانگشت است و به همهٔ اجراها تعلق
+ * دارد، نه به این یکی؛ پاک کردنش با حذفِ یک اجرا یعنی از دست دادنِ قضاوتی
+ * که روی اجراهای دیگر هم صدق می‌کرد.
+ */
+export async function deleteRun(input, { isActive } = {}) {
+  const runId = await resolveRunId(input);
+  if (isActive?.(runId)) throw new Error(`اجرای «${runId}» در جریان است؛ اول متوقفش کنید`);
+
+  const dir = resolveInside(RUNS_DIR, runId);
+  await fsp.rm(dir, { recursive: true, force: true });
+  return { runId };
+}

@@ -545,7 +545,10 @@
         </div>
       </div>
       <div class="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-        {#each runs as run (run.runId)}<RunCard {run} />{:else}<p class="rounded-xl border border-dashed p-10 text-center text-muted-foreground md:col-span-2">هنوز اجرایی ثبت نشده است.</p>{/each}
+        {#each runs as run (run.runId)}
+          <!-- حذف در همان لحظه از فهرست برداشته می‌شود، نه با بارگذاری دوبارهٔ صفحه -->
+          <RunCard {run} onRemoved={(id) => (runs = runs.filter((item) => item.runId !== id))} />
+        {:else}<p class="rounded-xl border border-dashed p-10 text-center text-muted-foreground md:col-span-2">هنوز اجرایی ثبت نشده است.</p>{/each}
       </div>
     </div>
   </section>

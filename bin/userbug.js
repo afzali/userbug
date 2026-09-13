@@ -140,6 +140,7 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
   userbug repro <runId> [اثرانگشت]
                                   بازتولید یک یافته از اجرای گذشته
   userbug list [--limit n]        فهرست اجراها
+  userbug remove <runId>          حذف یک اجرا با همهٔ عکس‌ها و traceهایش
   userbug report <runId|latest> [--junit <مسیر>]
                                   بازسازی گزارش از مخزن، بدون اجرای دوباره
   userbug diff <runA> <runB>      چه یافته‌ای تازه است و چه یافته‌ای رفته
@@ -502,6 +503,28 @@ function cmdRepro({ flags, positional }) {
     flags: { ...flags, file: path.join(dir, match), device: run.device === 'desktop' ? undefined : run.device },
     positional: [run.target],
   });
+}
+
+/**
+ * حذفِ یک اجرا.
+ *
+ * ── چرا در CLI هم هست ──
+ *
+ * قاعدهٔ پروژه: هیچ کاری نباید فقط از رابط ممکن باشد. و اینجا دلیلِ دومی هم
+ * هست — پاک کردنِ چند اجرای آزمایشی با یک حلقهٔ shell کاری است که در رابط
+ * ده کلیک می‌شود.
+ *
+ * `resolveRunId` پیشوندِ مبهم را رد می‌کند، پس `remove 2026-09` چیزی را
+ * بی‌صدا نمی‌برد.
+ */
+function cmdRemove({ positional }) {
+  const input = positional[0];
+  if (!input) throw new Error('شناسهٔ اجرا لازم است: userbug remove <runId>');
+
+  const runId = resolveRunId(input);
+  const dir = runDir(runId);
+  fs.rmSync(dir, { recursive: true, force: true });
+  console.log(`\n  حذف شد: ${runId}\n`);
 }
 
 function cmdList({ flags }) {
@@ -1410,6 +1433,9 @@ try {
       break;
     case 'repro':
       cmdRepro(parsed);
+      break;
+    case 'remove':
+      cmdRemove(parsed);
       break;
     case 'list':
       cmdList(parsed);
