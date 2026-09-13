@@ -30,6 +30,37 @@
   };
 
   const FROM = { settings: 'تنظیمات', config: 'userbug.config.js', default: 'پیش‌فرضِ ابزار' };
+  const SHORT = { resolve: 'حل', author: 'نوشتن', analyze: 'تحلیل' };
+  const LEVEL = { good: 'مناسب', ok: 'قابل استفاده', risky: 'پرخطر' };
+
+  let search = $state('');
+  let onlyFree = $state(true);
+  let onlyJson = $state(false);
+  let rankRole = $state('analyze');
+
+  /** رتبه‌بندی در سرور حساب شده؛ اینجا فقط فیلتر و مرتب‌سازی. */
+  let visible = $derived.by(() => {
+    const needle = search.trim().toLowerCase();
+    return (available || [])
+      .filter((model) => (onlyFree ? model.free : true))
+      .filter((model) => (onlyJson ? model.json !== 'none' : true))
+      .filter((model) => (needle ? `${model.id} ${model.name}`.toLowerCase().includes(needle) : true))
+      .toSorted((a, b) => (b.fit?.[rankRole]?.score ?? 0) - (a.fit?.[rankRole]?.score ?? 0))
+      .slice(0, 60);
+  });
+
+  /** دلار به ازای یک میلیون توکن، کوتاه. */
+  function money(value) {
+    if (!value) return '۰';
+    return value >= 1 ? `$${value.toFixed(2)}` : `$${value.toFixed(3)}`;
+  }
+
+  function compact(value) {
+    if (!value) return '—';
+    if (value >= 1_000_000) return `${Math.round(value / 1_000_000)}M`;
+    if (value >= 1000) return `${Math.round(value / 1000)}k`;
+    return String(value);
+  }
 
   function statusOf(role) {
     return checks?.find((item) => item.role === role);
@@ -188,26 +219,117 @@
           </div>
         {/each}
 
-        <!--
-          فهرست با کلیک می‌آید، نه با باز شدنِ صفحه: یک درخواست به ارائه‌دهنده
-          است و هر بار لازمش نیست.
-        -->
-        <div class="flex flex-wrap items-center gap-2 border-t pt-3">
-          <Button variant="ghost" size="sm" onclick={loadModels} disabled={Boolean(busy)}>
-            {busy === 'models' ? 'در حال گرفتن…' : 'فهرست مدل‌های موجود'}
+      </Card.Content>
+    </Card.Root>
+
+    <!--
+      فهرستِ زنده — با کلیک می‌آید، نه با باز شدنِ صفحه: یک درخواست به
+      ارائه‌دهنده است و هر بار لازمش نیست.
+    -->
+    <Card.Root>
+      <Card.Header>
+        <Card.Title class="text-sm">فهرست زندهٔ مدل‌ها</Card.Title>
+        <Card.Description>
+          مستقیم از OpenRouter. قیمت و اندازه‌ها گفتهٔ خودِ ارائه‌دهنده‌اند؛
+          «مناسب» قاعده‌ای است روی همان‌ها که در
+          <code>src/models/catalog.js</code> نوشته شده — نه نظرِ ما دربارهٔ
+          هوشِ مدل.
+        </Card.Description>
+      </Card.Header>
+      <Card.Content class="space-y-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onclick={loadModels} disabled={Boolean(busy)}>
+            {busy === 'models' ? 'در حال گرفتن…' : available ? 'تازه‌سازی' : 'گرفتن فهرست'}
           </Button>
+
           {#if available}
-            <span class="text-[11px] text-muted-foreground">
-              {available.length} مدل ({available.filter((m) => m.free).length} رایگان) — در کادرها پیشنهاد می‌شوند
-            </span>
+            <Input bind:value={search} placeholder="جست‌وجو…" class="h-8 w-40" />
+            <label class="flex items-center gap-1.5 text-xs">
+              <input type="checkbox" bind:checked={onlyFree} />
+              فقط رایگان
+            </label>
+            <label class="flex items-center gap-1.5 text-xs">
+              <input type="checkbox" bind:checked={onlyJson} />
+              فقط JSONِ تحمیل‌شدنی
+            </label>
+            <select bind:value={rankRole} class="h-8 rounded-md border bg-background px-2 text-xs">
+              {#each settings.roles as item (item.role)}
+                <option value={item.role}>رتبه‌بندی برای: {LABEL[item.role]}</option>
+              {/each}
+            </select>
+            <span class="text-[11px] text-muted-foreground">{visible.length} از {available.length}</span>
           {/if}
         </div>
 
-        <datalist id="ub-models">
-          {#each available || [] as model (model.id)}
-            <option value={model.id}>{model.free ? 'رایگان · ' : ''}{model.name}</option>
-          {/each}
-        </datalist>
+        {#if available}
+          <div class="max-h-[28rem] overflow-y-auto rounded-lg border">
+            <table class="w-full text-right text-xs">
+              <thead class="sticky top-0 bg-muted/80 backdrop-blur">
+                <tr>
+                  <th class="p-2 font-medium">مدل</th>
+                  <th class="p-2 font-medium">قیمت (هر ۱M توکن)</th>
+                  <th class="p-2 font-medium">اندازه</th>
+                  <th class="p-2 font-medium">مناسبِ {LABEL[rankRole]}</th>
+                  <th class="p-2 font-medium">بگذار در</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each visible as model (model.id)}
+                  {@const fit = model.fit?.[rankRole]}
+                  <tr class="border-t align-top">
+                    <td class="p-2">
+                      <span class="block font-medium">{model.name}</span>
+                      <span dir="ltr" class="block font-mono text-[10px] text-muted-foreground">{model.id}</span>
+                    </td>
+                    <td class="p-2 whitespace-nowrap" dir="ltr">
+                      {#if model.free}
+                        <Badge variant="secondary" class="text-[10px]">رایگان</Badge>
+                      {:else}
+                        <span class="text-muted-foreground">
+                          {money(model.price.prompt)} / {money(model.price.completion)}
+                        </span>
+                      {/if}
+                    </td>
+                    <td class="p-2 whitespace-nowrap text-muted-foreground" dir="ltr">
+                      {compact(model.context)} ← {compact(model.maxOutput)}
+                    </td>
+                    <td class="p-2">
+                      <Badge variant={fit?.level === 'good' ? 'default' : fit?.level === 'ok' ? 'secondary' : 'destructive'} class="text-[10px]">
+                        {LEVEL[fit?.level] || '—'}
+                      </Badge>
+                      {#if model.iq !== null}
+                        <span class="mr-1 text-[10px] text-muted-foreground">هوش {model.iq}</span>
+                      {/if}
+                      <ul class="mt-1 space-y-0.5">
+                        {#each fit?.notes || [] as note (note.text)}
+                          <li class="text-[10px] {note.good ? 'text-muted-foreground' : 'text-destructive'}">
+                            {note.good ? '+' : '−'} {note.text}
+                          </li>
+                        {/each}
+                      </ul>
+                    </td>
+                    <td class="p-2">
+                      <div class="flex flex-wrap gap-1">
+                        {#each settings.roles as item (item.role)}
+                          <button
+                            type="button"
+                            class="rounded border px-1.5 py-0.5 text-[10px] hover:bg-accent"
+                            onclick={() => (roles = { ...roles, [item.role]: model.id })}
+                          >
+                            {SHORT[item.role]}
+                          </button>
+                        {/each}
+                      </div>
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+          <p class="text-[11px] text-muted-foreground">
+            انتخاب فقط کادرِ بالا را پر می‌کند؛ تا «ذخیره» نزنید چیزی عوض نمی‌شود.
+          </p>
+        {/if}
       </Card.Content>
     </Card.Root>
 

@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { jsonError } from '$lib/server/http.js';
 import { assertLoopbackRequest, assertMutationRequest } from '$lib/server/security.js';
 import {
+  ROLES,
   checkAllModels,
   effectiveModels,
   setApiKey,
@@ -9,6 +10,7 @@ import {
   setModel,
 } from '../../../../../src/models/settings.js';
 import { listModels } from '../../../../../src/models/config.js';
+import { fitFor } from '../../../../../src/models/catalog.js';
 
 /**
  * تنظیماتِ هوش مصنوعی.
@@ -29,7 +31,17 @@ export async function GET(event) {
     return json({
       settings: await effectiveModels(),
       checks: check ? await checkAllModels() : null,
-      available: models ? await listModels({ free: false, limit: 400 }).catch(() => []) : null,
+      // فهرست زنده، با فیتِ هر نقش حساب‌شده در سرور: قاعده‌اش یک جا بماند
+      available: models
+        ? await listModels({ free: false, limit: 400 })
+            .then((rows) =>
+              rows.map((model) => ({
+                ...model,
+                fit: Object.fromEntries(ROLES.map((role) => [role, fitFor(model, role)])),
+              }))
+            )
+            .catch(() => [])
+        : null,
     });
   } catch (cause) {
     return jsonError(cause, cause?.status === 403 ? 403 : 500);

@@ -14,6 +14,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { rootDir } from '../target.js';
 import { loadEnv } from '../env.js';
+import { describeModel } from './catalog.js';
 
 loadEnv();
 
@@ -40,14 +41,19 @@ export const DEFAULTS = {
     resolve: 'inclusionai/ling-3.0-flash-fin:free',
     author: 'inclusionai/ling-3.0-flash-fin:free',
     /**
-     * کم‌تکرار، پس می‌شود مدل قوی‌تری گذاشت.
+     * کم‌تکرار، پس می‌شود مدل قوی‌تری گذاشت — ولی **باید JSON بدهد**.
      *
-     * پیش‌تر `z-ai/glm-5.2:free` بود و **رایگان بودنش تمام شد**: ارائه‌دهنده
-     * ۴۰۴ داد با پیامِ «نسخهٔ پولی را بزن»، و آن پیام وسطِ صفحهٔ شناخت به
-     * کاربر رسید. هیچ اسلاگی برای همیشه رایگان نمی‌ماند؛ برای همین
-     * `userbug ai --check` هست و صفحهٔ تنظیمات می‌گذارد همین‌جا عوضش کنید.
+     * دو شکستِ پشتِ سر هم این خط را ساختند. اول `z-ai/glm-5.2:free` رایگان
+     * بودنش تمام شد و ۴۰۴ داد. بعد `nvidia/nemotron-3-ultra-550b-a55b:free`
+     * نشست و **پاسخ خالی** داد: نسخهٔ رایگانش `structured_outputs` ندارد و
+     * یک مدلِ reasoning است، پس بودجهٔ خروجی صرفِ استدلال شد و `content`
+     * خالی برگشت.
+     *
+     * درسش این نیست که این اسلاگ بهتر است؛ این است که **معیار** عوض شد:
+     * برای این نقش، «JSONِ تحمیل‌شدنی» از «باهوش‌تر» مهم‌تر است. معیار در
+     * `catalog.js` نوشته شده و صفحهٔ تنظیمات با همان رتبه‌بندی می‌کند.
      */
-    analyze: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+    analyze: 'nex-agi/nex-n2.5-pro:free',
   },
   /** سقف هزینهٔ هر اجرا به دلار. رد شدن از آن اجرا را متوقف می‌کند، نه اینکه بی‌صدا ادامه دهد. */
   budgetPerRun: 0.5,
@@ -77,12 +83,7 @@ export async function listModels({ free = false, limit = 200 } = {}) {
   const all = (await response.json()).data || [];
   return all
     .filter((model) => (free ? String(model.id).endsWith(':free') : true))
-    .map((model) => ({
-      id: model.id,
-      name: model.name || model.id,
-      context: model.context_length || 0,
-      free: String(model.id).endsWith(':free'),
-    }))
+    .map(describeModel)
     .sort((a, b) => b.context - a.context)
     .slice(0, Math.max(1, Math.min(500, Number(limit) || 200)));
 }

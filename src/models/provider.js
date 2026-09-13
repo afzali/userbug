@@ -181,10 +181,24 @@ export async function askJson(cfg, prompt, budget) {
    * دلیلش پرامپتِ بزرگ است.
    */
   if (!text.trim()) {
+    /**
+     * دلیلِ پرتکرارترِ «پاسخ خالی»، پرامپتِ بزرگ نیست — مدلِ reasoning است.
+     *
+     * `nvidia/nemotron-3-ultra-550b-a55b:free` تمامِ بودجهٔ خروجی را صرفِ
+     * استدلال کرد و `content` خالی برگشت، در حالی که `reasoning` پر بود.
+     * پیامِ قبلی کاربر را دنبالِ کوچک کردنِ prompt می‌فرستاد؛ کاری که هر
+     * چقدر هم بکند جواب نمی‌داد.
+     */
+    const reasoned = data.choices?.[0]?.message?.reasoning;
     throw new Error(
       `مدل ${cfg.model} پاسخ خالی داد` +
         (data.choices?.[0]?.finish_reason ? ` (finish_reason: ${data.choices[0].finish_reason})` : '') +
-        '.\n  اگر پرامپت بزرگ است کوچکش کنید، یا مدل دیگری را با --model بیازمایید.'
+        '.\n' +
+        (reasoned
+          ? '  این مدل استدلال کرد ولی خروجی نداد: بودجهٔ خروجی صرفِ reasoning شده.\n' +
+            '  مدلی بگذارید که «خروجی ساختاریافته» دارد — در صفحهٔ تنظیمات علامت‌دار است.\n'
+          : '  اگر پرامپت بزرگ است کوچکش کنید، یا مدل دیگری بیازمایید.\n') +
+        `  تنظیمات: صفحهٔ «تنظیمات» در رابط، یا userbug ai --role ${cfg.role || 'analyze'}=<اسلاگ>`
     );
   }
 
