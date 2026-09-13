@@ -38,7 +38,7 @@ import { loadTarget } from '../target.js';
 import { INIT_SCRIPT, attachClientObservers } from '../observe/client.js';
 import { createServerCollectors, drainAll, startAll } from '../observe/server.js';
 import { fingerprint, judge, normalizeMessage } from '../observe/oracle.js';
-import { RunStore, newRunId, setCurrentRun } from '../store/run-store.js';
+import { RunStore, newRunId, runDir, setCurrentRun } from '../store/run-store.js';
 import { snapshotPage } from '../steps/snapshot.js';
 import { runUniversalChecks } from '../checks/run.js';
 import { readChecksConfig } from '../checks/config.js';
@@ -121,6 +121,30 @@ export class TourSession extends EventEmitter {
       acceptDownloads: true,
       ...emulation,
     });
+
+    /**
+     * trace، برای گشت هم.
+     *
+     * ── چرا تا امروز نبود، و چرا نباید نباشد ──
+     *
+     * trace را گزارشگرِ `playwright test` ذخیره می‌کند، و گشت زیر آن نمی‌رود.
+     * پس گشت — که پربارترین دقایقِ کشفِ باگ است — تنها اجرایی بود که هیچ
+     * trace نداشت: کاربر یک ساعت در اپ می‌گشت و بعد در صفحهٔ اجرا هیچ
+     * نمی‌دید.
+     *
+     * ولی این محدودیت نبود، فقط صدا زده نشده بود: `context.tracing` روی هر
+     * context کار می‌کند، از جمله `launchPersistentContext`.
+     *
+     * `sources: false` چون سورسِ خودِ ابزار به درد نمی‌خورد و فایل را بزرگ
+     * می‌کند؛ `screenshots` و `snapshots` همان چیزی‌اند که نمایشگر را
+     * ارزشمند می‌کنند.
+     */
+    await this.context
+      .tracing.start({ screenshots: true, snapshots: true, sources: false })
+      .then(() => (this.tracing = true))
+      .catch(() => {
+        // نبودِ trace نباید گشت را بشکند؛ بقیهٔ رصد سرِ جایش است
+      });
 
     await this.context.addInitScript(INIT_SCRIPT);
     await this.context.addInitScript(recorderScript());
@@ -311,6 +335,29 @@ export class TourSession extends EventEmitter {
     record.shot = shot;
 
     /**
+     * رخدادِ `step` — وگرنه عکس‌ها یتیم می‌مانند.
+     *
+     * ── چه چیزی این را لازم کرد ──
+     *
+     * گشتِ ۵۵ قدمی ۳۵ عکس روی دیسک گذاشته بود و صفحهٔ اجرا **هیچ** نشان
+     * نمی‌داد: خط زمانی از رخدادهای `kind: 'step'` ساخته می‌شود و گشت
+     * هیچ‌کدام را نمی‌نوشت. عکس‌ها بودند و هیچ‌چیز به آن‌ها اشاره نمی‌کرد.
+     *
+     * همان شکلی نوشته می‌شود که `ub.step` می‌نویسد، چون خواننده یکی است.
+     */
+    await this.store
+      .appendEvent({
+        kind: 'step',
+        step: `گشت: ${record.path || '/'}${record.view ? ` ▸ ${record.view}` : ''}`,
+        scenario: 'گشت زنده',
+        ms: 0,
+        shot,
+        route: record.path,
+        errorCount: 0,
+      })
+      .catch(() => {});
+
+    /**
      * هویت = مسیر **و** نما.
      *
      * پیش‌تر فقط مسیر بود، و نتیجه‌اش این: کاربری که روی `/contents` سه
@@ -458,6 +505,40 @@ export class TourSession extends EventEmitter {
     };
   }
 
+  /**
+   * trace را همان‌جایی بنویس که گزارشگر می‌نویسد.
+   *
+   * شکلِ ردیف عیناً همان `persistTraces` در `src/reporter.js` است، چون
+   * مصرف‌کننده یکی است: `readRunDetails` و اندپوینتِ `/trace/<شماره>`. شکلِ
+   * دوم یعنی نمایشگر برای گشت کار نکند و هیچ‌کس نفهمد چرا.
+   */
+  async saveTrace() {
+    if (!this.tracing) return null;
+    this.tracing = false;
+
+    try {
+      const dir = runDir(this.runId);
+      const relative = `traces/گشت-${Date.now()}.zip`;
+      await fsp.mkdir(path.join(dir, 'traces'), { recursive: true });
+      await this.context.tracing.stop({ path: path.join(dir, relative) });
+      await fsp.appendFile(
+        path.join(dir, 'traces.ndjson'),
+        JSON.stringify({
+          at: new Date().toISOString(),
+          file: relative,
+          scenario: 'گشت زنده',
+          status: 'passed',
+          retry: 0,
+        }) + '\n',
+        'utf8'
+      );
+      return relative;
+    } catch (cause) {
+      this.emitEvent('warning', { message: `ذخیرهٔ trace ناموفق بود: ${cause.message}` });
+      return null;
+    }
+  }
+
   async stop(reason = '') {
     if (this.status === 'stopped') return this.snapshotState();
     this.status = 'stopping';
@@ -467,6 +548,10 @@ export class TourSession extends EventEmitter {
     // آخرین خطوطِ لاگ سرور، پیش از بستن. کاری که کاربر در ثانیهٔ آخر کرد هم
     // ردِ سروری دارد و بی این، فقط آن یکی گم می‌شد.
     for (const line of await drainAll(this.collectors || []).catch(() => [])) await this.onObserved(line);
+
+    // trace پیش از بستنِ context ذخیره می‌شود، وگرنه چیزی برای ذخیره نمانده
+    await this.saveTrace();
+
     await this.context?.close().catch(() => {});
     await fsp.rm(this.profileDir, { recursive: true, force: true }).catch(() => {});
 

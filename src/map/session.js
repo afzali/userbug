@@ -19,6 +19,8 @@
  */
 import { chromium, devices } from '@playwright/test';
 import { EventEmitter } from 'node:events';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
 
 import { loadTarget } from '../target.js';
 import { INIT_SCRIPT, attachClientObservers } from '../observe/client.js';
@@ -26,7 +28,7 @@ import { createServerCollectors, drainAll, startAll } from '../observe/server.js
 import { judge } from '../observe/oracle.js';
 import { dismissBlockers } from '../observe/blockers.js';
 import { routeOf } from '../observe/route.js';
-import { GUI_RUN_MARKER, RunStore, newRunId, setCurrentRun } from '../store/run-store.js';
+import { GUI_RUN_MARKER, RunStore, newRunId, runDir, setCurrentRun } from '../store/run-store.js';
 import { snapshotPage } from '../steps/snapshot.js';
 import { resolveTarget } from '../scenario/resolve.js';
 import { runUniversalChecks } from '../checks/run.js';
@@ -218,6 +220,17 @@ export class MapSession extends EventEmitter {
       acceptDownloads: true,
       ...emulation,
     });
+    /**
+     * trace برای خزش هم — به همان دلیلِ گشت.
+     *
+     * خزش صدها کلیک می‌زند و یافته‌هایش بازتولیدپذیر باید باشند. بی trace،
+     * تنها چیزی که از یک کلیکِ مشکوک می‌ماند یک عکس است و یک خط متن.
+     */
+    await this.context
+      .tracing.start({ screenshots: true, snapshots: true, sources: false })
+      .then(() => (this.tracing = true))
+      .catch(() => {});
+
     await this.context.addInitScript(INIT_SCRIPT);
 
     this.collectors = await startAll(createServerCollectors(target.logs));
@@ -764,6 +777,28 @@ export class MapSession extends EventEmitter {
     return this.map;
   }
 
+  /** همان شکلِ ردیفی که `reporter.js` می‌نویسد؛ مصرف‌کننده یکی است. */
+  async saveTrace() {
+    if (!this.tracing) return null;
+    this.tracing = false;
+
+    try {
+      const dir = runDir(this.runId);
+      const relative = `traces/نقشه-${Date.now()}.zip`;
+      await fsp.mkdir(path.join(dir, 'traces'), { recursive: true });
+      await this.context.tracing.stop({ path: path.join(dir, relative) });
+      await fsp.appendFile(
+        path.join(dir, 'traces.ndjson'),
+        JSON.stringify({ at: new Date().toISOString(), file: relative, scenario: 'نقشهٔ اپ', status: 'passed', retry: 0 }) + '\n',
+        'utf8'
+      );
+      return relative;
+    } catch (cause) {
+      this.emitEvent('warning', { message: `ذخیرهٔ trace ناموفق بود: ${cause.message}` });
+      return null;
+    }
+  }
+
   async stop() {
     if (this.status === 'stopped') return;
     this.status = 'stopped';
@@ -771,6 +806,8 @@ export class MapSession extends EventEmitter {
       this.events.push({ ...line, at: new Date().toISOString() });
       await this.store?.appendEvent(line).catch(() => {});
     }
+
+    await this.saveTrace();
     await this.context?.close().catch(() => {});
     await this.browser?.close().catch(() => {});
     await this.store
