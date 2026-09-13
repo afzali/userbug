@@ -35,6 +35,11 @@
     original = data.file?.content || "";
     feedback = data.fileError || "";
     draft = null;
+    // بازنویسیِ فایلِ قبلی نباید روی فایلِ تازه بنشیند — همان اشتباهی که
+    // یک بار با خودِ `content` رخ داد و متنِ فایلِ قبلی را جای دیگری نوشت
+    revision = null;
+    wish = '';
+    showRevise = false;
   });
   let saving = $state(false);
   // svelte-ignore state_referenced_locally
@@ -66,9 +71,33 @@
   let draft = $state(null);
   let draftPath = $state('');
 
+  /**
+   * بازنویسیِ فایلِ باز.
+   *
+   * ── چرا اینجا و نه در «سناریوی تازه» ──
+   *
+   * آنجا از هیچ می‌سازد؛ اینجا روی چیزی کار می‌کند که جلوی چشم است. رایج‌ترین
+   * خواسته هم همان است: «ساخته شد، ولی اصلاً وارد نمی‌شود.»
+   */
+  let revising = $state(false);
+  let revision = $state(null);
+  let wish = $state('');
+  let entryPick = $state('');
+  let showRevise = $state(false);
+
   // پروژه از لایهٔ فضای کاری می‌آید، پس کشویی انتخاب پروژه اینجا لازم نیست.
   let project = $derived(data.project);
   let dirty = $derived(content !== original);
+
+  /**
+   * سناریوهایی که می‌شود مقدمهٔ ورود از آن‌ها برداشت.
+   *
+   * خودِ فایلِ باز بیرون است — سناریویی که جلوی خودش بنشیند بی‌معناست و
+   * بی‌صدا دوبرابر می‌شود.
+   */
+  let entryCandidates = $derived(
+    (project?.scenarios || []).filter((item) => item.kind === 'yaml' && item.steps && item.path !== data.relative)
+  );
   let promoting = $state(false);
 
   /**
@@ -174,6 +203,51 @@
     }
   }
 
+  /**
+   * بازنویسی — با مدل، یا رایگان با مقدمهٔ ورود.
+   *
+   * چیزی ذخیره نمی‌کند: تفاوت برمی‌گردد و تا کسی «جایگزین کن» نزند،
+   * ویرایشگر دست‌نخورده می‌ماند.
+   */
+  async function revise(mode) {
+    revising = true;
+    feedback = '';
+    try {
+      const response = await fetch('/api/scenarios/revise', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({
+          target: data.target,
+          yaml: content,
+          mode,
+          instruction: wish,
+          entry: entryPick,
+          model,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'بازنویسی نشد');
+      revision = payload;
+    } catch (cause) {
+      feedback = cause.message;
+    } finally {
+      revising = false;
+    }
+  }
+
+  /**
+   * جایگزینی فقط در ویرایشگر، نه روی دیسک.
+   *
+   * ذخیره همان دکمهٔ همیشگی است. اینجا یعنی «قبول دارم» و آنجا یعنی «بنویس»؛
+   * یکی کردنشان یعنی تفاوتی که تازه دیده شد، بی یک قدمِ دیگر روی فایل بنشیند.
+   */
+  function applyRevision() {
+    content = revision.yaml;
+    feedback = 'در ویرایشگر جایگزین شد — هنوز ذخیره نشده.';
+    revision = null;
+    showRevise = false;
+  }
+
   async function saveDraft() {
     creating = true;
     feedback = '';
@@ -277,8 +351,136 @@
             {promoting ? 'در حال رسمی کردن…' : 'تأیید و رسمی کردن'}
           </Button>
         {/if}
+        <!--
+          بازنویسی فقط روی سناریو، نه روی کانفیگ هدف: آن یکی جاوااسکریپت است
+          و مفسرِ سناریو نمی‌شناسدش.
+        -->
+        {#if data.kind === 'scenario' && data.file}
+          <Button variant="outline" onclick={() => { showRevise = !showRevise; }}>
+            {showRevise ? 'بستنِ بازنویسی' : 'بازنویسی با هوش مصنوعی'}
+          </Button>
+        {/if}
         <Button onclick={save} disabled={!dirty || saving || !data.file}>{saving ? 'در حال بررسی…' : 'اعتبارسنجی و ذخیره'}</Button>
       </div></div>
+
+    {#if showRevise && data.kind === 'scenario' && data.file}
+      <div class="space-y-4 border-b bg-muted/30 px-5 py-4">
+        <!--
+          میان‌بُرِ رایگان اول می‌آید، عمداً.
+
+          در بیشتر موردهای واقعی خواسته یکی است: «اصلاً وارد نمی‌شود». جوابش
+          از قبل روی دیسک هست — سناریوی ورودی که خودتان دارید. گذاشتنِ مدل
+          جلوی این یعنی پول دادن برای چیزی که یک copy است.
+        -->
+        {#if entryCandidates.length}
+          <div class="space-y-1.5">
+            <p class="text-sm font-medium">مقدمهٔ ورود را جلویش بگذار <span class="font-normal text-muted-foreground">— بی هوش مصنوعی</span></p>
+            <div class="flex flex-wrap gap-2">
+              <select bind:value={entryPick} class="h-9 min-w-52 flex-1 rounded-md border bg-background px-2 text-sm">
+                <option value="">— سناریوی ورود را انتخاب کنید —</option>
+                {#each entryCandidates as item (item.path)}
+                  <option value={item.path}>{item.name}</option>
+                {/each}
+              </select>
+              <Button variant="secondary" disabled={!entryPick || revising} onclick={() => revise('entry')}>
+                گذاشتنِ مقدمه
+              </Button>
+            </div>
+            <p class="text-[11px] leading-5 text-muted-foreground">
+              قدم‌های آن سناریو عیناً جلوی این یکی می‌نشینند. رایگان و قطعی، و
+              وضعیتِ سناریو دست‌نخورده می‌ماند.
+            </p>
+          </div>
+
+          <div class="border-t"></div>
+        {/if}
+
+        <div class="space-y-1.5">
+          <p class="text-sm font-medium">یا بگویید چه چیزش را عوض کنم</p>
+          <Textarea
+            bind:value={wish}
+            rows="2"
+            placeholder="مثلاً: اول با حساب crawler وارد شود، بعد سراغ آپلود برود"
+          />
+          <div class="flex flex-wrap items-end gap-2">
+            <ModelPicker bind:value={model} disabled={revising} />
+            <Button disabled={wish.trim().length < 4 || revising} onclick={() => revise('model')}>
+              {revising ? 'در حال بازنویسی…' : 'بازنویسی کن'}
+            </Button>
+          </div>
+          <p class="text-[11px] leading-5 text-muted-foreground">
+            سناریوی فعلی و شناختِ پروژه به مدل می‌رود. سناریوی
+            <code>approved</code> پس از بازنویسی به <code>draft</code> برمی‌گردد.
+          </p>
+        </div>
+
+        {#if revision}
+          <!--
+            تفاوت، نه متنِ تازه.
+
+            اگر فقط نتیجه دیده شود، `expect`ی که خودتان نوشته‌اید می‌تواند
+            بی‌صدا برود: فایلِ تازه هم معتبر است، هم اجرا می‌شود، و هم سبز
+            تمام می‌شود — چون همان سنجشی که می‌شکست دیگر آنجا نیست.
+          -->
+          <div class="space-y-2 rounded-lg border bg-background p-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-sm font-medium">
+                <span class="text-emerald-600 dark:text-emerald-400">+{revision.added}</span>
+                ·
+                <span class="text-destructive">−{revision.removed}</span>
+                خط
+              </span>
+              <div class="flex items-center gap-2">
+                <Button size="sm" variant="ghost" onclick={() => { revision = null; }}>بی‌خیال</Button>
+                <Button size="sm" onclick={applyRevision}>جایگزین کن</Button>
+              </div>
+            </div>
+
+            {#if revision.changed}
+              <p class="text-xs leading-6 text-muted-foreground">{revision.changed}</p>
+            {/if}
+            {#if revision.notes}
+              <p class="rounded-md bg-amber-500/10 p-2 text-xs leading-6">باید بازبینی شود: {revision.notes}</p>
+            {/if}
+            <!--
+              افتادنِ توضیح‌ها باید **گفته** شود، نه فقط در تفاوت دیده شود.
+
+              نخستین آزمایشِ واقعی روی `ورود.yml` نُه خطِ «چرا» را برداشت. آن
+              خط‌ها در تفاوت قرمز بودند، ولی میانِ شصت خطِ دیگر گم می‌شدند.
+            -->
+            {#if revision.lostComments}
+              <p class="rounded-md bg-amber-500/10 p-2 text-xs leading-6">
+                {revision.lostComments} خطِ توضیح که میانِ قدم‌ها بود نمی‌ماند —
+                YAML از نو ساخته می‌شود. سرصفحهٔ فایل نگه داشته شده؛ بقیه را
+                اگر لازم‌اند از تفاوت بردارید.
+              </p>
+            {/if}
+            {#if revision.demoted}
+              <p class="text-xs leading-6 text-muted-foreground">
+                این سناریو <code>approved</code> بود و در نسخهٔ تازه <code>draft</code> است.
+              </p>
+            {/if}
+
+            <div dir="ltr" class="max-h-80 overflow-auto rounded-md border bg-muted/40 p-2 font-mono text-[11px] leading-5">
+              {#each revision.diff as row, index (index)}
+                {#if row.kind === 'added'}
+                  <div class="whitespace-pre-wrap bg-emerald-500/15 text-emerald-800 dark:text-emerald-200">+ {row.text}</div>
+                {:else if row.kind === 'removed'}
+                  <div class="whitespace-pre-wrap bg-destructive/15 text-destructive">− {row.text}</div>
+                {:else}
+                  <div class="whitespace-pre-wrap text-muted-foreground">&nbsp; {row.text}</div>
+                {/if}
+              {/each}
+            </div>
+
+            <p class="text-[11px] text-muted-foreground">
+              «جایگزین کن» فقط ویرایشگر را عوض می‌کند؛ نوشتن روی دیسک با همان
+              دکمهٔ «اعتبارسنجی و ذخیره» است.
+            </p>
+          </div>
+        {/if}
+      </div>
+    {/if}
     {#if data.file}<CodeView bind:value={content} language={data.file.relative?.endsWith('.js') ? 'js' : 'yaml'} minHeight="70vh" />{:else}<div class="grid min-h-[60vh] place-items-center text-muted-foreground">{data.fileError || 'فایلی انتخاب نشده است'}</div>{/if}
     {#if feedback}<div class={`border-t px-5 py-3 text-sm ${feedback.includes('ذخیره شد') ? 'text-emerald-700 dark:text-emerald-300' : 'text-destructive'}`}>{feedback}</div>{/if}
   </Card.Root>
