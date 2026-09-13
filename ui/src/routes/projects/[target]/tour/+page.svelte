@@ -19,6 +19,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import { formatDate } from '$lib/format.js';
 
   let { data } = $props();
 
@@ -316,12 +317,74 @@
 
 {#if !running && !result}
   <section class="rounded-xl border border-dashed p-6 text-sm leading-7 text-muted-foreground">
-    <p class="mb-3 font-semibold text-foreground">گشت هنوز شروع نشده.</p>
+    <p class="mb-3 font-semibold text-foreground">
+      {data.history.length ? 'گشتی در جریان نیست.' : 'گشت هنوز شروع نشده.'}
+    </p>
     <p>
       «شروع گشت» یک پنجرهٔ مرورگر باز می‌کند. آن پنجره را کنارِ همین صفحه بگذارید: در آن کار کنید و
       در این صفحه توضیح بدهید. هر خطای کنسول، هر ۵۰۰، و هر چکِ همگانی همان لحظه اینجا ثبت می‌شود —
       یعنی باگی که حین آشنایی ببینید، یافتهٔ واقعی است نه یک تمرین.
     </p>
+  </section>
+{/if}
+
+<!--
+  آنچه از گشت‌های پیشین مانده.
+
+  ── چرا این بخش لازم بود ──
+
+  پنلِ گشت فقط نشستِ زندهٔ همین پروسه را می‌شناخت، پس بعد از پایانِ گشت —
+  یا با ریستِ رابط — می‌گفت «گشت هنوز شروع نشده»، حتی وقتی کاربر ساعت‌ها در
+  اپ گشته بود. صفحه‌ای که کارِ دیروزِ خودش را انکار کند، کاربر را وادار
+  می‌کند از صفر شروع کند.
+
+  هر دو سوی ماجرا نشان داده می‌شود: **گشت‌ها** (چه وقت، چند قدم، چند یافته)
+  و **صفحه‌ها** (چه چیزی از آن‌ها ماند). دومی مهم‌تر است، چون خروجیِ ماندگارِ
+  گشت همان است.
+-->
+{#if !running && (data.history.length || data.pages.length)}
+  <section class="mt-6 grid gap-4 lg:grid-cols-2">
+    {#if data.history.length}
+      <div class="rounded-xl border p-4">
+        <h2 class="mb-3 text-sm font-bold">گشت‌های پیشین</h2>
+        <ul class="space-y-2 text-xs">
+          {#each data.history as run (run.runId)}
+            <li class="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2">
+              <span class="text-muted-foreground">{formatDate(run.startedAt)}</span>
+              <span class="flex-1">{run.steps} قدم · {run.findings} یافته</span>
+              <a class="text-primary underline underline-offset-2" href={`/runs/${encodeURIComponent(run.runId)}`}>
+                روایتش
+              </a>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
+
+    {#if data.pages.length}
+      <div class="rounded-xl border p-4">
+        <h2 class="mb-1 text-sm font-bold">صفحه‌هایی که ثبت شده‌اند</h2>
+        <p class="mb-3 text-xs text-muted-foreground">
+          خروجیِ ماندگارِ گشت. گشتِ تازه اینها را پاک نمی‌کند؛ رویشان می‌سازد.
+        </p>
+        <ul class="space-y-1.5 text-xs">
+          {#each data.pages.slice(0, 10) as page (page.path + page.view)}
+            <li class="rounded-lg border px-3 py-1.5">
+              <code>{page.path}</code>
+              {#if page.view}<span class="text-muted-foreground"> ▸ {page.view}</span>{/if}
+              {#if page.purpose}
+                <span class="block text-muted-foreground">{page.purpose}</span>
+              {:else}
+                <span class="block text-muted-foreground">— هنوز کسی نگفته برای چیست</span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+        {#if data.pages.length > 10}
+          <p class="mt-2 text-xs text-muted-foreground">و {data.pages.length - 10} صفحهٔ دیگر.</p>
+        {/if}
+      </div>
+    {/if}
   </section>
 {/if}
 

@@ -107,6 +107,9 @@ export async function listRuns({ target, limit = 250 } = {}) {
       device: run.device || '',
       environment: run.environment || '',
       status: run.status || 'finished',
+      // اجرا، گشت، یا خزشِ نقشه — بی این، صفحهٔ گشت نمی‌تواند گشت‌های
+      // پیشینش را از اجراهای معمولی جدا کند
+      kind: run.kind || 'run',
       steps: run.steps ?? 0,
       findings: run.findings ?? 0,
       findingEvents: run.findingEvents ?? run.findings ?? 0,
