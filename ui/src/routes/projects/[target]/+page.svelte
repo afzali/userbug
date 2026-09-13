@@ -558,14 +558,27 @@
             <Input type="number" min="1" max="10" bind:value={repeat} disabled={busy} />
           </label>
         </div>
-        <div class="grid gap-3 sm:grid-cols-2">
-          <label class="block space-y-1.5 text-sm font-medium">
-            <span>رفتار کاربر</span>
-            <select class="app-select" bind:value={persona} disabled={busy}>
-              <option value="">پیش‌فرض سناریو</option><option value="novice">تازه‌کار</option><option value="pro">حرفه‌ای</option>
-            </select>
-          </label>
-          <ModelPicker bind:value={model} disabled={busy} />
+        <label class="block space-y-1.5 text-sm font-medium">
+          <span>رفتار کاربر</span>
+          <select class="app-select" bind:value={persona} disabled={busy}>
+            <option value="">پیش‌فرض سناریو</option><option value="novice">تازه‌کار</option><option value="pro">حرفه‌ای</option>
+          </select>
+        </label>
+
+        <!--
+          انتخاب مدل، ردیفِ خودش.
+
+          ── چرا از کنارِ «رفتار کاربر» درآمد ──
+
+          نصفِ عرضِ یک ستونِ ۲۳rem جا نداشت: خودِ کنترل یک ورودی است به‌علاوهٔ
+          دکمهٔ «فهرست»، و بازشدنش پنلی است با جست‌وجو و فهرستِ بلندِ مدل‌ها با
+          قیمت — که در نصفِ ستون خوانده نمی‌شد.
+
+          و یک نقصِ واقعی هم همین‌جا بود: `div`ِ آن شبکهٔ دوستونی هرگز بسته
+          نشده بود، پس ردیفِ تیک‌های زیرش هم داخلش می‌افتاد.
+        -->
+        <ModelPicker bind:value={model} disabled={busy} />
+
         <div class="flex flex-wrap gap-4 text-sm text-muted-foreground">
           <label class="flex items-center gap-2"><input type="checkbox" bind:checked={headed} disabled={busy} /> مرورگر دیده شود</label>
           <label class="flex items-center gap-2"><input type="checkbox" bind:checked={author} disabled={busy} /> ساخت پیش‌نویس کاوش</label>
