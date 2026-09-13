@@ -60,7 +60,7 @@
       return `"${text.replace(/"/g, '""')}"`;
     };
 
-    const header = ['اثرانگشت', 'منبع', 'وضعیت', 'یادداشت', 'پیام', 'قدم‌ها', 'دستگاه‌ها', 'تعداد رخداد', 'تعداد اجرا', 'اولین بار', 'آخرین بار'];
+    const header = ['اثرانگشت', 'منبع', 'وضعیت', 'یادداشت', 'پیام', 'قدم‌ها', 'دستگاه‌ها', 'بنچ‌ها', 'تعداد رخداد', 'تعداد اجرا', 'اولین بار', 'آخرین بار'];
     const rows = filtered.map((item) => [
       item.fingerprint,
       sourceLabelOf(item.source),
@@ -69,6 +69,7 @@
       item.message || item.normalized,
       (item.steps || []).join(' · '),
       (item.devices || []).join(' · '),
+      (item.benches || []).join(' · '),
       item.count,
       item.runs.length,
       item.firstSeen,
@@ -168,6 +169,22 @@
   {#each filtered as item (item.fingerprint)}
     <FindingCard finding={item}>
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><span>{formatNumber(item.runs.length)} اجرا · {formatNumber(item.count)} رخداد</span><span>آخرین: {formatDate(item.lastSeen)}</span></div>
+      <!--
+        بنچ‌هایی که این یافته در آن‌ها بود.
+
+        ── چرا این خط ارزشِ جا گرفتن دارد ──
+
+        «۳ اجرا» چیزی نمی‌گوید؛ سه رشتهٔ تاریخ هم. ولی «پیش از انتشار ۴.۲ ·
+        پس از اصلاح» یعنی این یافته اصلاح را هم دوام آورده — و همان جمله‌ای
+        است که آدم می‌خواست بپرسد.
+      -->
+      {#if item.benches?.length}
+        <div class="mb-3 flex flex-wrap gap-1.5">
+          {#each item.benches as name (name)}
+            <span class="rounded-md bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">{name}</span>
+          {/each}
+        </div>
+      {/if}
       <div class="grid gap-3 sm:grid-cols-[11rem_minmax(0,1fr)_auto]">
         <select class="app-select" bind:value={item.triage.status}><option value="open">باز</option><option value="acknowledged">بررسی‌شده</option><option value="resolved">رفع‌شده</option><option value="ignored">نادیده‌گرفته</option></select>
         <select class="app-select" bind:value={item.triage.verdict} title="این برچسب به شناخت برمی‌گردد: «قلابی» چکِ پرسروصدا را خاموش می‌کند، «باگ واقعی» به خطرها می‌رود."><option value="">قضاوت؟</option><option value="false-positive">قلابی</option><option value="real-bug">باگ واقعی</option><option value="by-design">رفتار درست است</option><option value="later">بعداً</option></select>

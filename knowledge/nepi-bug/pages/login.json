@@ -20,32 +20,10 @@
         "name": "فراموشی رمز عبور؟",
         "exact": true,
         "visible": true
-      },
-      {
-        "role": "button",
-        "name": "کپی کد",
-        "exact": true,
-        "visible": true
-      },
-      {
-        "role": "button",
-        "name": "دانلود به‌شکل فایل",
-        "exact": true,
-        "visible": true
-      },
-      {
-        "label": "کد بازیابی را در جای مطمئنی ذخیره کردم.",
-        "visible": true
-      },
-      {
-        "role": "button",
-        "name": "ادامه",
-        "exact": true,
-        "visible": true
       }
     ],
-    "seenIn": 6,
-    "lastSeen": "2026-09-13T10:05:00.782Z",
+    "seenIn": 7,
+    "lastSeen": "2026-09-13T10:35:37.058Z",
     "approvedBy": null
   },
   "by": "tour"

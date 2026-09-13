@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import { benchGrep, normalizeBench } from '../../../../src/runs/bench.js';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
@@ -448,6 +449,21 @@ export async function startJob(rawOptions = {}) {
      * هم نباید ممکن باشد — که با همین slotِ مشترک خودبه‌خود رعایت می‌شود.
      */
     kind: ['map', 'quest'].includes(rawOptions?.kind) ? rawOptions.kind : 'run',
+
+    /**
+     * چند سناریوی انتخاب‌شده، و اسمی روی این بار.
+     *
+     * ── چرا `only` جدا از `grep` ماند ──
+     *
+     * `grep` الگوست و از زمان‌بندی و اجرای دوباره هم می‌آید. `only` فهرستِ
+     * نامِ آدم است که رابط تیک زده؛ escapeش با `benchGrep` انجام می‌شود، در
+     * همان تابعی که خط فرمان استفاده می‌کند — دو نسخه یعنی روزی یکی‌شان
+     * نامِ پرانتزدار را بی‌صدا نگیرد.
+     */
+    only: Array.isArray(rawOptions?.only)
+      ? rawOptions.only.map((name) => String(name).slice(0, 300)).filter(Boolean).slice(0, 50)
+      : [],
+    bench: normalizeBench(rawOptions?.bench),
     goal: rawOptions?.goal ? String(rawOptions.goal).slice(0, 300) : '',
     from: rawOptions?.from ? String(rawOptions.from).slice(0, 300) : '',
     states: toCap(rawOptions?.states),
@@ -513,6 +529,18 @@ export async function startJob(rawOptions = {}) {
     if (options.kind === 'run' && options.grep && !project.scenarios.some((scenario) => scenario.runnable && scenario.name === options.grep)) {
       throw new Error('سناریوی انتخاب‌شده در این هدف نیست');
     }
+    /**
+     * هر نامِ تیک‌خورده باید واقعاً اجراشدنی باشد.
+     *
+     * وگرنه `--grep` آن یکی را نمی‌گیرد و اجرا با سه سناریو به‌جای چهار تمام
+     * می‌شود — سبز، و کم. همان شکستِ خاموشی که بدترین نوعش است: گزارش
+     * می‌گوید همه‌چیز خوب است، چون آن یکی اصلاً اجرا نشد.
+     */
+    for (const name of options.only) {
+      if (!project.scenarios.some((scenario) => scenario.executable && scenario.name === name)) {
+        throw new Error(`سناریوی «${name}» در این هدف اجراشدنی نیست`);
+      }
+    }
   } catch (cause) {
     if (job.cancelRequested) {
       await finish(job, null, null);
@@ -545,7 +573,10 @@ export async function startJob(rawOptions = {}) {
     if (options.model) args.push('--model', options.model);
     if (options.headed) args.push('--headed');
   } else {
-    if (options.grep) args.push('--grep', options.grep);
+    // `--only` بر `--grep` مقدم است: تیکِ صریحِ کاربر از الگو روشن‌تر است
+    const selection = benchGrep(options.only) || options.grep;
+    if (selection) args.push('--grep', selection);
+    if (options.bench) args.push('--bench', options.bench);
     if (options.device) args.push('--device', options.device);
     if (options.persona) args.push('--persona', options.persona);
     if (options.depth) args.push('--depth', String(options.depth));

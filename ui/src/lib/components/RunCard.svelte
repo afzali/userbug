@@ -47,7 +47,16 @@
       <span class="code-value truncate text-sm" title={run.runId}>{run.runId}</span>
       <StatusBadge status={run.status} />
     </Card.Title>
-    <Card.Description>{formatDate(run.startedAt)} · {run.target || '—'} · {run.device || '—'}</Card.Description>
+    <Card.Description class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      <span>{formatDate(run.startedAt)} · {run.target || '—'} · {run.device || '—'}</span>
+      <!--
+        بنچ پررنگ‌تر از بقیهٔ فراداده است، چون تنها چیزی است که **آدم**
+        نوشته. بقیه را ماشین ثبت کرده.
+      -->
+      {#if run.bench}
+        <span class="rounded-md bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">{run.bench}</span>
+      {/if}
+    </Card.Description>
   </Card.Header>
   <Card.Content class="grid grid-cols-3 gap-3 px-5 text-center">
     <div class="rounded-lg bg-muted/70 p-2"><strong class="block text-lg">{formatNumber(run.steps)}</strong><span class="text-xs text-muted-foreground">قدم</span></div>

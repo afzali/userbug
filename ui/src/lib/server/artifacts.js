@@ -110,6 +110,8 @@ export async function listRuns({ target, limit = 250 } = {}) {
       // اجرا، گشت، یا خزشِ نقشه — بی این، صفحهٔ گشت نمی‌تواند گشت‌های
       // پیشینش را از اجراهای معمولی جدا کند
       kind: run.kind || 'run',
+      // اسمی که آدم روی این بار گذاشته؛ خالی برای اجراهایی که پیش از بنچ بودند
+      bench: run.bench || '',
       steps: run.steps ?? 0,
       findings: run.findings ?? 0,
       findingEvents: run.findingEvents ?? run.findings ?? 0,
@@ -225,6 +227,19 @@ export async function aggregateTriage(target) {
     return own.length ? own : [run.device].filter(Boolean);
   };
 
+  /**
+   * بنچِ یک یافته فقط از اجرا می‌آید، نه از خودش.
+   *
+   * یافته نمی‌داند در کدام بار دیده شده — همان یافته می‌تواند در سه بنچ
+   * تکرار شود. پس اینجا **جمع** می‌شود: «این هنوز در بنچِ پس از اصلاح هم
+   * هست» حرفِ متفاوتی است با «فقط یک بار، آن اول، دیده شد».
+   */
+  const addBench = (list, run) => {
+    const name = run.bench || '';
+    if (name && !list.includes(name)) list.push(name);
+    return list;
+  };
+
   for (const run of [...runs].reverse()) {
     const detail = await readRunDetails(run.runId);
     for (const finding of detail.findings) {
@@ -234,6 +249,7 @@ export async function aggregateTriage(target) {
         seen.runs.push(run.runId);
         seen.lastSeen = run.startedAt;
         seen.latest = finding;
+        addBench(seen.benches, run);
         for (const device of devicesOf(finding, run)) {
           if (!seen.devices.includes(device)) seen.devices.push(device);
         }
@@ -248,6 +264,7 @@ export async function aggregateTriage(target) {
           devices: devicesOf(finding, run),
           count: finding.count || 1,
           runs: [run.runId],
+          benches: addBench([], run),
           firstSeen: run.startedAt,
           lastSeen: run.startedAt,
           latest: finding,

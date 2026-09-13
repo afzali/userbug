@@ -116,6 +116,28 @@ async function scenarioMetadata(directory, relative) {
         name: String(doc?.name || relative),
         status,
         runnable: status !== 'draft' && Boolean(doc?.name) && Array.isArray(doc?.steps),
+        /**
+         * «واقعاً اجرا می‌شود» ≠ «رگرسیون شمرده می‌شود».
+         *
+         * ── چرا این دو از هم جدا شدند ──
+         *
+         * `runnable` پیش‌نویس را کنار می‌گذارد، و درست هم هست: پیش‌نویس
+         * تأیید نشده و نباید معیارِ سلامت باشد. ولی `yaml.spec.js`
+         * اجرایش **می‌کند** و فقط در عنوان علامتش می‌زند.
+         *
+         * تا امروز فرقی نداشت. با آمدنِ انتخابِ چندتایی فرق کرد: فهرستِ
+         * تیک‌ها از `runnable` ساخته شد و پروژه‌ای که همهٔ سناریوهایش
+         * پیش‌نویس بودند، «سناریوی اجراشدنی‌ای نیست» نشان داد — در حالی که
+         * دکمهٔ «شروع اجرا» همان‌ها را می‌برد.
+         *
+         * ── و چرا زیرپوشه بیرون است ──
+         *
+         * `loadScenarios` فقط ریشهٔ پوشه را می‌خواند، نه بازگشتی. پس
+         * `_drafts/` و `_quests/` در فهرستِ فایل‌ها دیده می‌شوند ولی
+         * اجراگر هرگز به آن‌ها نمی‌رسد. تیک زدنشان یعنی اجرایی با «۰ تست»
+         * که سبز تمام می‌شود — بدترین نوعِ شکست.
+         */
+        executable: Boolean(doc?.name) && Array.isArray(doc?.steps) && !relative.includes('/'),
         persona: String(doc?.persona || 'novice'),
         steps: Array.isArray(doc?.steps) ? doc.steps.length : 0,
       };
@@ -126,6 +148,7 @@ async function scenarioMetadata(directory, relative) {
         name: relative,
         status: 'invalid',
         runnable: false,
+        executable: false,
         persona: '',
         steps: 0,
         error: cause.message,
@@ -139,6 +162,7 @@ async function scenarioMetadata(directory, relative) {
     name: title || relative,
     status: 'approved',
     runnable: relative.toLowerCase().endsWith('.spec.js') && Boolean(title),
+    executable: relative.toLowerCase().endsWith('.spec.js') && Boolean(title) && !relative.includes('/'),
     persona: '',
     steps: null,
   };

@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { finalizeRun, printSummary } from '../src/finalize.js';
 import { assertModelSlug, listModels, loadGlobalConfig, resolveModel } from '../src/models/config.js';
+import { benchGrep, normalizeBench } from '../src/runs/bench.js';
 import { Budget } from '../src/models/provider.js';
 import { loadTarget } from '../src/target.js';
 import { assertNewProjectKey, assertProjectKey, renderTargetConfig } from '../src/target-template.js';
@@ -47,6 +48,8 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
   userbug run [هدف] [گزینه‌ها]     اجرای سناریوها
       --scenario <مسیر>           فیلتر روی مسیر فایل سناریو
       --grep <عنوان>              فیلتر روی عنوان تست
+      --only <نام>[,<نام>…]       فقط این سناریوها (نامِ کامل، نه الگو)
+      --bench <نام>               اسمی روی این بار، که در تریاژ دیده می‌شود
       --persona <novice|pro>      سرعت و رفتار کاربر؛ بر سناریو می‌چربد
       --depth <n>                 سقف قدمِ هر کاوش؛ بر سناریو می‌چربد
       --model <اسلاگ>             مدل هوش مصنوعی؛ بر کانفیگ می‌چربد
@@ -73,7 +76,7 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
   userbug schedule add <کلید> --target <هدف> --time HH:MM [گزینه‌ها]
                                   ساخت تسک در زمان‌بندِ سیستم
       --weekly --days MON,WED     هفتگی به‌جای روزانه
-      --grep --device --persona --model --depth --repeat
+      --grep --only --bench --device --persona --model --depth --repeat
                                   همان پرچم‌های run
   userbug schedule remove <کلید>  حذف تسک و فایل‌هایش (لاگ می‌ماند)
   userbug schedule run <کلید>     اجرای دستیِ همان تسک، برای آزمودن
@@ -357,6 +360,7 @@ function cmdRun({ flags, positional }) {
   // چون یک اجرا باید یک روایت باشد و مخلوط کردن دستگاه‌ها گزارش را بی‌معنا می‌کند.
   const runs = devices.length ? devices : [null];
   const results = [];
+  const bench = normalizeBench(flags.bench === true ? '' : flags.bench);
 
   for (const device of runs) {
     // مستقیم CLI پلی‌رایت با node، نه از راه npx و پوسته.
@@ -373,7 +377,16 @@ function cmdRun({ flags, positional }) {
     else if (flags.scenario) args.push(String(flags.scenario));
     // --scenario مسیر فایل را فیلتر می‌کند و --grep عنوان تست را. جدا نگه
     // داشته شدند چون یک بار «--scenario <عنوان>» بی‌صدا صفر تست اجرا کرد.
-    if (flags.grep) args.push('--grep', String(flags.grep));
+    /**
+     * `--only` چند سناریو، `--grep` یک الگو.
+     *
+     * جدا نگه داشته شده‌اند چون جنسشان فرق دارد: `--grep` الگوست و کاربر
+     * خودش مسئولِ درستی‌اش است؛ `--only` فهرستِ نامِ آدم است و باید escape
+     * شود. یکی کردنشان یعنی نامِ سناویی که پرانتز دارد بی‌صدا هیچ تستی
+     * نگیرد.
+     */
+    const only = benchGrep(String(flags.only || '').split(',')) || String(flags.grep || '');
+    if (only) args.push('--grep', only);
     if (flags.headed) args.push('--headed');
     if (flags.repeat) args.push(`--repeat-each=${flags.repeat}`);
 
@@ -388,6 +401,9 @@ function cmdRun({ flags, positional }) {
     if (model) env.UB_MODEL = model;
     if (flags.author) env.UB_AUTHOR = '1';
     if (flags.file) env.UB_SCENARIO_FILE = String(flags.file);
+    // نامِ بنچ در `run.json` می‌نشیند، نه فقط در این پروسه: ارزشش وقتی است
+    // که هفتهٔ بعد کسی در تریاژ بپرسد این یافته از کدام بار بود
+    if (bench) env.UB_BENCH = bench;
 
     // اجرای چنددستگاهی چند اجرای مستقل است؛ یک مسیر ثابت JUnit یعنی آخرین
     // دستگاه بقیه را پاک می‌کند و CI فقط یکی را می‌بیند.
@@ -442,14 +458,20 @@ function cmdReplay({ flags, positional }) {
   const wanted = flags['only-findings'] ? scenarios.filter((s) => s.findings > 0) : scenarios;
   if (!wanted.length) throw new Error('آن اجرا یافته‌ای نداشت؛ چیزی برای اجرای دوباره نیست');
 
-  const escape = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const grep = wanted.map((s) => escape(s.name)).join('|');
+  const grep = benchGrep(wanted.map((s) => s.name));
 
   console.log(`\n  اجرای دوبارهٔ ${runId}`);
   console.log(`  دستگاه: ${run.device}  ·  سناریو: ${wanted.length} از ${scenarios.length}\n`);
 
   cmdRun({
-    flags: { ...flags, grep, device: run.device === 'desktop' ? undefined : run.device },
+    flags: {
+      ...flags,
+      grep,
+      // بنچِ همان اجرا ادامه پیدا می‌کند مگر کاربر اسمِ تازه بدهد: اجرای
+      // دوباره همان بار است، یک قدم جلوتر
+      bench: flags.bench ?? run.bench,
+      device: run.device === 'desktop' ? undefined : run.device,
+    },
     positional: [run.target],
   });
 }

@@ -17,6 +17,19 @@
   // svelte-ignore state_referenced_locally
   let runs = $state(data.runs);
   let scenario = $state('');
+  /**
+   * سناریوهای تیک‌خورده — «بَنچ».
+   *
+   * ── چرا کشویی کافی نبود ──
+   *
+   * کشویی فقط دو حال داشت: یک سناریو، یا همه. ولی کاری که آدم واقعاً می‌کند
+   * چیزی وسطِ این دوتاست: «این سه تا که به ورود مربوط‌اند را ببر». با
+   * کشویی یا باید سه بار اجرا می‌گرفت — سه گزارشِ جدا که هیچ‌کدام کلِ ماجرا
+   * نیست — یا همه را می‌برد و منتظرِ بیست سناریوی بی‌ربط می‌ماند.
+   */
+  let picked = $state(new Set());
+  /** اسمی روی این بار. اختیاری، ولی در تریاژ همان چیزی است که یادت می‌ماند. */
+  let bench = $state('');
   let device = $state('');
   let persona = $state('');
   let depth = $state('');
@@ -59,21 +72,41 @@
    */
   let blank = $derived(!project.scenarios?.length && !runs.length && !job);
 
+  /** سناریوهای اجراشدنی، یک بار — هم برای تیک‌ها، هم برای کشویی. */
+  let runnableScenarios = $derived((project?.scenarios || []).filter((item) => item.executable));
+
+  function togglePick(name) {
+    const next = new Set(picked);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    picked = next;
+  }
+
   let runSearch = $state('');
   let runKind = $state('all');
+  let runBench = $state('all');
   let runFindings = $state('all');
   let runSort = $state('new');
 
   let filtered = $derived(
-    Boolean(runSearch.trim()) || runKind !== 'all' || runFindings !== 'all' || runSort !== 'new'
+    Boolean(runSearch.trim()) || runKind !== 'all' || runBench !== 'all' || runFindings !== 'all' || runSort !== 'new'
   );
 
   function resetRunFilters() {
     runSearch = '';
     runKind = 'all';
+    runBench = 'all';
     runFindings = 'all';
     runSort = 'new';
   }
+
+  /**
+   * نام‌های بنچی که واقعاً وجود دارند.
+   *
+   * فهرستِ از پیش تعریف‌شده‌ای در کار نیست و نباید باشد: بنچ همان چیزی است
+   * که کاربر لحظهٔ اجرا اسمش را می‌گذارد.
+   */
+  let benchNames = $derived([...new Set(runs.map((run) => run.bench).filter(Boolean))]);
 
   /**
    * فیلتر و مرتب‌سازی روی همان داده‌ای که از قبل هست.
@@ -85,10 +118,12 @@
     const needle = runSearch.trim().toLowerCase();
     const rows = runs.filter((run) => {
       if (runKind !== 'all' && (run.kind || 'run') !== runKind) return false;
+      if (runBench === 'none' && run.bench) return false;
+      if (runBench !== 'all' && runBench !== 'none' && run.bench !== runBench) return false;
       if (runFindings === 'with' && !run.findings) return false;
       if (runFindings === 'without' && run.findings) return false;
       if (!needle) return true;
-      return `${run.runId} ${(run.scenarios || []).join(' ')}`.toLowerCase().includes(needle);
+      return `${run.runId} ${run.bench || ''} ${(run.scenarios || []).join(' ')}`.toLowerCase().includes(needle);
     });
 
     const at = (run) => Date.parse(run.startedAt || '') || 0;
@@ -211,7 +246,19 @@
       const response = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ target, grep: scenario, device, persona, depth, model, repeat, headed, author }),
+        body: JSON.stringify({
+          target,
+          grep: scenario,
+          only: [...picked],
+          bench,
+          device,
+          persona,
+          depth,
+          model,
+          repeat,
+          headed,
+          author,
+        }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'اجرا شروع نشد');
@@ -415,14 +462,71 @@
     </Card.Header>
     <Card.Content>
       <form class="space-y-4" onsubmit={start}>
+        <!--
+          تیک، نه کشویی.
+
+          کشویی فقط «یکی» یا «همه» می‌داد؛ کارِ واقعی وسطِ این دوتاست. تیکِ
+          هیچ‌کدام یعنی همه — همان پیش‌فرضِ قبلی، پس کسی که تا دیروز فقط
+          «شروع اجرا» می‌زد، هیچ تغییری نمی‌بیند.
+        -->
+        <div class="space-y-1.5 text-sm font-medium">
+          <div class="flex items-baseline justify-between gap-2">
+            <span>سناریوها</span>
+            <span class="text-[11px] font-normal text-muted-foreground">
+              {picked.size ? `${formatNumber(picked.size)} انتخاب‌شده` : 'هیچ تیکی = همه'}
+            </span>
+          </div>
+
+          {#if runnableScenarios.length}
+            <div class="max-h-48 space-y-0.5 overflow-y-auto rounded-lg border p-1.5">
+              {#each runnableScenarios as item (item.path || item.name)}
+                <label class="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1 text-sm font-normal hover:bg-accent/50">
+                  <input
+                    type="checkbox"
+                    class="mt-1"
+                    checked={picked.has(item.name)}
+                    disabled={busy}
+                    onchange={() => togglePick(item.name)}
+                  />
+                  <span class="min-w-0 flex-1 break-words">
+                    {item.name}
+                    <!-- پیش‌نویس اجرا می‌شود ولی رگرسیون نیست؛ در فهرست هم باید فرق کند -->
+                    {#if item.status === 'draft'}
+                      <span class="text-[10px] text-muted-foreground">· پیش‌نویس</span>
+                    {/if}
+                  </span>
+                </label>
+              {/each}
+            </div>
+            {#if picked.size}
+              <button
+                type="button"
+                class="text-[11px] text-muted-foreground underline underline-offset-2"
+                onclick={() => { picked = new Set(); }}
+              >
+                برداشتنِ همهٔ تیک‌ها
+              </button>
+            {/if}
+          {:else}
+            <p class="rounded-lg border border-dashed p-3 text-center text-xs font-normal text-muted-foreground">
+              سناریوی اجراشدنی‌ای نیست.
+            </p>
+          {/if}
+        </div>
+
+        <!--
+          اسمِ بار.
+
+          ارزشش در فهرست نیست، در تریاژ است: یافته‌ای که هفتهٔ بعد باز می‌شود
+          باید بتواند بگوید «در بنچِ پس از اصلاح هم بود» — چیزی که رشتهٔ
+          تاریخِ اجرا هرگز نگفت.
+        -->
         <label class="block space-y-1.5 text-sm font-medium">
-          <span>سناریو</span>
-          <select class="app-select" bind:value={scenario} disabled={busy}>
-            <option value="">همهٔ سناریوها</option>
-            {#each project?.scenarios || [] as item}
-              {#if item.runnable}<option value={item.name}>{item.name}</option>{/if}
-            {/each}
-          </select>
+          <span>اسمِ این بار <span class="font-normal text-muted-foreground">(اختیاری)</span></span>
+          <Input bind:value={bench} placeholder="مثلاً: پیش از انتشار ۴.۲" disabled={busy} maxlength="60" />
+          <span class="block text-[11px] font-normal leading-5 text-muted-foreground">
+            در فهرست اجراها فیلتر می‌شود و در تریاژ کنارِ هر یافته می‌آید.
+          </span>
         </label>
         <div class="grid grid-cols-2 gap-3">
           <label class="block space-y-1.5 text-sm font-medium">
@@ -601,19 +705,34 @@
         کردن و خواندنِ شناسه‌ها.
 
         محورها همان‌هایی‌اند که آدم واقعاً با آن‌ها می‌گردد: **نوع** (اجرا،
-        گشت، خزش)، **یافته داشت یا نه**، و جست‌وجو روی شناسه و سناریو. همه
+        کاوش، گشت، خزش)، **بنچ** (اسمی که خودش روی آن بار گذاشته)، **یافته
+        داشت یا نه**، و جست‌وجو روی شناسه و سناریو و بنچ. همه
         سمتِ کلاینت، روی داده‌ای که از قبل بارگذاری شده — پس فیلتر کردن
         درخواستی به سرور نمی‌زند.
       -->
       {#if runs.length > 3}
         <div class="mb-4 flex flex-wrap items-center gap-2">
-          <Input bind:value={runSearch} placeholder="جست‌وجو در شناسه یا سناریو…" class="h-8 w-52" />
+          <Input bind:value={runSearch} placeholder="جست‌وجو در شناسه، بنچ یا سناریو…" class="h-8 w-52" />
           <select bind:value={runKind} class="h-8 rounded-md border bg-background px-2 text-xs">
             <option value="all">همهٔ انواع</option>
             <option value="run">اجرای سناریو</option>
+            <option value="quest">کاوشِ هدف‌دار</option>
             <option value="tour">گشت</option>
             <option value="map">خزشِ نقشه</option>
           </select>
+          <!--
+            کشویی بنچ فقط وقتی هست که بنچی وجود دارد: گزینه‌ای که همیشه خالی
+            است، فقط جا می‌گیرد و به کاربر می‌گوید چیزی را از دست داده.
+          -->
+          {#if benchNames.length}
+            <select bind:value={runBench} class="h-8 rounded-md border bg-background px-2 text-xs">
+              <option value="all">همهٔ بنچ‌ها</option>
+              <option value="none">بی‌بنچ</option>
+              {#each benchNames as name (name)}
+                <option value={name}>{name}</option>
+              {/each}
+            </select>
+          {/if}
           <select bind:value={runFindings} class="h-8 rounded-md border bg-background px-2 text-xs">
             <option value="all">با و بی یافته</option>
             <option value="with">فقط یافته‌دارها</option>
