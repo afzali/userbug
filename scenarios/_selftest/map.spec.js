@@ -457,3 +457,50 @@ test.describe('پشتِ درِ ورود', () => {
     expect(stuckAtLogin({ states: [{ route: '/login' }] }, { loginPath: '/' })).toBe(false);
   });
 });
+
+/**
+ * اولویتِ صف — «اول کجا برود»، نه «کجا برود».
+ *
+ * صفِ یک اپِ متوسط صدها کنش دارد و سقفِ زمان همیشه زودتر می‌رسد. فیلتر
+ * کردن جوابِ بدی است: چیزی که کنار گذاشته شود، نبودش در نقشه شبیهِ
+ * «نداریم» می‌شود. پس وزن، نه حذف.
+ */
+test.describe('اولویتِ صف', () => {
+  const state = { path: [{ click: 1 }], route: '/contents', view: '' };
+
+  test('بی تمرکز، همان عمق است', async () => {
+    const { priorityOf } = await import('../../src/map/state.js');
+    expect(priorityOf({ label: 'هرچیز' }, state)).toBe(2);
+  });
+
+  test('واژهٔ تمرکز جلو می‌اندازد، ولی حذف نمی‌کند', async () => {
+    const { focusWords, priorityOf } = await import('../../src/map/state.js');
+    const focus = focusWords('کتاب واژه‌نامه');
+
+    const hit = priorityOf({ label: 'افزودن کتاب جدید' }, state, { focus });
+    const miss = priorityOf({ label: 'تنظیمات' }, state, { focus });
+    expect(hit).toBeLessThan(miss);
+    // هر دو هنوز در صف‌اند — هیچ‌کدام حذف نشده
+    expect(Number.isFinite(hit) && Number.isFinite(miss)).toBe(true);
+  });
+
+  test('نیم‌فاصله تمرکز را نمی‌شکند', async () => {
+    const { focusWords, priorityOf } = await import('../../src/map/state.js');
+    expect(priorityOf({ label: 'واژه‌نامه' }, state, { focus: focusWords('واژهنامه') })).toBeLessThan(2);
+  });
+
+  test('روتِ نرسیدهٔ سورس از هر واژه‌ای مهم‌تر است', async () => {
+    const { focusWords, priorityOf } = await import('../../src/map/state.js');
+    const options = { focus: focusWords('کتاب'), wanted: ['/settings'] };
+
+    const toUnseen = priorityOf({ label: 'تنظیمات', predicted: '/settings' }, state, options);
+    const toFocus = priorityOf({ label: 'کتاب تازه' }, state, options);
+    expect(toUnseen).toBeLessThan(toFocus);
+  });
+
+  test('روتِ پویا هم می‌خورد', async () => {
+    const { priorityOf } = await import('../../src/map/state.js');
+    const hit = priorityOf({ label: 'یک کتاب', predicted: '/content/42' }, state, { wanted: ['/content/[id]'] });
+    expect(hit).toBeLessThan(0);
+  });
+});

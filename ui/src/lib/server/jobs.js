@@ -454,6 +454,7 @@ export async function startJob(rawOptions = {}) {
     fresh: Boolean(rawOptions?.fresh),
     remember: rawOptions?.remember ? String(rawOptions.remember).slice(0, 60) : '',
     profile: Boolean(rawOptions?.profile),
+    focus: rawOptions?.focus ? String(rawOptions.focus).slice(0, 200) : '',
   };
 
   if (state.activeId) {
@@ -529,6 +530,7 @@ export async function startJob(rawOptions = {}) {
     if (options.fresh) args.push('--fresh');
     if (options.remember) args.push('--remember', options.remember);
     if (options.profile) args.push('--profile');
+    if (options.focus) args.push('--focus', options.focus);
     if (options.headed) args.push('--headed');
   } else {
     if (options.grep) args.push('--grep', options.grep);

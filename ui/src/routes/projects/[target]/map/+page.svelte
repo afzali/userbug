@@ -23,6 +23,8 @@
   let remember = $state('crawler');
   /** پروفایلِ ماندگار: نشستِ خزشِ قبلی می‌ماند، پس ورود یک‌بار است. */
   let profile = $state(true);
+  /** واژه‌هایی که اول سراغشان برود. فیلتر نیست، اولویت است. */
+  let focus = $state('');
   let busy = $state(false);
   let error = $state('');
 
@@ -92,6 +94,7 @@
           headed,
           remember,
           profile,
+          focus,
         }),
       });
       const payload = await response.json();
@@ -191,6 +194,16 @@
               <Input type="number" min="1" max="1000" bind:value={minutes} />
             </label>
           </div>
+
+          <label class="block space-y-1">
+            <span class="text-xs text-muted-foreground">اول سراغِ چه برود</span>
+            <Input bind:value={focus} placeholder="مثلاً: کتاب واژه‌نامه — خالی یعنی همه‌جا" />
+            <span class="block text-[11px] leading-5 text-muted-foreground">
+              فیلتر نیست، <strong>اولویت</strong> است: چیزی حذف نمی‌شود، فقط
+              زودتر دیده می‌شود. روت‌هایی که در سورس هست و خزش ندیده، خودکار
+              اولویت می‌گیرند.
+            </span>
+          </label>
 
           <label class="block space-y-1">
             <span class="text-xs text-muted-foreground">حسابی که به خاطر بسپارد</span>

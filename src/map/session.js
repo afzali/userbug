@@ -38,7 +38,15 @@ import { avoidFrom } from '../knowledge/select.js';
 import { freshIdentity } from '../data/persian.js';
 import { listAccounts, readAccounts, saveAccount } from '../knowledge/credentials.js';
 
-import { actionsFrom, profileOf, routePatternOf, sampleActions, stateIdOf } from './state.js';
+import {
+  actionsFrom,
+  focusWords,
+  priorityOf,
+  profileOf,
+  routePatternOf,
+  sampleActions,
+  stateIdOf,
+} from './state.js';
 import {
   DEFAULT_CAPS,
   addEdge,
@@ -105,6 +113,7 @@ export class MapSession extends EventEmitter {
     rememberAs = '',
     profile = false,
     freshProfile = false,
+    focus = '',
   } = {}) {
     super();
     this.targetName = target;
@@ -118,6 +127,7 @@ export class MapSession extends EventEmitter {
     this.rememberAs = rememberAs;
     this.profile = profile;
     this.freshProfile = freshProfile;
+    this.focus = focusWords(focus);
 
     this.status = 'starting';
     this.events = [];
@@ -525,11 +535,28 @@ export class MapSession extends EventEmitter {
   }
 
   enqueue(state) {
-    const depth = (state.path?.length || 0) + 1;
+    /**
+     * «اول کجا برود» — نه «کجا برود».
+     *
+     * `wanted` روت‌هایی است که سورس می‌شناسد و خزش هنوز ندیده. کنشی که
+     * پیش‌بینی می‌شود به آن‌جا ببرد، جلو می‌افتد — بی آنکه کسی چیزی تایپ کرده
+     * باشد.
+     */
+    const wanted = this.unreachedRoutes();
     pushFrontier(
       this.map,
-      this.untriedOf(state).map((action) => ({ state: state.id, action: action.key, depth }))
+      this.untriedOf(state).map((action) => ({
+        state: state.id,
+        action: action.key,
+        depth: priorityOf(action, state, { focus: this.focus, wanted }),
+      }))
     );
+  }
+
+  /** روتِ سورس که هنوز گرهی رویش نداریم. */
+  unreachedRoutes() {
+    const seen = new Set((this.map?.states || []).map((state) => state.route));
+    return this.knownRoutes.map((route) => routePatternOf(route)).filter((route) => !seen.has(route));
   }
 
   /* ─────────────────────────── حرکت ─────────────────────────── */
@@ -884,7 +911,17 @@ export class MapSession extends EventEmitter {
         }
       }
 
-      const action = this.untriedOf(state)[0];
+      /**
+       * داخلِ گره هم اولویت، نه ترتیبِ سند.
+       *
+       * حلقه اول کنش‌های همان گره را تمام می‌کند و تازه بعد سراغِ صف می‌رود،
+       * پس وزنی که فقط به صف بخورد عملاً دیده نمی‌شود: نخستین خزشِ با
+       * `--focus` هیچ تفاوتی نشان نداد.
+       */
+      const wanted = this.unreachedRoutes();
+      const action = this.untriedOf(state)
+        .slice()
+        .sort((a, b) => priorityOf(a, state, { focus: this.focus, wanted }) - priorityOf(b, state, { focus: this.focus, wanted }))[0];
       if (!action) {
         this.skipped++;
         continue;

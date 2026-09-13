@@ -124,6 +124,8 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --profile                   مرورگر را با پروفایلِ خزشِ قبلی باز کن —
                                   نشست و کش می‌مانند، پس ورود یک‌بار است
       --fresh-profile             پروفایل را اول پاک کن
+      --focus <واژه‌ها>            اول سراغِ اینها برو (فیلتر نیست، اولویت است؛
+                                  روت‌های نرسیدهٔ سورس خودکار اولویت دارند)
       --show                      نقشهٔ موجود را نشان بده، بی‌خزش
       --classify                  هر کنش چه می‌کند: از سورس، و برای باقی‌مانده
                                   یک فراخوانی به ازای هر گره (کش‌شده)
@@ -1079,6 +1081,7 @@ async function cmdMap({ flags, positional }) {
     fresh: Boolean(flags.fresh),
     allowDestructive: Boolean(flags['allow-destructive']),
     rememberAs: flags.remember && flags.remember !== true ? String(flags.remember) : '',
+    focus: flags.focus && flags.focus !== true ? String(flags.focus) : '',
     profile: Boolean(flags.profile || flags['fresh-profile']),
     freshProfile: Boolean(flags['fresh-profile']),
   });

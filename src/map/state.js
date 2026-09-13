@@ -329,6 +329,62 @@ export function sampleActions(actions = [], { perRole = 3, family = 20, max = 25
  * و نتیجهٔ امتحان (`tried`/`to`) هرگز پاک نمی‌شود: بازدیدِ تازه دانش اضافه
  * می‌کند، کم نمی‌کند.
  */
+/**
+ * وزنِ یک کنش در صف — کوچک‌تر یعنی زودتر.
+ *
+ * ── چرا اولویت، نه فیلتر ──
+ *
+ * صفِ یک اپِ متوسط صدها کنش دارد و سقفِ زمان همیشه پیش از تمام شدنش می‌رسد.
+ * پس سؤالِ واقعی «کجا برود» نیست، «**اول** کجا برود» است.
+ *
+ * فیلتر کردن جواب بدی است: چیزی که کنار گذاشته شود، نبودش در نقشه شبیهِ
+ * «نداریم» می‌شود. با وزن، هیچ‌چیز حذف نمی‌شود — فقط ترتیب عوض می‌شود، و
+ * اگر بودجه بماند بقیه هم خزیده می‌شوند.
+ *
+ * ── و چرا مدل لازم نیست ──
+ *
+ * هر دو منبعِ اولویت از قبل روی دیسک‌اند: واژه‌هایی که کاربر داده، و روتی
+ * که سورس می‌شناسد و خزش به آن نرسیده. دومی بهترین «هدف» است و هیچ‌کس لازم
+ * نیست تایپش کند.
+ */
+export function priorityOf(action, state, { focus = [], wanted = [] } = {}) {
+  const depth = (state?.path?.length || 0) + 1;
+
+  // کنشی که پیش‌بینی می‌شود به روتِ ندیده ببرد، از هر واژه‌ای مهم‌تر است:
+  // این حدسِ ما نیست، حرفِ سورس است
+  if (action.predicted && wanted.some((route) => routeMatchesPattern(action.predicted, route))) {
+    return depth - 1000;
+  }
+
+  if (focus.length) {
+    const haystack = normalizeFocus(`${action.label || ''} ${state?.route || ''} ${state?.view || ''}`);
+    if (focus.some((word) => haystack.includes(word))) return depth - 500;
+  }
+
+  return depth;
+}
+
+/** واژه‌های تمرکز، نرمال‌شده. نیم‌فاصله همان تلهٔ همیشگی است. */
+export function focusWords(input) {
+  return String(input ?? '')
+    .split(/[\s،,]+/)
+    .map((word) => normalizeFocus(word))
+    .filter((word) => word.length >= 2);
+}
+
+function normalizeFocus(text) {
+  return String(text ?? '').replace(/‌/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+/** `/content/[id]` با `/content/42` یکی است. */
+function routeMatchesPattern(candidate, pattern) {
+  const clean = (value) => String(value || '').split('?')[0].replace(/\/+$/, '') || '/';
+  const a = clean(candidate).split('/');
+  const b = clean(pattern).split('/');
+  if (a.length !== b.length) return false;
+  return a.every((part, index) => /^\[.+\]$/.test(b[index]) || /^\[.+\]$/.test(part) || part === b[index]);
+}
+
 export function mergeActions(existing = [], incoming = []) {
   const byKey = new Map(existing.map((action) => [action.key, { ...action }]));
 

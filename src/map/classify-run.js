@@ -9,6 +9,7 @@
  */
 import { Budget, askJson } from '../models/provider.js';
 import { redactDeep } from '../models/redact.js';
+import { accountSecrets } from '../knowledge/credentials.js';
 import { KINDS, applyVerdicts, hashSource, loadCorpus, needsClassify, ruleVerdict, sourceFor } from './classify.js';
 import { readMap, writeMap } from './store.js';
 
@@ -80,7 +81,7 @@ export async function classifyMap({ target, roots, models, force = false, onStat
     let modelVerdicts = {};
     if (left.length && models) {
       try {
-        modelVerdicts = await askModel({ state, actions: left, snippets, models, budget });
+        modelVerdicts = await askModel({ state, actions: left, snippets, models, budget, target });
         stats.calls++;
         stats.byModel += applyVerdicts(state, modelVerdicts, { by: 'model' });
       } catch (cause) {
@@ -112,10 +113,24 @@ export async function classifyMap({ target, roots, models, force = false, onStat
   return { map, stats, spent: budget.spent, calls: budget.calls };
 }
 
-async function askModel({ state, actions, snippets, models, budget }) {
+async function askModel({ state, actions, snippets, models, budget, target }) {
+  /**
+   * رازهای حساب پیش از هر ارسال پاک می‌شوند.
+   *
+   * ── چرا این خط جا افتاده بود ──
+   *
+   * `do.js` و `explore.js` از اول `accountSecrets` را به `redactDeep`
+   * می‌دادند؛ اینجا فهرستِ خالی رفته بود. و دقیقاً همین‌جا خطرناک است:
+   * برچسبِ کنش از DOM می‌آید، و اگر اپ مقدارِ یک توکن یا ایمیل را در متنِ
+   * دکمه یا عنوان نشان دهد، همان رشته وارد prompt می‌شد.
+   *
+   * نمونه‌اش را همین نقشه دارد: گره‌ای که نامش شد «منوی
+   * ub-…@userbug.test کاربر سامانه».
+   */
+  const secrets = accountSecrets(target || process.env.UB_TARGET || '');
   const safe = redactDeep(
     actions.map((action) => ({ key: action.key, label: action.label, role: action.role })),
-    []
+    secrets
   );
 
   const { json } = await askJson(
