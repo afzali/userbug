@@ -7,6 +7,7 @@
   import ModelPicker from '$lib/components/ModelPicker.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import CommandBar from '$lib/components/CommandBar.svelte';
+  import Onboarding from '$lib/components/Onboarding.svelte';
   import RunCard from '$lib/components/RunCard.svelte';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import { formatNumber, sourceLabel } from '$lib/format.js';
@@ -81,6 +82,42 @@
     if (next.has(name)) next.delete(name);
     else next.add(name);
     picked = next;
+  }
+
+  /**
+   * راهنمای نخستین ورود.
+   *
+   * ── چرا خودکار باز می‌شود، و چرا نه همیشه ──
+   *
+   * ترتیبِ پنج قدم هیچ‌جا نوشته نبود و روی یک پروژهٔ واقعی دیدیم چه می‌شود:
+   * کاربر حساب و فایل و کلید را درست گذاشت، خزش را زد، و خزنده روی صفحهٔ
+   * ورود ماند — چون نمی‌دانست گشت باید اول برود.
+   *
+   * ولی پروژه‌ای که هر پنج قدمش انجام شده، صاحبش این را از بر است. پس شرط
+   * دو تاست: نه رد شده باشد، و نه کار تمام شده باشد.
+   *
+   * `localStorage` جای درستش است: تصمیمِ همین مرورگرِ همین آدم است، نه
+   * دانشی دربارهٔ پروژه که در `knowledge/` بنشیند.
+   */
+  let showIntro = $state(false);
+  const introKey = $derived(`userbug-intro:${target}`);
+
+  onMount(() => {
+    try {
+      if (localStorage.getItem(introKey) === 'off') return;
+    } catch {
+      // مرورگرِ بی‌انبار؛ راهنما نشان داده می‌شود که بدتر از پنهان کردنش نیست
+    }
+    showIntro = steps.some((step) => !step.done);
+  });
+
+  function dismissIntro(never) {
+    if (!never) return;
+    try {
+      localStorage.setItem(introKey, 'off');
+    } catch {
+      // ذخیره نشد؛ دفعهٔ بعد دوباره می‌آید و همان دکمه هست
+    }
   }
 
   let runSearch = $state('');
@@ -354,9 +391,13 @@
 
 <PageHeader eyebrow={`${project.environment} · ${project.baseURL}`} title={project.name} description="بگویید چه می‌خواهید، یا از فرمِ کناری دقیق انتخاب کنید.">
   {#snippet actions()}
+    <!-- راهِ برگشت به راهنما: بستنِ همیشگی نباید یعنی گم شدنِ همیشگی -->
+    <Button variant="ghost" onclick={() => { showIntro = true; }}>راهنما</Button>
     <Button href={`/projects/${encodeURIComponent(target)}/files`} variant="outline">سناریوها</Button>
   {/snippet}
 </PageHeader>
+
+<Onboarding {target} {steps} bind:open={showIntro} onDismiss={dismissIntro} />
 
 <!--
   درِ ورودی، بالای همه‌چیز.
