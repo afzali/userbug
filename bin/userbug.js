@@ -98,6 +98,7 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --remove <نام فایل>         حذف
 
   userbug invariants <هدف>        قاعده‌هایی که نباید بشکنند (باگ منطقی)
+      --scan                      استخراج از schema، بی مدل
       --off <شناسه> --why <متن>   خاموش کردن؛ دلیل اجباری
       --watch/--expect <شناسه>    تغییر حالت
       --add <شناسه> --statement <جمله> --query <SQL>
@@ -730,9 +731,39 @@ async function cmdDocs({ flags, positional }) {
  * استخراج کارِ `learn` است، چون از همان پیمایشِ سورس درمی‌آید. اینجا فقط
  * دیدن، خاموش کردن، و افزودنِ دستی.
  */
-function cmdInvariants({ flags, positional }) {
+async function cmdInvariants({ flags, positional }) {
   const name = positional[0];
   if (!name) throw new Error('نام هدف لازم است: userbug invariants <هدف>');
+
+  /**
+   * استخراج از schema، بی یک فراخوانی مدل.
+   *
+   * ── چرا این راه لازم شد ──
+   *
+   * ناوردا از `CREATE TABLE` درمی‌آید: `UNIQUE(email)` نحوِ ثابت دارد و حدس
+   * نمی‌خواهد. ولی تنها راهِ ذخیره‌اش `userbug learn` بود که **مدل** لازم
+   * دارد، و `--dry` هم عمداً چیزی ذخیره نمی‌کند.
+   *
+   * نتیجه‌اش روی نپی این بود: اسکن ۱۶۳ ناوردا پیدا می‌کرد و صفرشان روی دیسک
+   * می‌نشست — صد و شصت و سه فکتِ ماشین‌خوانده که پشتِ یک کلیدِ API گیر
+   * افتاده بودند.
+   */
+  if (flags.scan) {
+    const target = await loadTarget(name);
+    const { scanSource } = await import('../src/knowledge/digest.js');
+    const scan = await scanSource(target);
+
+    if (!scan.invariants?.length) {
+      console.log('\n  هیچ ناوردایی در schema پیدا نشد.');
+      console.log('  اگر پروژه SQL دارد، مطمئن شوید `source.root` به آن می‌رسد.\n');
+      return;
+    }
+
+    const merged = mergeInvariants(name, scan.invariants);
+    console.log(`\n  ${scan.files.length} فایل خوانده شد`);
+    console.log(`  ${scan.invariants.length} ناوردا در schema  ·  ${merged.added} تازه · ${merged.kept} با حالتِ قبلی\n`);
+    return;
+  }
 
   for (const [flag, mode] of [
     ['off', 'off'],
@@ -1136,14 +1167,11 @@ async function cmdEntry({ flags, positional }) {
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.writeFileSync(destination, yaml, 'utf8');
 
-  console.log(`
-  ${wantSeed ? 'دانه' : 'مسیرِ ورود'}: scenarios/${target}/${out}`);
+  console.log(`\n  ${wantSeed ? 'دانه' : 'مسیرِ ورود'}: scenarios/${target}/${out}`);
   console.log(`  از روی: ${source}`);
   if (!wantSeed) console.log(accountId ? `  با حسابِ «${accountId}»` : '  بی حسابِ ذخیره‌شده — هر اجرا کاربرِ تازه');
   for (const note of built.notes) console.log(`  · ${note}`);
-  console.log(`
-  حالا: userbug map ${target} --${wantSeed ? 'seed' : 'from'} scenarios/${target}/${out}
-`);
+  console.log(`\n  حالا: userbug map ${target} --${wantSeed ? 'seed' : 'from'} scenarios/${target}/${out}\n`);
 }
 
 /**

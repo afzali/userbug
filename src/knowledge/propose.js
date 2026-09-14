@@ -32,6 +32,7 @@ import path from 'node:path';
 import { loadScenarios } from '../scenario/load.js';
 import { normalizeRoutePath } from './schema.js';
 import { knowledgeDir, listPages, readDossier } from './store.js';
+import { listInvariants } from './invariants.js';
 import { readMap } from '../map/store.js';
 import { mergeActions } from '../map/state.js';
 
@@ -308,6 +309,167 @@ function fromMap(target, { touched, haystacks }) {
  * @param {string} target کلید پروژه
  * @returns {{proposals: object[], coveredRoutes: number, totalRoutes: number}}
  */
+/**
+ * ستون‌هایی که کاربر پرشان می‌کند، در برابر ستون‌هایی که ماشین پر می‌کند.
+ *
+ * ── چرا این تفکیک لازم بود ──
+ *
+ * روی نپی ۱۴۹ ناوردای `not-null` هست و بیشترشان `id` و `created_at` و
+ * `*_hash`اند — چیزهایی که هیچ فرمی از کاربر نمی‌پرسد. پیشنهاد دادن برای
+ * آن‌ها یعنی صد و چهل ردیفِ بی‌معنا که صفحهٔ «چه باید آزمود» را دفن می‌کند و
+ * چهارده تای مفید را با خودش می‌برد.
+ */
+const MACHINE_COLUMN = /^(id|.*_id|.*_hash|.*_at|created|updated|deleted|rowid|uuid|seq|order|position|version|revision|checksum|salt|iv|nonce)$/i;
+
+/**
+ * چیزهایی که آدم واقعاً در یک فرم می‌نویسد.
+ *
+ * عمداً کوتاه است. بلند کردنش یعنی دوباره همه‌چیز «کاربری» شود و رتبه‌بندی
+ * بی‌اثر — همان اتفاقی که با فهرستِ منفی افتاد.
+ */
+const USER_FACING = /^(e?mail|name|title|slug|username|user_?name|phone|mobile|code|label|nickname|handle)$/i;
+
+/**
+ * ناوردا → پیشنهادِ سناریو.
+ *
+ * ── چرا این جهت، در حالی که ناوردا از قبل چک می‌شود ──
+ *
+ * `checks/invariant.js` همین قاعده‌ها را به‌شکل SQL روی دیتابیس می‌سنجد —
+ * ولی **پس از** اینکه تخطی رخ داده. این جهت برعکس است: سناریویی که
+ * **تلاش می‌کند** تخطی کند، از راه رابط. اولی می‌گوید «خراب شد»، دومی
+ * می‌پرسد «آیا اصلاً می‌شود خرابش کرد؟».
+ *
+ * ── و چرا هیچ فراخوانیِ مدلی ندارد ──
+ *
+ * ناوردا از `CREATE TABLE` درآمده و جمله‌اش از قبل فارسی نوشته شده. آنچه
+ * اینجا ساخته می‌شود فقط **متنِ خواسته** است؛ مدل وقتی می‌آید که کاربر
+ * «بساز» بزند — مثل هر پیشنهادِ دیگری.
+ */
+function fromInvariants(target, { haystacks }) {
+  /**
+   * `mode: 'off'` اینجا معنای دیگری دارد.
+   *
+   * ── چرا فیلترِ اولیه غلط بود ──
+   *
+   * اول `mode !== 'off'` گذاشتیم و صفر پیشنهادِ «فرمِ خالی» درآمد. علتش را
+   * که دنبال کردیم: هر ۱۴۹ ناوردای `not-null` پیش‌فرض `off`اند، و درست هم
+   * هست — به‌عنوان **پرس‌وجوی SQL** بی‌معنا هستند، چون خودِ دیتابیس
+   * اجبارشان می‌کند و هیچ‌وقت نقض نمی‌شوند.
+   *
+   * ولی به‌عنوان **ایدهٔ آزمون** دقیقاً همان‌ها جالب‌اند: آیا فرم می‌گذارد
+   * فیلدِ اجباری خالی برود و خطای خامِ دیتابیس بالا بیاید؟ «این چک را اجرا
+   * نکن» با «این فکت بی‌ارزش است» یکی نیست.
+   *
+   * پس فقط چیزی کنار می‌رود که **آدم** با دلیل خاموشش کرده باشد.
+   */
+  const all = listInvariants(target).filter((item) => !item.why);
+  const out = [];
+
+  /* ── یکتایی: هر کدام یک جریانِ کاربریِ واقعی است ── */
+  for (const item of all.filter((one) => one.kind === 'unique')) {
+    const columns = (item.columns || []).join('، ');
+    if (!item.table || !columns) continue;
+    if (mentionedIn(haystacks, [item.table, ...(item.columns || [])])) continue;
+
+    out.push({
+      id: idOf('invariant', item.id),
+      kind: 'invariant',
+      // جنسِ آزمون، صریح — نه حدس از روی عنوان
+      shape: 'unique',
+      title: `تکراری بودنِ «${columns}» آزموده نمی‌شود`,
+      why: item.statement,
+      evidence: `از ${item.from || 'schema'} · by: ${item.by}`,
+      routes: [],
+      columns: item.columns || [],
+      text:
+        `از راه رابط، دو بار چیزی در «${item.table}» بساز که «${columns}» یکسان داشته باشند.\n` +
+        `بارِ دوم باید **رد شود** و پیامِ روشنی به کاربر بدهد؛ نه خطای خام، نه سکوت.\n` +
+        `اگر ساخته شد، قاعده‌ای که در schema نوشته شده از راه رابط شکسته است.`,
+    });
+  }
+
+  /**
+   * اجباری بودن: یک پیشنهاد به‌ازای **جدول**، نه به‌ازای ستون.
+   *
+   * «عنوان نباید خالی باشد» و «متن نباید خالی باشد» یک آزمونند: فرم را
+   * خالی بفرست. جدا کردنشان یعنی پنج ردیف برای یک کلیک.
+   */
+  const byTable = new Map();
+  for (const item of all.filter((one) => one.kind === 'not-null')) {
+    const human = (item.columns || []).filter((column) => !MACHINE_COLUMN.test(column));
+    if (!human.length || !item.table) continue;
+    const list = byTable.get(item.table) || [];
+    for (const column of human) if (!list.includes(column)) list.push(column);
+    byTable.set(item.table, list);
+  }
+
+  for (const [table, columns] of byTable) {
+    if (mentionedIn(haystacks, [table, ...columns])) continue;
+    out.push({
+      id: idOf('invariant', `not-null:${table}`),
+      kind: 'invariant',
+      shape: 'required',
+      title: `فرمِ خالیِ «${table}» آزموده نمی‌شود`,
+      why: `این ستون‌ها در schema اجباری‌اند: ${columns.join('، ')}`,
+      evidence: `از schema · ${columns.length} ستونِ اجباری`,
+      routes: [],
+      columns,
+      text:
+        `فرمی که «${table}» می‌سازد را پیدا کن و **خالی** بفرست.\n` +
+        `باید جلویش گرفته شود و بگوید کدام فیلد لازم است.\n` +
+        `بعد همان را با فاصله‌های خالی («   ») پر کن و دوباره بفرست.`,
+    });
+  }
+
+  /**
+   * ترتیب: آن‌هایی که **کاربر** می‌تواند بشکندشان، اول.
+   *
+   * ── چرا ──
+   *
+   * `UNIQUE(email)` یک جریانِ واقعی است: دو بار ثبت‌نام. ولی
+   * `UNIQUE(user_id, generation, chunk_index)` ماشینِ همگام‌سازی است و هیچ
+   * فرمی نمی‌سازدش. هر دو در schema یکسان‌اند و برای آدم اصلاً یکی نیستند.
+   *
+   * حذف نمی‌شوند، فقط عقب می‌روند: روزی ممکن است کسی دقیقاً همان را بخواهد.
+   */
+  /**
+   * رتبه‌بندی با فهرستِ **مثبت**، نه با حذفِ ماشینی‌ها.
+   *
+   * ── چرا نسخهٔ اول کار نکرد ──
+   *
+   * اول «هر ستونی که ماشینی نیست، انسانی است» گرفتیم. نتیجه‌اش وارونه شد:
+   * `UNIQUE(user_id, generation, chunk_index)` — ماشینِ همگام‌سازی — رتبهٔ
+   * اول گرفت چون «generation» و «chunk_index» در فهرستِ ماشینی نبودند، و
+   * `UNIQUE(email_hash)` ته فهرست افتاد چون به `_hash` ختم می‌شد.
+   *
+   * فهرستِ مثبت پیش‌بینی‌پذیرتر است: می‌دانیم آدم چه چیزهایی را در فرم
+   * می‌نویسد، و نمی‌دانیم چند اسمِ داخلیِ تازه فردا ساخته می‌شود.
+   */
+  const score = (proposal) => {
+    const columns = proposal.columns || [];
+    const facing = columns.filter((column) => USER_FACING.test(String(column).replace(/_(hash|id)$/i, ''))).length;
+    // هر ستونِ اضافه یعنی کلیدِ ترکیبی، و کلیدِ ترکیبی معمولاً دامنه‌بندی است نه قاعدهٔ کاربری
+    return facing * 10 - columns.length;
+  };
+  out.sort((a, b) => score(b) - score(a));
+
+  /**
+   * سقف — و سقفِ **هر جنس** جدا.
+   *
+   * ── چرا نه یک سقفِ کلی ──
+   *
+   * روی نپی ۱۴ ناوردای یکتایی هست و همه‌شان امتیازشان از گروه‌های
+   * «اجباری‌بودن» بالاتر بود. با یک سقفِ دوازده‌تایی، هر دوازده ردیف یک جنس
+   * می‌شدند و «فرمِ خالی بفرست» — که آزمونِ کاملاً متفاوتی است — هیچ‌وقت
+   * پیشنهاد نمی‌شد.
+   *
+   * و کلاً سقف لازم است: این‌ها ارزان تولید می‌شوند و گران خوانده می‌شوند.
+   * سی ردیفِ هم‌شکل، پیشنهادهای نقشه را هم با خودش دفن می‌کند.
+   */
+  const pick = (shape, count) => out.filter((one) => one.shape === shape).slice(0, count);
+  return [...pick('unique', 8), ...pick('required', 4)];
+}
+
 export function proposalsFor(target) {
   const dossier = readDossier(target);
 
@@ -428,6 +590,9 @@ export function proposalsFor(target) {
 
   /* ── ۶. حالتی که نقشه پیدا کرده و هیچ سناریویی سراغش نمی‌رود ── */
   for (const proposal of fromMap(target, { touched, haystacks })) out.push(proposal);
+
+  /* ── ۷. قاعده‌ای که schema گفته و هیچ سناریویی تلاش نمی‌کند بشکندش ── */
+  for (const proposal of fromInvariants(target, { haystacks })) out.push(proposal);
 
   /**
    * ردشده‌ها حذف نمی‌شوند، علامت می‌خورند.
