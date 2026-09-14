@@ -51,8 +51,15 @@ export async function pickPort(preferred, { host = '127.0.0.1', tries = 12 } = {
     if (await tryListen(port, host)) return port;
   }
 
+  /**
+   * پیامِ کنسول انگلیسی است، برخلافِ بقیهٔ پروژه.
+   *
+   * این متن در پنجرهٔ `cmd.exe` دیده می‌شود که فارسی را درست نشان نمی‌دهد —
+   * حتی با `chcp 65001`. راهنمایی‌ای که خوانده نشود، راهنمایی نیست.
+   * توضیح‌های کد فارسی می‌مانند؛ آن‌ها هرگز در کنسول چاپ نمی‌شوند.
+   */
   throw new Error(
-    `هیچ پورتی از ${preferred} تا ${preferred + (tries - 1) * 100} قابل استفاده نبود.\n` +
-      '  روی ویندوز این را ببینید: netsh interface ipv4 show excludedportrange protocol=tcp'
+    `No usable port between ${preferred} and ${preferred + (tries - 1) * 100}.` +
+      `\n  On Windows, check: netsh interface ipv4 show excludedportrange protocol=tcp`
   );
 }

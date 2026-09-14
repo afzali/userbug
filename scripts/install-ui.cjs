@@ -31,7 +31,8 @@ const result = spawnSync(command, args, {
 });
 
 if (result.error) {
-  console.error(`نصب وابستگی‌های UI شروع نشد: ${result.error.message}`);
+  // انگلیسی چون در پنجرهٔ cmd دیده می‌شود؛ آنجا فارسی خوانا نیست
+  console.error(`Could not start the UI dependency install: ${result.error.message}`);
   process.exit(1);
 }
 process.exit(result.status ?? 1);

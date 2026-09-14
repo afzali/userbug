@@ -19,6 +19,16 @@
  * تصمیم بگیرد، یا اشتباه می‌کند یا فهرستِ بی‌پایانی از حالت‌های خاص می‌شود.
  *
  * پس فقط می‌پرسد آدرس چیست، و اگر کسی آنجا نبود صریح می‌گوید.
+ *
+ * ── چرا متنِ چاپ‌شده اینجا انگلیسی است ──
+ *
+ * برخلافِ کلِ پروژه. این خروجی در پنجرهٔ `cmd.exe` دیده می‌شود و آنجا فارسی
+ * درست نمایش داده نمی‌شود — حتی با `chcp 65001`؛ حرف‌ها جدا و وارونه
+ * می‌افتند، و راهنمایی‌ای که خوانده نشود راهنمایی نیست.
+ *
+ * توضیح‌های کد فارسی می‌مانند: آن‌ها هرگز چاپ نمی‌شوند. همین قاعده برای
+ * `port.mjs`، `install-ui.cjs` و `nepi.mjs` هم هست — هر چیزی که از یک
+ * فایلِ `.bat` بالا می‌آید.
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -79,9 +89,9 @@ function start(label, command, args, cwd, env = null) {
   pipe(child.stdout);
   pipe(child.stderr);
 
-  child.once('error', (cause) => log(label, `اجرا نشد: ${cause.message}`));
+  child.once('error', (cause) => log(label, `failed to start: ${cause.message}`));
   child.once('close', (code) => {
-    if (!shuttingDown) log(label, `بسته شد (کد ${code})`);
+    if (!shuttingDown) log(label, `exited (code ${code})`);
   });
 
   return child;
@@ -104,12 +114,12 @@ async function waitForPort(port, label, seconds = 60) {
   const deadline = Date.now() + seconds * 1000;
   while (Date.now() < deadline) {
     if (await portOpen(port)) {
-      log(label, `آماده روی ${port}`);
+      log(label, `ready on ${port}`);
       return true;
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  log(label, `تا ${seconds} ثانیه روی ${port} بالا نیامد`);
+  log(label, `did not come up on ${port} within ${seconds}s`);
   return false;
 }
 
@@ -136,7 +146,7 @@ function shutdown() {
         child.kill('SIGTERM');
       }
     } catch (cause) {
-      log(label, `بستن ناموفق: ${cause.message}`);
+      log(label, `could not stop: ${cause.message}`);
     }
   }
 }
@@ -152,28 +162,28 @@ function runOnce(label, command, cwd) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, { cwd, stdio: 'inherit', shell: true, windowsHide: true });
     child.once('error', reject);
-    child.once('close', (code) => (code === 0 ? resolve() : reject(new Error(`${label} با کد ${code} بسته شد`))));
+    child.once('close', (code) => (code === 0 ? resolve() : reject(new Error(`${label} exited with code ${code}`))));
   });
 }
 
 /* ─────────────────────────────────────────────────────────── */
 
-console.log('\n  userbug\n  ' + '─'.repeat(46));
+console.log('\n  userbug\n  ' + '-'.repeat(46));
 
 if (!fs.existsSync(path.join(ROOT, 'node_modules'))) {
-  console.log(paint('[نصب]', 'نخستین اجرا: وابستگی‌ها...'));
+  console.log(paint('[setup]', 'first run: installing dependencies...'));
   await runOnce('npm install', 'npm install', ROOT);
 }
 
 if (dev) {
-  console.log(paint('[حالت]', 'توسعه — بی بیلد، با بازتابِ زندهٔ تغییرها.'));
+  console.log(paint('[mode]', 'dev - no build, edits reload live.'));
 } else {
-  console.log(paint('[بیلد]', 'ساخت رابط...'));
+  console.log(paint('[build]', 'building the GUI...'));
   await runOnce('ui:build', 'npm run ui:build', ROOT);
 }
 
 const port = await pickPort(4174);
-if (port !== 4174) log('رابط', `۴۱۷۴ روی این ویندوز رزرو شده؛ رابط روی ${port} بالا می‌آید.`);
+if (port !== 4174) log('gui', `4174 is reserved on this Windows; using ${port} instead.`);
 
 /**
  * پورت دو راهِ متفاوت دارد و هر دو لازم‌اند.
@@ -190,16 +200,16 @@ if (port !== 4174) log('رابط', `۴۱۷۴ روی این ویندوز رزرو
  * «paths[0] must be a string» مرد. یک لایه `npm`، یک مسئله کمتر.
  */
 if (dev) {
-  start('رابط', 'npm', ['run', 'dev', '--', '--port', String(port), '--strictPort'], path.join(ROOT, 'ui'));
+  start('gui', 'npm', ['run', 'dev', '--', '--port', String(port), '--strictPort'], path.join(ROOT, 'ui'));
 } else {
-  start('رابط', 'npm', ['run', 'ui:start'], ROOT, {
+  start('gui', 'npm', ['run', 'ui:start'], ROOT, {
     PORT: String(port),
     ORIGIN: `http://127.0.0.1:${port}`,
     USERBUG_NO_OPEN: flags.has('--no-open') ? '1' : process.env.USERBUG_NO_OPEN || '',
   });
 }
 
-const ready = await waitForPort(port, 'رابط', 60);
+const ready = await waitForPort(port, 'gui', 60);
 
 /**
  * باز کردنِ مرورگر در حالتِ توسعه، اینجا.
@@ -214,11 +224,11 @@ if (dev && ready && !flags.has('--no-open') && process.env.USERBUG_NO_OPEN !== '
   spawn(command, [`http://127.0.0.1:${port}`], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
 }
 
-console.log('\n  ' + '─'.repeat(46));
-console.log(paint('', `رابط: http://127.0.0.1:${port}${dev ? '  (توسعه)' : ''}`));
-console.log(paint('', dev ? 'تغییرِ رابط را ذخیره کنید؛ همین‌جا بازتاب می‌شود.' : 'برای بازتابِ تغییرها: start.bat --dev'));
-console.log(paint('', 'بستن: Ctrl+C'));
-console.log('  ' + '─'.repeat(46));
+console.log('\n  ' + '-'.repeat(46));
+console.log(paint('', `GUI: http://127.0.0.1:${port}${dev ? '  (dev)' : ''}`));
+console.log(paint('', dev ? 'Save any GUI file and it reloads here.' : 'To see GUI edits live: start.bat --dev'));
+console.log(paint('', 'Stop: Ctrl+C'));
+console.log('  ' + '-'.repeat(46));
 
 /**
  * یادآوریِ اینکه اپِ هدف کارِ خودِ شماست.
@@ -227,8 +237,8 @@ console.log('  ' + '─'.repeat(46));
  * می‌شود، و بعد نخستین اجرا با «صفحه بالا نیامد» شکست می‌خورد — یافته‌ای که
  * دربارهٔ اپ هیچ نمی‌گوید.
  */
-console.log('\n  اپِ خودتان را جدا بالا بیاورید؛ userbug فقط سراغش می‌رود.');
-console.log('  مثال: npm run dev در پوشهٔ پروژه‌تان — بعد همان آدرس را');
-console.log('  در «پروژهٔ تازه» وارد کنید.\n');
+console.log('\n  Start your own app separately; userbug only points at it.');
+console.log('  Example: npm run dev inside your project, then enter that');
+console.log('  address under "New project" in the GUI.\n');
 
 if (!ready) process.exitCode = 1;

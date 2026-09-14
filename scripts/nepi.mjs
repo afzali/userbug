@@ -13,6 +13,12 @@
  * قاعده‌ای که با همین نام‌گذاری حفظ می‌شود: هیچ چیزِ عمومی‌نامی دربارهٔ نپی
  * چیزی نمی‌داند. اگر فردا پروژهٔ دومی بیاید، `scripts/<نامش>.mjs` خودش را
  * می‌گیرد و هیچ‌کدام به دیگری دست نمی‌زند.
+ *
+ * ── چرا متنِ چاپ‌شده انگلیسی است ──
+ *
+ * برخلافِ کلِ پروژه. این خروجی در پنجرهٔ `cmd.exe` دیده می‌شود و آنجا فارسی
+ * درست نمایش داده نمی‌شود — حتی با `chcp 65001`. توضیح‌های کد فارسی
+ * می‌مانند: هرگز چاپ نمی‌شوند.
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -88,9 +94,9 @@ function start(label, command, args, cwd, useShell = false) {
   pipe(child.stdout);
   pipe(child.stderr);
 
-  child.once('error', (cause) => log(label, `اجرا نشد: ${cause.message}`));
+  child.once('error', (cause) => log(label, `failed to start: ${cause.message}`));
   child.once('close', (code) => {
-    if (!shuttingDown) log(label, `بسته شد (کد ${code})`);
+    if (!shuttingDown) log(label, `exited (code ${code})`);
   });
 
   return child;
@@ -113,12 +119,12 @@ async function waitForPort(port, label, seconds = 60) {
   const deadline = Date.now() + seconds * 1000;
   while (Date.now() < deadline) {
     if (await portOpen(port)) {
-      log(label, `آماده روی ${port}`);
+      log(label, `ready on ${port}`);
       return true;
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  log(label, `تا ${seconds} ثانیه روی ${port} بالا نیامد`);
+  log(label, `did not come up on ${port} within ${seconds}s`);
   return false;
 }
 
@@ -145,7 +151,7 @@ function shutdown() {
         child.kill('SIGTERM');
       }
     } catch (cause) {
-      log(label, `بستن ناموفق: ${cause.message}`);
+      log(label, `could not stop: ${cause.message}`);
     }
   }
 }
@@ -161,22 +167,22 @@ function runOnce(label, command, cwd) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, { cwd, stdio: 'inherit', shell: true, windowsHide: true });
     child.once('error', reject);
-    child.once('close', (code) => (code === 0 ? resolve() : reject(new Error(`${label} با کد ${code} بسته شد`))));
+    child.once('close', (code) => (code === 0 ? resolve() : reject(new Error(`${label} exited with code ${code}`))));
   });
 }
 
 /* ─────────────────────────────────────────────────────────── */
 
-console.log('\n  نپی — بالا آوردن اپ\n  ' + '─'.repeat(46));
+console.log('\n  nepi - bringing the app up\n  ' + '-'.repeat(46));
 
 if (!fs.existsSync(path.join(NEPI, 'package.json'))) {
-  console.error(paint('[خطا]', `پوشهٔ نپی پیدا نشد: ${NEPI}`));
-  console.error(paint('', 'اگر جای دیگری است: set NEPI_ROOT=D:\\path\\to\\nepi'));
+  console.error(paint('[error]', `nepi folder not found: ${NEPI}`));
+  console.error(paint('', 'If it lives elsewhere: set NEPI_ROOT=D:\\path\\to\\nepi'));
   process.exit(1);
 }
 
 if (!fs.existsSync(path.join(NEPI, 'node_modules'))) {
-  console.log(paint('[نصب]', 'وابستگی‌های نپی...'));
+  console.log(paint('[setup]', 'installing nepi dependencies...'));
   await runOnce('npm install (nepi)', 'npm install', NEPI);
 }
 
@@ -188,7 +194,7 @@ if (usePreview) {
    * `build:noversion` عمدی است: بیلد معمولی نسخه و changelog را جلو می‌برد،
    * و بالا آوردنِ اپ برای آزمون نباید تاریخچهٔ نسخه را دست بزند.
    */
-  console.log(paint('[بیلد]', 'بیلد تولیدی نپی (بدون جلو بردن نسخه)...'));
+  console.log(paint('[build]', 'production build of nepi (version not bumped)...'));
   await runOnce('build:noversion', 'npm run build:noversion', NEPI);
   start('nepi', 'npm', ['run', 'preview'], NEPI, true);
   appPort = 4173;
@@ -219,18 +225,18 @@ if (withApi) {
     apiReady = await waitForPort(8081, 'api', 20);
   } else {
     // نبودش اجرا را نمی‌شکند؛ فقط سناریوهای سمت سرور بی‌معنا می‌شوند.
-    console.log(paint('[api]', `رد شد: php.exe در ${PHP} نبود. سناریوهای سمت سرور اجرا نمی‌شوند.`));
+    console.log(paint('[api]', `skipped: no php.exe at ${PHP}. Server-side scenarios will not run.`));
   }
 }
 
-console.log('\n  ' + '─'.repeat(46));
-console.log(paint('', `فرانت: http://localhost:${appPort}`));
+console.log('\n  ' + '-'.repeat(46));
+console.log(paint('', `front: http://localhost:${appPort}`));
 if (apiReady) console.log(paint('', 'API:   http://127.0.0.1:8081'));
-if (logFiles.nepi) console.log(paint('', 'لاگ فرانت: ' + logFiles.nepi));
-console.log(paint('', 'لاگ بک:    ' + path.join(LOG_DIR, 'php-error.log')));
-console.log(paint('', 'سورس:  ' + NEPI));
-console.log(paint('', 'بستن:  Ctrl+C'));
-console.log('  ' + '─'.repeat(46));
+if (logFiles.nepi) console.log(paint('', 'front log: ' + logFiles.nepi));
+console.log(paint('', 'back log:  ' + path.join(LOG_DIR, 'php-error.log')));
+console.log(paint('', 'source: ' + NEPI));
+console.log(paint('', 'Stop:   Ctrl+C'));
+console.log('  ' + '-'.repeat(46));
 
 /**
  * چهار خطِ بالا دقیقاً همان چیزی است که فرم «پروژهٔ تازه» می‌خواهد.
@@ -238,6 +244,6 @@ console.log('  ' + '─'.repeat(46));
  * چاپشان تصادفی نیست: کاربر باید بتواند کپی کند، نه اینکه در پوشه‌ها دنبال
  * مسیر لاگ بگردد.
  */
-console.log('\n  این چهار مقدار را در userbug → «پروژهٔ تازه» بگذارید.\n');
+console.log('\n  Put these values into userbug -> "New project".\n');
 
 if (!appReady) process.exitCode = 1;
