@@ -276,7 +276,14 @@ export async function aggregateTriage(target) {
   return [...grouped.values()]
     .map((item) => {
       const triage = state[item.fingerprint] || { status: 'open', note: '' };
-      return { ...item, triage, ...regressionOf(item, triage) };
+      /**
+       * فرضیهٔ «چرا این شد» کنارِ تریاژ می‌نشیند، نه داخلش.
+       *
+       * `triage` تصمیمِ **آدم** است و `explain` حدسِ **مدل**؛ قاطی کردنشان
+       * همان چیزی است که قانونِ `by:` جلویش را می‌گیرد. یک ذخیره‌گاه، دو
+       * کلید.
+       */
+      return { ...item, triage, explain: triage.explain || null, ...regressionOf(item, triage) };
     })
     /**
      * برگشته‌ها اول.
@@ -323,6 +330,36 @@ export function regressionOf(item, triage) {
   };
 }
 
+/**
+ * ذخیرهٔ فرضیهٔ مدل، بی دست زدن به تصمیمِ آدم.
+ *
+ * ── چرا تابعِ جدا و نه پرچمی روی `saveTriage` ──
+ *
+ * `saveTriage` وضعیت و یادداشت و قضاوت را می‌نویسد — همه ساختهٔ آدم. اگر
+ * فرضیهٔ مدل از همان در می‌آمد، یک اشتباهِ کوچک کافی بود تا یادداشتِ آدم
+ * پاک شود. قانونِ «`by: user` را اتوماسیون بازنویسی نمی‌کند» اینجا به‌شکلِ
+ * دو دروازهٔ جدا پیاده می‌شود، نه یک شرط.
+ */
+export async function saveExplain(target, fingerprint, explain) {
+  const key = assertSafeSegment(target, 'هدف');
+  const print = String(fingerprint || '');
+  if (!/^[a-f0-9]{12}$/i.test(print)) throw new Error('اثرانگشت نامعتبر است');
+
+  await fsp.mkdir(TRIAGE_DIR, { recursive: true });
+  const file = path.join(TRIAGE_DIR, `${key}.json`);
+  const state = (await readJson(file, {})) || {};
+  state[print] = { status: 'open', note: '', ...(state[print] || {}), explain };
+
+  const temporary = `${file}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
+  try {
+    await fsp.writeFile(temporary, JSON.stringify(state, null, 2) + '\n', 'utf8');
+    await fsp.rename(temporary, file);
+  } finally {
+    await fsp.rm(temporary, { force: true }).catch(() => {});
+  }
+  return explain;
+}
+
 export async function saveTriage(target, fingerprint, patch) {
   const key = assertSafeSegment(target, 'هدف');
   const print = String(fingerprint || '');
@@ -358,7 +395,8 @@ export async function saveTriage(target, fingerprint, patch) {
     const state = (await readJson(file, {})) || {};
     const before = state[print] || null;
     const at = new Date().toISOString();
-    const saved = { status, note, updatedAt: at };
+    // فرضیهٔ مدل با تصمیمِ تازهٔ آدم پاک نمی‌شود؛ دو چیزِ جدا در یک فایل‌اند
+    const saved = { status, note, updatedAt: at, ...(before?.explain ? { explain: before.explain } : {}) };
     // برچسبِ قبلی می‌ماند مگر اینکه برچسبِ تازه‌ای داده شود
     const keptVerdict = verdict ?? before?.verdict ?? null;
     if (keptVerdict) saved.verdict = keptVerdict;

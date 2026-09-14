@@ -9,7 +9,42 @@
   let { data } = $props();
   // وضعیت هر ردیف در فرم تریاژ محلی و قابل‌ویرایش است.
   // svelte-ignore state_referenced_locally
-  let items = $state(data.findings.map((item) => ({ ...item, triage: { ...item.triage }, saving: false, feedback: '' })));
+  let items = $state(
+    data.findings.map((item) => ({ ...item, triage: { ...item.triage }, saving: false, feedback: '', asking: false }))
+  );
+
+  /**
+   * «چرا این شد؟» — از یافته به سورس.
+   *
+   * ── چرا دکمه، و نه خودکار ──
+   *
+   * مدل صدا می‌زند. چهل یافته یعنی چهل فراخوانی، برای چیزی که شاید فقط
+   * دو تایش را بخواهی بدانی. و جوابش **فرضیه** است نه فکت، پس باید کسی
+   * خواسته باشدش.
+   *
+   * جواب ذخیره می‌شود: فرضیه با رفرشِ صفحه عوض نمی‌شود، و پرداختِ دوباره
+   * برای همان جواب یعنی بودجه‌ای که بی‌صدا آب می‌رود.
+   */
+  async function explain(item) {
+    item.asking = true;
+    item.feedback = '';
+    try {
+      const response = await fetch('/api/explain', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({ target: data.target, fingerprint: item.fingerprint }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'نشد');
+      item.explain = payload.explain;
+    } catch (cause) {
+      item.feedback = cause.message;
+    } finally {
+      item.asking = false;
+    }
+  }
+
+  const CONFIDENCE = { high: 'اطمینانِ بالا', medium: 'اطمینانِ متوسط', low: 'اطمینانِ کم' };
   let search = $state('');
   let status = $state('active');
   /**
@@ -311,6 +346,81 @@
         <Button size="sm" onclick={() => save(item)} disabled={item.saving}>{item.saving ? '…' : 'ذخیره'}</Button>
       </div>
       {#if item.feedback}<p class="mt-2 text-xs text-muted-foreground">{item.feedback}</p>{/if}
+
+      <!--
+        فرضیهٔ سورس — با برچسبِ «حدس»، نه کنارِ فکت‌ها.
+
+        ── چرا این تفکیک اینجا هم تکرار می‌شود ──
+
+        همان قانونِ `by:` در پرونده. بالای این کارت فکت است (چه شد، کجا، چند
+        بار) و این تکه حدسِ مدل. اگر بی مرز کنار هم می‌نشستند، فردا کسی
+        فرضیه را به‌عنوان علتِ قطعی نقل می‌کرد.
+      -->
+      <div class="mt-3 border-t pt-3">
+        {#if item.explain}
+          <div class="space-y-2 rounded-lg border bg-muted/30 p-3 text-xs leading-6">
+            <div class="flex flex-wrap items-center gap-2">
+              <strong>چرا احتمالاً این شد</strong>
+              <span class="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[11px] text-amber-700 dark:text-amber-300">
+                حدسِ مدل · {CONFIDENCE[item.explain.confidence] || item.explain.confidence}
+              </span>
+            </div>
+
+            <p>{item.explain.cause}</p>
+
+            {#if item.explain.where?.length}
+              <div>
+                <span class="text-muted-foreground">جایی که احتمالاً مسئول است:</span>
+                <ul class="mt-1 space-y-1">
+                  {#each item.explain.where as row (row.file)}
+                    <li>
+                      <code dir="ltr" class="font-mono text-[11px]">{row.file}</code>
+                      <span class="block text-muted-foreground">{row.why}</span>
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
+
+            <!--
+              «کجاهای دیگر همین الگو هست» — همان چیزی که خواسته شد: نه
+              گشتنِ سورس دنبال باگ، بلکه بردنِ یک شکستِ دیده‌شده به جاهای
+              مشابهی که هنوز آزموده نشده‌اند.
+            -->
+            {#if item.explain.siblings?.length}
+              <div>
+                <span class="text-muted-foreground">همین الگو جای دیگر هم هست:</span>
+                <ul class="mt-1 space-y-1">
+                  {#each item.explain.siblings as row (row.file)}
+                    <li>
+                      <code dir="ltr" class="font-mono text-[11px]">{row.file}</code>
+                      <span class="block text-muted-foreground">{row.why}</span>
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
+
+            {#if item.explain.next}
+              <p class="rounded-md bg-background p-2">
+                <span class="text-muted-foreground">برای آزمودنِ این فرضیه:</span>
+                {item.explain.next}
+              </p>
+            {/if}
+
+            <p class="text-[11px] text-muted-foreground">
+              {item.explain.model} · {formatDate(item.explain.at)}
+              <button type="button" class="underline underline-offset-2" onclick={() => explain(item)} disabled={item.asking}>
+                {item.asking ? 'دوباره می‌پرسم…' : 'دوباره بپرس'}
+              </button>
+            </p>
+          </div>
+        {:else}
+          <Button variant="ghost" size="sm" onclick={() => explain(item)} disabled={item.asking}>
+            {item.asking ? 'دارم سورس را می‌خوانم…' : 'چرا این شد؟ — از سورس بپرس'}
+          </Button>
+        {/if}
+      </div>
 
       <!--
         تاریخچهٔ تصمیم‌ها.
