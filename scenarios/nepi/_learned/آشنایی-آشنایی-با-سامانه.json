@@ -1,0 +1,473 @@
+{
+  "version": 1,
+  "steps": {
+    "دکمهٔ «نشان نده» را بزن": {
+      "intent": "دکمهٔ «نشان نده» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "نشان نده",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "دکمهٔ «بستن» را بزن": {
+      "intent": "دکمهٔ «بستن» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "بستن",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "فیلدِ «ایمیل» را پر کن": {
+      "intent": "فیلدِ «ایمیل» را پر کن",
+      "action": "fill",
+      "target": {
+        "label": "ایمیل",
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "فیلدِ «رمز عبور» را پر کن": {
+      "intent": "فیلدِ «رمز عبور» را پر کن",
+      "action": "fill",
+      "target": {
+        "label": "رمز عبور",
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "دکمهٔ «ورود / ثبت‌نام» را بزن": {
+      "intent": "دکمهٔ «ورود / ثبت‌نام» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "ورود / ثبت‌نام",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "تیکِ «کد بازیابی را در جای مطمئنی ذخیره کردم.» را علامت بزن": {
+      "intent": "تیکِ «کد بازیابی را در جای مطمئنی ذخیره کردم.» را علامت بزن",
+      "action": "check",
+      "target": {
+        "label": "کد بازیابی را در جای مطمئنی ذخیره کردم.",
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "دکمهٔ «ادامه» را بزن": {
+      "intent": "دکمهٔ «ادامه» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "ادامه",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "«وارد کردن اطلاعات» را بزن": {
+      "intent": "«وارد کردن اطلاعات» را بزن",
+      "action": "click",
+      "target": {
+        "role": "menuitem",
+        "name": "وارد کردن اطلاعات",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "«فایل» را بزن": {
+      "intent": "«فایل» را بزن",
+      "action": "click",
+      "target": {
+        "label": "فایل",
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "دکمهٔ «وارد کردن اطلاعات» را بزن": {
+      "intent": "دکمهٔ «وارد کردن اطلاعات» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "وارد کردن اطلاعات",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "دکمهٔ «تنظیمات هوش مصنوعی» را بزن": {
+      "intent": "دکمهٔ «تنظیمات هوش مصنوعی» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "تنظیمات هوش مصنوعی",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "فیلدِ «کلید API» را پر کن": {
+      "intent": "فیلدِ «کلید API» را پر کن",
+      "action": "fill",
+      "target": {
+        "label": "کلید API",
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "دکمهٔ «OpenAI: GPT-4o-mini $0.150 / $0.600» را بزن": {
+      "intent": "دکمهٔ «OpenAI: GPT-4o-mini $0.150 / $0.600» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "OpenAI: GPT-4o-mini $0.150 / $0.600",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "فیلدِ «نام یا شناسهٔ مدل…» را بزن": {
+      "intent": "فیلدِ «نام یا شناسهٔ مدل…» را بزن",
+      "action": "click",
+      "target": {
+        "placeholder": "نام یا شناسهٔ مدل…",
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "فیلدِ «نام یا شناسهٔ مدل…» را پر کن": {
+      "intent": "فیلدِ «نام یا شناسهٔ مدل…» را پر کن",
+      "action": "fill",
+      "target": {
+        "placeholder": "نام یا شناسهٔ مدل…",
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "دکمهٔ «Free Models Router openrouter/free رایگان» را بزن": {
+      "intent": "دکمهٔ «Free Models Router openrouter/free رایگان» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Free Models Router openrouter/free رایگان",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "دکمهٔ «تست اتصال» را بزن": {
+      "intent": "دکمهٔ «تست اتصال» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "تست اتصال",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "دکمهٔ «ذخیره تنظیمات» را بزن": {
+      "intent": "دکمهٔ «ذخیره تنظیمات» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "ذخیره تنظیمات",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "دکمهٔ «نبوت و امامت 1 فایل» را بزن": {
+      "intent": "دکمهٔ «نبوت و امامت 1 فایل» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "نبوت و امامت 1 فایل",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "«همگام‌سازی خاموش» را بزن": {
+      "intent": "«همگام‌سازی خاموش» را بزن",
+      "action": "click",
+      "target": {
+        "role": "menuitem",
+        "name": "همگام‌سازی خاموش",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "«قابلیت‌ها و پلاگین‌ها» را بزن": {
+      "intent": "«قابلیت‌ها و پلاگین‌ها» را بزن",
+      "action": "click",
+      "target": {
+        "role": "menuitem",
+        "name": "قابلیت‌ها و پلاگین‌ها",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "«تنظیمات» را بزن": {
+      "intent": "«تنظیمات» را بزن",
+      "action": "click",
+      "target": {
+        "role": "menuitem",
+        "name": "تنظیمات",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "«خروجی گرفتن از اطلاعات» را بزن": {
+      "intent": "«خروجی گرفتن از اطلاعات» را بزن",
+      "action": "click",
+      "target": {
+        "role": "menuitem",
+        "name": "خروجی گرفتن از اطلاعات",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "«دانلود نسخه‌های برنامه» را بزن": {
+      "intent": "«دانلود نسخه‌های برنامه» را بزن",
+      "action": "click",
+      "target": {
+        "role": "menuitem",
+        "name": "دانلود نسخه‌های برنامه",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "«قفل کردن» را بزن": {
+      "intent": "«قفل کردن» را بزن",
+      "action": "click",
+      "target": {
+        "role": "menuitem",
+        "name": "قفل کردن",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "دکمهٔ «باز کردن قفل» را بزن": {
+      "intent": "دکمهٔ «باز کردن قفل» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "باز کردن قفل",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "دکمهٔ «کتاب گزيده نهج البلاغه استاد اعتقادیمرجع ۱۴۰۴/۸/۱۵» را بزن": {
+      "intent": "دکمهٔ «کتاب گزيده نهج البلاغه استاد اعتقادیمرجع ۱۴۰۴/۸/۱۵» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "کتاب گزيده نهج البلاغه استاد اعتقادیمرجع ۱۴۰۴/۸/۱۵",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.135Z",
+      "lastVerified": "2026-09-14T13:29:15.135Z"
+    },
+    "فیلدِ «سوال *» را بزن": {
+      "intent": "فیلدِ «سوال *» را بزن",
+      "action": "click",
+      "target": {
+        "label": "سوال *",
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.136Z",
+      "lastVerified": "2026-09-14T13:29:15.136Z"
+    },
+    "فیلدِ «سوال *» را پر کن": {
+      "intent": "فیلدِ «سوال *» را پر کن",
+      "action": "fill",
+      "target": {
+        "label": "سوال *",
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.136Z",
+      "lastVerified": "2026-09-14T13:29:15.136Z"
+    },
+    "دکمهٔ «به‌روزرسانی» را بزن": {
+      "intent": "دکمهٔ «به‌روزرسانی» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "به‌روزرسانی",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.136Z",
+      "lastVerified": "2026-09-14T13:29:15.136Z"
+    },
+    "فیلدِ «کامنت *» را پر کن": {
+      "intent": "فیلدِ «کامنت *» را پر کن",
+      "action": "fill",
+      "target": {
+        "label": "کامنت *",
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.136Z",
+      "lastVerified": "2026-09-14T13:29:15.136Z"
+    },
+    "فیلدِ «کامنت *» را بزن": {
+      "intent": "فیلدِ «کامنت *» را بزن",
+      "action": "click",
+      "target": {
+        "label": "کامنت *",
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.136Z",
+      "lastVerified": "2026-09-14T13:29:15.136Z"
+    },
+    "دکمهٔ «بستن و بازگشت به مطالب» را بزن": {
+      "intent": "دکمهٔ «بستن و بازگشت به مطالب» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "بستن و بازگشت به مطالب",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.136Z",
+      "lastVerified": "2026-09-14T13:29:15.136Z"
+    },
+    "دکمهٔ «هوش مصنوعی» را بزن": {
+      "intent": "دکمهٔ «هوش مصنوعی» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "هوش مصنوعی",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.136Z",
+      "lastVerified": "2026-09-14T13:29:15.136Z"
+    },
+    "دکمهٔ «بستن گفت‌وگو» را بزن": {
+      "intent": "دکمهٔ «بستن گفت‌وگو» را بزن",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "بستن گفت‌وگو",
+        "exact": true,
+        "visible": true
+      },
+      "resolvedBy": "human",
+      "healCount": 0,
+      "firstLearned": "2026-09-14T13:29:15.136Z",
+      "lastVerified": "2026-09-14T13:29:15.136Z"
+    }
+  }
+}

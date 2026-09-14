@@ -408,3 +408,43 @@ export function mergeActions(existing = [], incoming = []) {
 
   return [...byKey.values()];
 }
+
+/**
+ * دادهٔ همین اجرا را از برچسب بیرون بکش.
+ *
+ * ── چرا این باگ گران بود ──
+ *
+ * منوی کاربر نامش می‌شود «U ub-3c5c45c0@userbug.test کاربر سامانه» — یعنی
+ * ایمیلِ هویتِ **همان اجرا** داخلِ نامِ گره و داخلِ مسیرِ رسیدن به آن نشست.
+ * خزشِ بعدی با هویتِ دیگری وارد می‌شود، آن دکمه نامِ دیگری دارد، و بازپخشِ
+ * مسیر با `locator.click: Timeout` می‌شکند. خزش نه می‌میرد و نه جلو می‌رود:
+ * هر گرهی که پشتِ آن منو بود، برای همیشه دست‌نیافتنی می‌شود.
+ *
+ * همین هم بود که نقشه را غیرقابلِ کامیت کرده بود — `.gitignore` نوشته:
+ * «نامِ بعضی نماها از دادهٔ همان اجرا می‌آید».
+ *
+ * جای‌نگهدار همان نحوی است که مفسر می‌فهمد، پس بازپخش خودش برمی‌گرداندش.
+ */
+export function maskVolatile(text, secrets = []) {
+  let out = String(text ?? '');
+  for (const { value, as } of secrets) {
+    if (!value || String(value).length < 4) continue;
+    out = out.split(value).join(as);
+  }
+  // هر ایمیلِ دیگری هم داده است، نه ساختار — و فردا عوض می‌شود
+  return out.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '{{identity.email}}');
+}
+
+/** همان ماسک، روی یک کنش و توصیفگرش. */
+export function maskAction(action, secrets = []) {
+  const descriptor = { ...action.descriptor };
+  for (const key of ['name', 'label', 'text', 'placeholder']) {
+    if (typeof descriptor[key] === 'string') descriptor[key] = maskVolatile(descriptor[key], secrets);
+  }
+  return {
+    ...action,
+    descriptor,
+    label: maskVolatile(action.label, secrets),
+    key: actionKeyOf(descriptor),
+  };
+}

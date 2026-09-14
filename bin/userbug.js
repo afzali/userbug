@@ -147,6 +147,12 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --watch <شناسه>             یافته ثبت کن، ولی نشکن (پیش‌فرض)
       --expect <شناسه>            سخت بشکن — یعنی «این قاعده است»
 
+  userbug bundle export <هدف>     همه‌چیزِ پروژه در یک فایل: شناخت، نقشه،
+                                  سناریو، حساب (بی رمز)، فایلِ نمونه
+      --out <فایل> --no-fixtures
+  userbug bundle import <فایل>    بازگرداندنش
+      --as <نامِ تازه> --force --show
+
   userbug coverage <هدف>          endpointهای بک‌اند: چه هست و صدایش نزده‌ایم
       --all                       مسیرهایی که صدا خوردند و در سورس نبودند
       --verbose                   شمارشِ آشکارسازها
@@ -1046,6 +1052,71 @@ async function cmdCoverage({ flags, positional }) {
 }
 
 /**
+ * بسته‌بندی و بازگرداندنِ یک پروژه.
+ *
+ * ── چرا این فرمان لازم شد ──
+ *
+ * گشتِ زنده وقتِ **آدم** است، نه وقتِ ماشین. تا امروز اگر کسی می‌خواست از
+ * نو شروع کند یا روی ماشینِ دیگری ادامه دهد، باید همهٔ آن را با دست تکرار
+ * می‌کرد: گشت، تنظیمات، حساب، آپلودِ فایلِ نمونه.
+ */
+async function cmdBundle({ flags, positional }) {
+  const [action, name] = positional;
+  const { exportBundle, importBundle, describeBundle } = await import('../src/knowledge/bundle.js');
+
+  if (action === 'export') {
+    if (!name) throw new Error('نام هدف لازم است: userbug bundle export <هدف>');
+    const bundle = exportBundle(name, { fixtures: flags.fixtures !== false });
+    const out = flags.out && flags.out !== true ? String(flags.out) : `${name}-bundle.json`;
+    fs.writeFileSync(out, JSON.stringify(bundle, null, 2) + '\n', 'utf8');
+
+    const info = describeBundle(bundle);
+    const size = (fs.statSync(out).size / 1024).toFixed(0);
+    console.log(`\n  بسته: ${out}  (${size} کیلوبایت)`);
+    console.log(`  ${info.knowledge} فایلِ شناخت · ${info.scenarios} سناریو · ${info.fixtures} فایلِ نمونه`);
+    if (info.states) console.log(`  نقشه: ${info.states} حالت · ${info.pages} صفحهٔ ثبت‌شده`);
+    for (const note of info.omitted) console.log(`  ! نیامد: ${note}`);
+    console.log(`\n  بازگرداندن: userbug bundle import ${out}\n`);
+    return;
+  }
+
+  if (action === 'import') {
+    if (!name) throw new Error('مسیر فایل لازم است: userbug bundle import <فایل>');
+    const file = path.resolve(name);
+    if (!fs.existsSync(file)) throw new Error(`بسته پیدا نشد: ${file}`);
+
+    const bundle = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const info = describeBundle(bundle);
+
+    if (flags.show) {
+      console.log(`\n  هدف: ${info.target}  ·  ساخته‌شده: ${info.at.slice(0, 16).replace('T', ' ')}`);
+      console.log(`  ${info.knowledge} فایلِ شناخت · ${info.scenarios} سناریو · ${info.fixtures} فایلِ نمونه`);
+      if (info.states) console.log(`  نقشه: ${info.states} حالت`);
+      for (const note of info.omitted) console.log(`  ! داخلش نیست: ${note}`);
+      console.log('');
+      return;
+    }
+
+    const result = importBundle(bundle, {
+      as: flags.as && flags.as !== true ? String(flags.as) : '',
+      force: Boolean(flags.force),
+    });
+
+    console.log(`\n  هدف: ${result.target}`);
+    console.log(`  ${result.written.length} فایل نوشته شد`);
+    if (result.skipped.length) {
+      console.log(`  ${result.skipped.length} فایل رد شد چون از قبل بود (برای بازنویسی: --force)`);
+      for (const one of result.skipped.slice(0, 5)) console.log(`    · ${one}`);
+    }
+    for (const note of result.omitted) console.log(`  ! در بسته نبود: ${note}`);
+    console.log('');
+    return;
+  }
+
+  throw new Error('userbug bundle export <هدف>  |  userbug bundle import <فایل>');
+}
+
+/**
  * ساختِ «مسیرِ ورود» از چیزی که یک بار کار کرد.
  *
  * ── چرا این فرمان لازم شد ──
@@ -1906,6 +1977,9 @@ try {
       break;
     case 'coverage':
       await cmdCoverage(parsed);
+      break;
+    case 'bundle':
+      await cmdBundle(parsed);
       break;
     case 'checks':
       cmdChecks(parsed);

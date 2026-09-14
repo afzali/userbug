@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "path": "/content/f2e9a6d428",
+  "title": "گزيده نهج البلاغه",
+  "purpose": "",
+  "domSignature": "",
+  "stale": false,
+  "shot": "shots/15--content-f2e9a6d428.png",
+  "contract": {
+    "mode": "watch",
+    "must": [
+      {
+        "role": "button",
+        "name": "فهرست",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "جستجو",
+        "exact": true,
+        "visible": true,
+        "nth": 0
+      },
+      {
+        "role": "button",
+        "name": "سوالات",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "یادداشت",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "علامت ها",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "هایلایت ها",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "واژه‌نامه",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "A a@a.a کاربر سامانه",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "Toggle Sidebar",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "تغییر حالت مطالعه",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "جستجو",
+        "exact": true,
+        "visible": true,
+        "nth": 1
+      },
+      {
+        "role": "button",
+        "name": "بستن و بازگشت به مطالب",
+        "exact": true,
+        "visible": true
+      }
+    ],
+    "seenIn": 1,
+    "lastSeen": "2026-09-14T13:29:15.114Z",
+    "approvedBy": null
+  },
+  "by": "tour"
+}

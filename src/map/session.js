@@ -41,6 +41,7 @@ import { accountsFor, listAccounts, readAccounts, saveAccount } from '../knowled
 import {
   actionsFrom,
   focusWords,
+  maskAction,
   priorityOf,
   profileOf,
   routePatternOf,
@@ -555,9 +556,20 @@ export class MapSession extends EventEmitter {
     const current = known || (await this.settle());
     if (!current) return null;
 
-    const raw = actionsFrom(current.snapshot).map((action) =>
-      this.avoid.some((rx) => rx.test(action.label)) ? { ...action, kind: 'avoided' } : action
-    );
+    /**
+     * ماسکِ دادهٔ اجرا **پیش از** هر کار دیگری.
+     *
+     * ترتیب مهم است: هویتِ گره، کلیدِ کنش و مسیرِ رسیدن همه از همین برچسب‌ها
+     * ساخته می‌شوند. اگر بعد از آن ماسک می‌زدیم، نقشه با ایمیلِ اجرای امروز
+     * ساخته می‌شد و فردا هیچ‌کدامشان نمی‌خواندند — همان چیزی که «بازپخشِ
+     * مسیر شکست» را سه بار پشت سر هم داد.
+     */
+    const secrets = this.maskSecrets();
+    const raw = actionsFrom(current.snapshot)
+      .map((action) => maskAction(action, secrets))
+      .map((action) =>
+        this.avoid.some((rx) => rx.test(action.label)) ? { ...action, kind: 'avoided' } : action
+      );
 
     const { state, created } = upsertState(this.map, {
       id: current.id,
@@ -646,6 +658,22 @@ export class MapSession extends EventEmitter {
    * و این دقیقاً همان توقعی است که کاربر دارد: حسابی که در تنظیمات ساخته،
    * باید همانی باشد که خزش با آن وارد می‌شود.
    */
+  /**
+   * چیزهایی که نباید در نقشه بمانند: ایمیل و نامِ کاربریِ همین اجرا.
+   *
+   * هم هویتِ موقت، هم حساب‌های ذخیره‌شده — چون خزش ممکن است با هرکدام وارد
+   * شده باشد و برچسبِ منو همان را نشان می‌دهد.
+   */
+  maskSecrets() {
+    const out = [];
+    if (this.identity?.email) out.push({ value: this.identity.email, as: '{{identity.email}}' });
+    const { accounts } = accountsFor(this.targetName);
+    for (const [id, data] of Object.entries(accounts || {})) {
+      if (data?.email) out.push({ value: data.email, as: `{{account.${id}.email}}` });
+    }
+    return out;
+  }
+
   replayCtx() {
     const { accounts } = accountsFor(this.targetName);
     return { identity: this.identity, account: accounts };

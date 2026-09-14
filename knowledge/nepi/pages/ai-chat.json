@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "path": "/ai-chat",
+  "title": "چت هوش مصنوعی :: نپی",
+  "purpose": "",
+  "domSignature": "",
+  "stale": false,
+  "shot": "shots/17--ai-chat.png",
+  "contract": {
+    "mode": "watch",
+    "must": [
+      {
+        "role": "button",
+        "name": "بستن فهرست",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "چت جدید",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "تنظیمات",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "Free Models Router",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "بستن گفت‌وگو",
+        "exact": true,
+        "visible": true
+      },
+      {
+        "role": "button",
+        "name": "شروع چت جدید",
+        "exact": true,
+        "visible": true
+      }
+    ],
+    "seenIn": 1,
+    "lastSeen": "2026-09-14T13:29:15.120Z",
+    "approvedBy": null
+  },
+  "by": "tour"
+}
