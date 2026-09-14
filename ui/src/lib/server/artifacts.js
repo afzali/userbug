@@ -112,6 +112,13 @@ export async function listRuns({ target, limit = 250 } = {}) {
       kind: run.kind || 'run',
       // اسمی که آدم روی این بار گذاشته؛ خالی برای اجراهایی که پیش از بنچ بودند
       bench: run.bench || '',
+      /**
+       * خطایی که اجرا را کشت.
+       *
+       * بی این، اجرایی با صفر قدم در فهرست می‌نشیند و هیچ نمی‌گوید چرا —
+       * و کاربر باید ترمینالی را به یاد بیاورد که بسته شده.
+       */
+      error: run.error || '',
       steps: run.steps ?? 0,
       findings: run.findings ?? 0,
       findingEvents: run.findingEvents ?? run.findings ?? 0,

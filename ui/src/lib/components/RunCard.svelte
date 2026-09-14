@@ -63,6 +63,20 @@
     <div class="rounded-lg bg-muted/70 p-2"><strong class="block text-lg">{formatNumber(run.findings)}</strong><span class="text-xs text-muted-foreground">یافته</span></div>
     <div class="rounded-lg bg-muted/70 p-2"><strong class="block text-lg">{formatNumber(run.serverLines)}</strong><span class="text-xs text-muted-foreground">لاگ سرور</span></div>
   </Card.Content>
+  <!--
+    چرا این اجرا مرد — روی خودِ کارت.
+
+    اجرایی که وسطِ کار بشکند، تا امروز فقط «صفر قدم» نشان می‌داد و علتش
+    در ترمینالی می‌ماند که بسته شده بود.
+  -->
+  {#if run.error}
+    <Card.Content class="px-5 pt-0">
+      <p class="rounded-lg border border-destructive/30 bg-destructive/5 p-2.5 text-xs leading-6 text-destructive">
+        {run.error.split('\n')[0]}
+      </p>
+    </Card.Content>
+  {/if}
+
   <Card.Footer class="flex-col items-stretch gap-2 px-5">
     <div class="flex gap-2">
       <Button href={`/runs/${encodeURIComponent(run.runId)}`} variant="outline" class="flex-1">دیدن خط زمانی</Button>

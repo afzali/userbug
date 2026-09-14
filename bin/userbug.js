@@ -1518,9 +1518,12 @@ async function cmdMap({ flags, positional }) {
   let map;
   try {
     map = await session.crawl();
-  } finally {
-    await session.stop();
+  } catch (cause) {
+    // خطا در `run.json` می‌نشیند، وگرنه فهرستِ اجراها «پایان‌یافته» نشان می‌دهد
+    await session.stop(cause);
+    throw cause;
   }
+  await session.stop();
 
   console.log('\n' + renderMap(map, { knownRoutes, loginPath }));
   console.log(`\n  یافته‌ها: ${session.findings.length} ثبت‌شده از ${session.seenFindings.size} یکتا`);

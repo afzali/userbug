@@ -91,6 +91,26 @@ export class TourSession extends EventEmitter {
     this.target = target;
 
     /**
+     * اپِ هدف بالاست؟
+     *
+     * همان چکِ خزش. گشتی که روی اپِ خاموش باز شود، پنجره‌ای می‌دهد با
+     * «ERR_CONNECTION_REFUSED» — پیامی که شبیهِ باگِ ابزار است نه شبیهِ
+     * «اپت را بالا بیاور». و اینجا بدتر است، چون مرورگر جلوی چشمِ آدم باز
+     * می‌شود و خالی می‌ماند.
+     */
+    // فقط `http(s)`: هدف می‌تواند فایلِ محلی باشد، و `fetch` روی `file:` می‌شکند
+    try {
+      if (/^https?:/i.test(String(target.baseURL || ''))) {
+        await fetch(target.baseURL, { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(5000) });
+      }
+    } catch (cause) {
+      throw new Error(
+        `اپِ هدف روی ${target.baseURL} بالا نیست (${cause.message.slice(0, 60)}).` +
+          '\n  اول اپتان را خودتان بالا بیاورید، بعد گشت را شروع کنید.'
+      );
+    }
+
+    /**
      * گشت روی تولید ممکن است، ولی صدادار.
      *
      * کاربر با «اکانت واقعی» لاگین می‌کند و ممکن است روی محیط تولیدی باشد.

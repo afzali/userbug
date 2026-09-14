@@ -101,6 +101,42 @@ function hasRealAction(snapshot) {
   return actionsFrom(snapshot).some((action) => action.kind !== 'noise');
 }
 
+/**
+ * اپِ هدف بالاست؟
+ *
+ * ── چرا این چک لازم شد ──
+ *
+ * خزشی که روی اپِ خاموش اجرا شود، این را می‌دهد:
+ *
+ *     page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:5173/
+ *
+ * پیامی که شبیهِ باگِ ابزار است، نه شبیهِ «اپت را بالا بیاور». و چون
+ * مرورگر تا آن لحظه باز شده و یک پوشهٔ اجرا ساخته شده، کاربر فکر می‌کند
+ * خزش شروع شده و وسطِ کار شکسته.
+ *
+ * `fetch` ساده کافی است: هر پاسخی — حتی ۴۰۴ — یعنی کسی آنجا هست.
+ */
+async function assertReachable(baseURL) {
+  /**
+   * فقط `http(s)`.
+   *
+   * هدف می‌تواند یک فایلِ محلی باشد (`file:///…`) — خودآزمای گشت دقیقاً
+   * همین کار را می‌کند. `fetch` روی `file:` در Node می‌شکند، و آن شکست
+   * ربطی به «اپ بالا نیست» ندارد.
+   */
+  if (!/^https?:/i.test(String(baseURL || ''))) return;
+
+  try {
+    await fetch(baseURL, { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(5000) });
+  } catch (cause) {
+    throw new Error(
+      `اپِ هدف روی ${baseURL} بالا نیست (${cause.message.slice(0, 60)}).\n` +
+        '  اول اپتان را خودتان بالا بیاورید، بعد خزش را بزنید.\n' +
+        '  آدرس را در «پیکربندی پروژه» می‌شود عوض کرد.'
+    );
+  }
+}
+
 export class MapSession extends EventEmitter {
   constructor({
     target,
@@ -177,6 +213,8 @@ export class MapSession extends EventEmitter {
   async start() {
     const target = await loadTarget(this.targetName);
     this.target = target;
+
+    await assertReachable(target.baseURL);
 
     const bad = unsupportedVerbs(this.entrySteps);
     if (bad.length) {
@@ -1071,7 +1109,19 @@ export class MapSession extends EventEmitter {
     }
   }
 
-  async stop() {
+  /**
+   * @param {Error} [cause] اگر خزش با خطا مرد
+   *
+   * ── چرا خطا باید در `run.json` بنشیند ──
+   *
+   * تا امروز `stop()` همیشه `finished` می‌نوشت، حتی وقتی `crawl()` پرتاب
+   * کرده بود. نتیجه‌اش روی نپی این شد: اجرایی با **صفر قدم** در فهرست
+   * «پایان‌یافته» نشست و هیچ‌جا ننوشت چه شد. کاربر چند بار خزش زد، هر بار
+   * خطایی وسطِ ترمینال دید، و فهرستِ اجراها هیچ نشانی از آن نداشت.
+   *
+   * همان شکستِ خاموشی که این ابزار برای شکارش ساخته شده — این بار در خودش.
+   */
+  async stop(cause = null) {
     if (this.status === 'stopped') return;
     this.status = 'stopped';
     for (const line of await drainAll(this.collectors || []).catch(() => [])) {
@@ -1084,10 +1134,11 @@ export class MapSession extends EventEmitter {
     await this.browser?.close().catch(() => {});
     await this.store
       ?.finish({
-        status: 'finished',
+        status: cause ? 'failed' : 'finished',
         kind: 'map',
         steps: this.stepIndex,
         findings: this.findings.length,
+        ...(cause ? { error: String(cause.message || cause).slice(0, 2000) } : {}),
       })
       .catch(() => {});
   }
