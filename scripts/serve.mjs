@@ -30,6 +30,20 @@ import { pickPort } from './port.mjs';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const flags = new Set(process.argv.slice(2));
 
+/**
+ * حالتِ توسعه — بیلد نگیر، خودِ سورس را سرو کن.
+ *
+ * ── چرا لازم شد ──
+ *
+ * راه‌انداز همیشه `ui:build` می‌گرفت و نسخهٔ ساخته‌شده را بالا می‌آورد. یعنی
+ * هر تغییرِ کوچک در رابط، یک بستن و باز کردنِ کامل می‌خواست — و بدتر:
+ * مرورگری که باز مانده بود، بی‌صدا نسخهٔ **قدیمی** را نشان می‌داد و آدم فکر
+ * می‌کرد تغییرش کار نکرده.
+ *
+ * با `--dev`، `vite dev` بالا می‌آید و هر ذخیره همان لحظه در مرورگر می‌نشیند.
+ */
+const dev = flags.has('--dev');
+
 const children = [];
 let shuttingDown = false;
 
@@ -151,22 +165,58 @@ if (!fs.existsSync(path.join(ROOT, 'node_modules'))) {
   await runOnce('npm install', 'npm install', ROOT);
 }
 
-console.log(paint('[بیلد]', 'ساخت رابط...'));
-await runOnce('ui:build', 'npm run ui:build', ROOT);
+if (dev) {
+  console.log(paint('[حالت]', 'توسعه — بی بیلد، با بازتابِ زندهٔ تغییرها.'));
+} else {
+  console.log(paint('[بیلد]', 'ساخت رابط...'));
+  await runOnce('ui:build', 'npm run ui:build', ROOT);
+}
 
 const port = await pickPort(4174);
 if (port !== 4174) log('رابط', `۴۱۷۴ روی این ویندوز رزرو شده؛ رابط روی ${port} بالا می‌آید.`);
 
-start('رابط', 'npm', ['run', 'ui:start'], ROOT, {
-  PORT: String(port),
-  ORIGIN: `http://127.0.0.1:${port}`,
-  USERBUG_NO_OPEN: flags.has('--no-open') ? '1' : process.env.USERBUG_NO_OPEN || '',
-});
+/**
+ * پورت دو راهِ متفاوت دارد و هر دو لازم‌اند.
+ *
+ * نسخهٔ ساخته‌شده `PORT` را از محیط می‌خواند. ولی `vite dev` در این پروژه با
+ * `--port 4174 --strictPort` ثابت شده، پس باید پرچمِ صریح بگیرد وگرنه روی
+ * پورتِ انتخاب‌شده بالا نمی‌آید و `waitForPort` بی‌دلیل شصت ثانیه صبر می‌کند.
+ *
+ * ── و چرا مستقیم در پوشهٔ `ui` ──
+ *
+ * نسخهٔ اول `npm run ui:dev -- --port N` را از ریشه صدا زد و نشد: دو لایه
+ * `npm run` تو در تو، و `--` در لایهٔ بیرونی گم می‌شود. نتیجه‌اش
+ * `vite dev … --strictPort 4174` بود و vite با خطای نامفهومِ
+ * «paths[0] must be a string» مرد. یک لایه `npm`، یک مسئله کمتر.
+ */
+if (dev) {
+  start('رابط', 'npm', ['run', 'dev', '--', '--port', String(port), '--strictPort'], path.join(ROOT, 'ui'));
+} else {
+  start('رابط', 'npm', ['run', 'ui:start'], ROOT, {
+    PORT: String(port),
+    ORIGIN: `http://127.0.0.1:${port}`,
+    USERBUG_NO_OPEN: flags.has('--no-open') ? '1' : process.env.USERBUG_NO_OPEN || '',
+  });
+}
 
 const ready = await waitForPort(port, 'رابط', 60);
 
+/**
+ * باز کردنِ مرورگر در حالتِ توسعه، اینجا.
+ *
+ * در نسخهٔ ساخته‌شده این کار را `ui/scripts/start.js` می‌کند، ولی `vite dev`
+ * آن فایل را اصلاً اجرا نمی‌کند. بی این خط، `--dev` بی‌صدا مرورگر باز
+ * نمی‌کرد و فرقش با حالتِ عادی شبیهِ خرابی به نظر می‌رسید.
+ */
+if (dev && ready && !flags.has('--no-open') && process.env.USERBUG_NO_OPEN !== '1') {
+  const command =
+    process.platform === 'win32' ? 'explorer.exe' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+  spawn(command, [`http://127.0.0.1:${port}`], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+}
+
 console.log('\n  ' + '─'.repeat(46));
-console.log(paint('', `رابط: http://127.0.0.1:${port}`));
+console.log(paint('', `رابط: http://127.0.0.1:${port}${dev ? '  (توسعه)' : ''}`));
+console.log(paint('', dev ? 'تغییرِ رابط را ذخیره کنید؛ همین‌جا بازتاب می‌شود.' : 'برای بازتابِ تغییرها: start.bat --dev'));
 console.log(paint('', 'بستن: Ctrl+C'));
 console.log('  ' + '─'.repeat(46));
 

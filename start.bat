@@ -7,7 +7,10 @@ rem  Brings up the userbug GUI only. It does NOT start your app:
 rem  run your own dev server yourself, then point a project at it.
 rem
 rem  Options:
-rem    start.bat              open the GUI in your browser
+rem    start.bat              build the GUI, then serve it
+rem    start.bat --dev        serve from source with live reload:
+rem                           edits to the GUI show up without a
+rem                           restart. Use this while changing it.
 rem    start.bat --no-open    do not open a browser
 rem
 rem  Logic lives in scripts\serve.mjs. Comments here are ASCII on
