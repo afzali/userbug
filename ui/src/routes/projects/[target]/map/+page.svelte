@@ -1,5 +1,5 @@
 <script>
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
@@ -28,6 +28,80 @@
   let focus = $state('');
   let busy = $state(false);
   let error = $state('');
+
+  /**
+   * ساختنِ «مسیرِ ورود» — همین‌جا، چون همین‌جاست که کم می‌آید.
+   *
+   * ── چرا لازم شد ──
+   *
+   * کاربری در تنظیمات حساب ساخت، فایل نمونه آپلود کرد، کلید مدل گذاشت، و
+   * خزش را زد — و خزنده روی صفحهٔ ورود ماند. هر سه کار درست بودند ولی
+   * هیچ‌کدام به خزش وصل نبود: **خزنده بلد نیست وارد شود**، یک سناریوی ورود
+   * را بازپخش می‌کند.
+   *
+   * و نوشتنِ آن سناریو با دست سخت است (همه‌چیز باید زیر `when` برود). ولی
+   * قدم‌هایش از قبل روی دیسک‌اند، در پیش‌نویسِ گشت یا کاوش.
+   */
+  let entrySource = $state('');
+  let entryAccount = $state('');
+  let entryOptions = $state(null);
+  let entryDraft = $state(null);
+  let entryBusy = $state(false);
+  let entryError = $state('');
+
+  async function loadEntryOptions() {
+    if (entryOptions) return;
+    const response = await fetch(`/api/scenarios/entry?target=${encodeURIComponent(target)}`);
+    if (response.ok) entryOptions = await response.json();
+  }
+
+  async function buildEntryScenario() {
+    entryBusy = true;
+    entryError = '';
+    try {
+      const response = await fetch('/api/scenarios/entry', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({ target, from: entrySource, account: entryAccount }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'ساخته نشد');
+      entryDraft = payload;
+    } catch (cause) {
+      entryError = cause.message;
+    } finally {
+      entryBusy = false;
+    }
+  }
+
+  /** ذخیره از همان دروازهٔ همیشگی، و بعد خودش در کشویی انتخاب می‌شود. */
+  async function saveEntryScenario() {
+    entryBusy = true;
+    entryError = '';
+    try {
+      const response = await fetch('/api/files', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({
+          kind: 'scenario',
+          target,
+          relative: entryDraft.relative,
+          content: entryDraft.yaml,
+          createOnly: true,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'ذخیره نشد');
+      from = `scenarios/${target}/${payload.relative}`;
+      entryDraft = null;
+      // فهرستِ کشویی از سرور می‌آید، پس باید تازه شود تا فایلِ نو در آن باشد
+      await invalidateAll();
+    } catch (cause) {
+      entryError = cause.message;
+    } finally {
+      entryBusy = false;
+    }
+  }
 
   /** هدفِ کاوش. نقشه مسیرِ رسیدن را می‌دهد، مدل فقط همان‌جا فکر می‌کند. */
   let goal = $state('');
@@ -220,6 +294,96 @@
             </span>
           </label>
 
+          <!--
+            هشدار **پیش از** خزش، نه بعدش.
+
+            تا امروز فقط وقتی گفته می‌شد که خزش تمام شده و روی `/login` مانده
+            بود — یعنی دقیقاً بعد از هدر رفتنِ چند دقیقه. حالا همان جمله
+            کنارِ کشویی است، جایی که هنوز می‌شود کاری کرد.
+          -->
+          {#if !from}
+            <div class="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 text-[11px] leading-6">
+              <p class="font-medium text-amber-700 dark:text-amber-300">بی مسیرِ ورود، خزش وارد نمی‌شود.</p>
+              <p class="mt-0.5 text-muted-foreground">
+                خزنده خودش بلد نیست وارد شود؛ یک سناریوی ورود را بازپخش می‌کند.
+                حسابی که در «حساب و فایل» ذخیره کرده‌اید تا وقتی سناریویی به آن
+                اشاره نکند، استفاده نمی‌شود.
+              </p>
+              <button
+                type="button"
+                class="mt-1.5 underline underline-offset-2"
+                onclick={loadEntryOptions}
+              >
+                از روی گشت یا کاوشِ قبلی برایم بساز
+              </button>
+            </div>
+          {/if}
+
+          {#if entryOptions}
+            <!--
+              هیچ مدلی صدا زده نمی‌شود: قدم‌های ورود از قبل ضبط شده‌اند و
+              برچسب‌هایشان از DOM واقعی آمده، نه از حدس.
+            -->
+            <div class="space-y-2 rounded-lg border p-2.5">
+              {#if entryOptions.candidates.length}
+                <label class="block space-y-1">
+                  <span class="text-[11px] text-muted-foreground">از روی کدام سناریو</span>
+                  <select bind:value={entrySource} class="h-8 w-full rounded-md border bg-background px-2 text-xs">
+                    <option value="">— انتخاب کنید —</option>
+                    {#each entryOptions.candidates as item (item.path)}
+                      <option value={item.path}>{item.name}</option>
+                    {/each}
+                  </select>
+                </label>
+
+                <label class="block space-y-1">
+                  <span class="text-[11px] text-muted-foreground">با کدام حساب</span>
+                  <select bind:value={entryAccount} class="h-8 w-full rounded-md border bg-background px-2 text-xs">
+                    <option value="">— هر اجرا کاربرِ تازه بسازد —</option>
+                    {#each entryOptions.accounts as item (item.id)}
+                      <option value={item.id}>{item.id}{item.email ? ` — ${item.email}` : ''}</option>
+                    {/each}
+                  </select>
+                  <a class="block text-[11px] underline underline-offset-2" href={`${base}/config`}>
+                    حساب یا فایلِ تازه اضافه کنم
+                  </a>
+                </label>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  class="w-full"
+                  disabled={!entrySource || entryBusy}
+                  onclick={buildEntryScenario}
+                >
+                  {entryBusy ? 'یک لحظه…' : 'بساز'}
+                </Button>
+              {:else}
+                <p class="text-[11px] leading-6 text-muted-foreground">
+                  هیچ سناریویی با فرمِ ورود پیدا نشد. یک بار
+                  <a class="underline underline-offset-2" href={`${base}/tour`}>گشتِ زنده</a>
+                  بروید و خودتان وارد شوید؛ قدم‌هایش ضبط می‌شود و بعد از همان
+                  ساخته می‌شود.
+                </p>
+              {/if}
+
+              {#if entryError}<p class="text-[11px] text-destructive">{entryError}</p>{/if}
+
+              {#if entryDraft}
+                <div class="space-y-1.5 border-t pt-2">
+                  {#each entryDraft.notes as note (note)}
+                    <p class="text-[11px] leading-5 text-amber-700 dark:text-amber-300">{note}</p>
+                  {/each}
+                  <pre dir="ltr" class="max-h-52 overflow-auto rounded-md bg-muted p-2 font-mono text-[10px] leading-4">{entryDraft.yaml}</pre>
+                  <Button type="button" size="sm" class="w-full" disabled={entryBusy} onclick={saveEntryScenario}>
+                    ذخیره در scenarios/{target}/{entryDraft.relative}
+                  </Button>
+                </div>
+              {/if}
+            </div>
+          {/if}
+
           <div class="grid grid-cols-2 gap-2">
             <label class="block space-y-1">
               <span class="text-xs text-muted-foreground">سقف حالت</span>
@@ -245,8 +409,9 @@
             <span class="text-xs text-muted-foreground">حسابی که به خاطر بسپارد</span>
             <Input bind:value={remember} placeholder="crawler — خالی یعنی هر بار کاربر تازه" />
             <span class="block text-[11px] leading-5 text-muted-foreground">
-              بارِ اول با سناریوی ورود کاربر می‌سازد و ذخیره‌اش می‌کند؛ دفعهٔ بعد با
-              همان وارد می‌شود. حسابی که خزشِ قبلی پُرش کرده، نقشهٔ عمیق‌تری می‌دهد.
+              <strong>خودش وارد نمی‌شود</strong> — فرم را سناریوی ورودِ بالا پر
+              می‌کند. این فقط می‌گوید هویتی که آنجا ساخته شد، با چه شناسه‌ای
+              ذخیره بماند تا دفعهٔ بعد همان باشد.
             </span>
           </label>
 

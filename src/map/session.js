@@ -36,7 +36,7 @@ import { readChecksConfig } from '../checks/config.js';
 import { knowledgeDir, readDossier } from '../knowledge/store.js';
 import { avoidFrom } from '../knowledge/select.js';
 import { freshIdentity } from '../data/persian.js';
-import { listAccounts, readAccounts, saveAccount } from '../knowledge/credentials.js';
+import { accountsFor, listAccounts, readAccounts, saveAccount } from '../knowledge/credentials.js';
 
 import {
   actionsFrom,
@@ -568,11 +568,28 @@ export class MapSession extends EventEmitter {
    * اول مسیرِ خالی را بازپخش می‌کرد، یعنی هیچ ناوبری‌ای نمی‌شد، پس هر برگشت به
    * ریشه شکست می‌خورد و کلِ صف با یک «مسیر شکسته» خالی شد.
    */
+  /**
+   * زمینهٔ جای‌گذاری برای بازپخش.
+   *
+   * ── چرا حساب‌ها هم باید اینجا باشند ──
+   *
+   * تا امروز فقط `identity` می‌رفت، چون مسیرهای ورودِ دست‌نویس هم فقط از آن
+   * استفاده می‌کردند. نخستین «مسیرِ ورودِ خودکار» که به حسابِ ذخیره‌شده بسته
+   * شد، همین‌جا ایستاد: «متغیر ناشناخته در سناریو: {{account.a.email}}».
+   *
+   * و این دقیقاً همان توقعی است که کاربر دارد: حسابی که در تنظیمات ساخته،
+   * باید همانی باشد که خزش با آن وارد می‌شود.
+   */
+  replayCtx() {
+    const { accounts } = accountsFor(this.targetName);
+    return { identity: this.identity, account: accounts };
+  }
+
   async enterRoot() {
     await replayPath({
       page: this.page,
       steps: [this.entryPath[0]],
-      ctx: { identity: this.identity },
+      ctx: this.replayCtx(),
       baseURL: this.target.baseURL,
       target: this.targetName,
     });
@@ -609,7 +626,7 @@ export class MapSession extends EventEmitter {
 
     const rest = this.entryPath.slice(1);
     try {
-      await replayPath({ page: this.page, steps: rest, ctx: { identity: this.identity }, baseURL: this.target.baseURL, target: this.targetName });
+      await replayPath({ page: this.page, steps: rest, ctx: this.replayCtx(), baseURL: this.target.baseURL, target: this.targetName });
     } catch (cause) {
       /**
        * مزاحمی که **وسطِ** مسیرِ ورود می‌آید.
@@ -629,7 +646,7 @@ export class MapSession extends EventEmitter {
       this.emitEvent('warning', { message: 'مسیرِ ورود پشتِ یک پنجره ماند؛ بسته شد و دوباره رفت.' });
       await this.settle();
       await dismissBlockers(this.page).catch(() => {});
-      await replayPath({ page: this.page, steps: rest, ctx: { identity: this.identity }, baseURL: this.target.baseURL, target: this.targetName });
+      await replayPath({ page: this.page, steps: rest, ctx: this.replayCtx(), baseURL: this.target.baseURL, target: this.targetName });
     }
     return await this.settle();
   }
@@ -640,7 +657,7 @@ export class MapSession extends EventEmitter {
     await replayPath({
       page: this.page,
       steps: state.path || [],
-      ctx: { identity: this.identity },
+      ctx: this.replayCtx(),
       baseURL: this.target.baseURL,
       target: this.targetName,
     });

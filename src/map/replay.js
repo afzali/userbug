@@ -12,6 +12,7 @@
  * سکوت در برابر فعلی که اجرا نشده یعنی مسیری که فکر می‌کنیم طی شده و نشده،
  * و بعد از آن هر یالی که ثبت شود دروغ است.
  */
+import { dismissBlockers } from '../observe/blockers.js';
 import { resolveTarget } from '../scenario/resolve.js';
 import { interpolate } from '../scenario/interpolate.js';
 import { resolveFixture } from '../knowledge/fixtures.js';
@@ -30,6 +31,18 @@ export const REPLAY_VERBS = [
   'clearState',
   'when',
   'upload',
+  /**
+   * بستنِ پنجرهٔ مزاحم.
+   *
+   * ── چرا اینجا هم لازم شد ──
+   *
+   * `enterRoot` خودش مزاحم‌ها را می‌بندد، پس خزش این فعل را «لازم نداشت».
+   * ولی سناریوی ورود فقط برای خزش نیست: همان فایل از اجراگرِ معمولی هم رد
+   * می‌شود و آنجا لازمش دارد. نبودنش یعنی فایلی که در یک مسیر کار می‌کند و
+   * در دیگری بی‌صدا پشتِ یک مودال می‌ماند — و نخستین «مسیرِ ورودِ خودکار»
+   * دقیقاً همین‌جا رد شد: «فعلی که خزش اجرا نمی‌کند: dismissBlockers».
+   */
+  'dismissBlockers',
 ];
 
 const TIMEOUT = 8000;
@@ -137,6 +150,19 @@ export async function replayStep({ page, step, ctx = {}, baseURL = '', target = 
     }
     case 'press':
       await page.keyboard.press(String(body || 'Enter'));
+      break;
+
+    /**
+     * اینجا یافته ثبت نمی‌شود، برخلافِ مفسرِ سناریو.
+     *
+     * همان تصمیمِ `enterRoot`: مزاحمی که **پیش از شروعِ کار** بسته شود قدمِ
+     * کاربر را نشکسته. جای ثبتش سناریوست، جایی که قدمی واقعاً گرفته شده.
+     */
+    case 'dismissBlockers':
+      await dismissBlockers(page, {
+        only: body?.only,
+        wait: Number(body?.wait) || 0,
+      }).catch(() => []);
       break;
     /**
      * پاکسازیِ وضعیت، در حدی که بی‌`ub` ممکن است.

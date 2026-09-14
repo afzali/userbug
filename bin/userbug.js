@@ -140,6 +140,11 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --watch <شناسه>             یافته ثبت کن، ولی نشکن (پیش‌فرض)
       --expect <شناسه>            سخت بشکن — یعنی «این قاعده است»
 
+  userbug entry <هدف>             ساختِ «مسیرِ ورود» از سناریویی که کار کرد
+      --from <سناریو>             منبع؛ بی آن، خودش نامزدها را نشان می‌دهد
+      --account <شناسه>           مقدارها به حسابِ ذخیره‌شده بسته شوند
+      --out <نام> --force
+
   userbug quest <هدف> "<چه را بررسی کنم>"
                                   کاوشِ هدف‌دار: نقشه رایگان می‌بردت آنجا،
                                   بعد مدل همان‌جا می‌گردد و پیش‌نویس می‌نویسد
@@ -908,6 +913,103 @@ async function cmdTour({ flags, positional }) {
 }
 
 /**
+ * ساختِ «مسیرِ ورود» از چیزی که یک بار کار کرد.
+ *
+ * ── چرا این فرمان لازم شد ──
+ *
+ * خزنده بلد نیست وارد شود؛ یک سناریوی ورود را بازپخش می‌کند. پروژه‌ای که آن
+ * را نداشت، خزشش «موفق» تمام می‌شد با دو گرهِ `/login` — و کاربری که در
+ * تنظیمات حساب ساخته بود، حق داشت فکر کند کارش را کرده.
+ *
+ * نوشتنش با دست سخت است (همه‌چیز باید زیر `when` برود، وگرنه اجرای دوم
+ * می‌شکند)، ولی قدم‌هایش از قبل روی دیسک‌اند: در گشتِ زنده، یا در پیش‌نویسی
+ * که کاوش نوشت.
+ */
+async function cmdEntry({ flags, positional }) {
+  const target = positional[0];
+  if (!target) throw new Error('نام هدف لازم است: userbug entry <هدف> --from <سناریو> --account <شناسه>');
+
+  const { loadScenario, loadScenarios, scenarioDir } = await import('../src/scenario/load.js');
+  const { buildEntry, entryYaml } = await import('../src/scenario/entry.js');
+  const { listAccounts } = await import('../src/knowledge/credentials.js');
+
+  /**
+   * منبع: یا فایلی که گفته شده، یا — اگر نگفته — هر سناریویی که فیلدِ ورود
+   * دارد. حدس نمی‌زنیم؛ اگر چند تا بود، فهرست را نشان می‌دهیم و می‌ایستیم.
+   */
+  let source = flags.from && flags.from !== true ? String(flags.from) : '';
+  if (!source) {
+    const dir = scenarioDir(target);
+    const candidates = [];
+    for (const sub of ['', '_drafts']) {
+      const folder = sub ? path.join(dir, sub) : dir;
+      if (!fs.existsSync(folder)) continue;
+      for (const file of fs.readdirSync(folder)) {
+        if (!/\.ya?ml$/.test(file)) continue;
+        const full = path.join(folder, file);
+        try {
+          if (buildEntry({ steps: loadScenario(full).steps }).found) {
+            candidates.push(path.relative(ROOT, full).split(path.sep).join('/'));
+          }
+        } catch {
+          // فایلِ خراب اینجا خطا نیست، فقط نامزد نیست
+        }
+      }
+    }
+    if (!candidates.length) {
+      throw new Error(
+        'هیچ سناریویی با فرمِ ورود پیدا نشد.\n' +
+          '  یک بار «گشتِ زنده» بروید و خودتان وارد شوید؛ قدم‌هایش ضبط می‌شود.'
+      );
+    }
+    if (candidates.length > 1) {
+      console.log('\n  چند نامزد پیدا شد؛ یکی را با --from بدهید:\n');
+      for (const item of candidates) console.log('   • ' + item);
+      console.log('');
+      return;
+    }
+    source = candidates[0];
+  }
+
+  const file = path.resolve(source);
+  if (!fs.existsSync(file)) throw new Error('سناریوی منبع پیدا نشد: ' + file);
+
+  const accountId = flags.account && flags.account !== true ? String(flags.account) : '';
+  if (accountId && !listAccounts(target).some((item) => item.id === accountId)) {
+    throw new Error(
+      `حسابِ «${accountId}» در این پروژه نیست.\n` +
+        '  حساب‌ها: ' + (listAccounts(target).map((item) => item.id).join('، ') || '(هیچ)')
+    );
+  }
+
+  const built = buildEntry({ steps: loadScenario(file).steps, accountId });
+  if (!built.found) throw new Error(built.notes.join('\n'));
+
+  const yaml = entryYaml({
+    ...built,
+    accountId,
+    source: path.relative(scenarioDir(target), file).split(path.sep).join('/'),
+  });
+
+  const out = flags.out && flags.out !== true ? String(flags.out) : 'ورود.yml';
+  const destination = path.join(scenarioDir(target), out);
+
+  // بازنویسیِ بی‌خبرِ مسیرِ ورود یعنی خزشِ فردا با فرمی برود که کسی ندیده
+  if (fs.existsSync(destination) && !flags.force) {
+    throw new Error(`«${out}» از قبل هست. برای بازنویسی --force بدهید.`);
+  }
+
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  fs.writeFileSync(destination, yaml, 'utf8');
+
+  console.log(`\n  مسیرِ ورود: scenarios/${target}/${out}`);
+  console.log(`  از روی: ${source}`);
+  console.log(accountId ? `  با حسابِ «${accountId}»` : '  بی حسابِ ذخیره‌شده — هر اجرا کاربرِ تازه');
+  for (const note of built.notes) console.log(`  · ${note}`);
+  console.log(`\n  حالا: userbug map ${target} --from scenarios/${target}/${out}\n`);
+}
+
+/**
  * کاوشِ هدف‌دار — نقشه راه را می‌برد، کاوش فکر می‌کند.
  *
  * ── چرا این با `map` و با `run --author` فرق دارد ──
@@ -1624,6 +1726,9 @@ try {
       break;
     case 'quest':
       await cmdQuest(parsed);
+      break;
+    case 'entry':
+      await cmdEntry(parsed);
       break;
     case 'checks':
       cmdChecks(parsed);
