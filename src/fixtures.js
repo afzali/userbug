@@ -15,6 +15,7 @@ import { createServerCollectors, startAll, drainAll } from './observe/server.js'
 import { judge, fingerprint, normalizeMessage } from './observe/oracle.js';
 import { routeOf } from './observe/route.js';
 import { dismissBlockers } from './observe/blockers.js';
+import { callRecorder } from './knowledge/endpoints.js';
 import { RunStore, getCurrentRun } from './store/run-store.js';
 import { freshIdentity } from './data/persian.js';
 import { countHits, readChecksConfig } from './checks/config.js';
@@ -128,6 +129,8 @@ export const test = base.extend({
 
     await page.addInitScript(INIT_SCRIPT);
     attachClientObservers(page, sink, {
+      // پوششِ endpoint از همین‌جا ساخته می‌شود: چه چیزی واقعاً صدا زده شد
+      onCall: callRecorder(store),
       onDialog: async (d) => {
         const answer = dialogAnswers.shift();
         if (!answer) return false;

@@ -117,6 +117,18 @@ export class RunStore {
     await fsp.appendFile(path.join(this.dir, 'events.ndjson'), line + '\n', 'utf8');
   }
 
+  /**
+   * تماس‌های API — فایلِ جدا، مثل `traces.ndjson`.
+   *
+   * در `events.ndjson` نمی‌نشیند چون آنجا روایتِ اجراست و خطِ زمانی از رویش
+   * ساخته می‌شود؛ صدها تماسِ موفق آن روایت را دفن می‌کردند. اینها فکت‌اند،
+   * نه رخدادِ داستان.
+   */
+  async appendCall(call) {
+    const line = JSON.stringify(call);
+    await fsp.appendFile(path.join(this.dir, 'calls.ndjson'), line + '\n', 'utf8');
+  }
+
   async appendFinding(finding) {
     const line = JSON.stringify(finding);
     await fsp.appendFile(path.join(this.dir, 'findings.ndjson'), line + '\n', 'utf8');

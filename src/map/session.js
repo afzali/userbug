@@ -59,6 +59,7 @@ import {
   upsertState,
   writeMap,
 } from './store.js';
+import { callRecorder } from '../knowledge/endpoints.js';
 import { replayPath, unsupportedVerbs } from './replay.js';
 
 /** بیشتر از این از یک یافته ثبت نمی‌شود. خزش همان باگ را صدها بار می‌بیند. */
@@ -330,7 +331,12 @@ export class MapSession extends EventEmitter {
 
     this.collectors = await startAll(createServerCollectors(target.logs));
     this.page = this.context.pages()[0] || (await this.context.newPage());
-    attachClientObservers(this.page, (raw) => this.events.push({ ...raw, at: new Date().toISOString() }));
+    attachClientObservers(
+      this.page,
+      (raw) => this.events.push({ ...raw, at: new Date().toISOString() }),
+      // خزش بیش از هر اجرای دیگری endpoint لمس می‌کند؛ پوشش از همین‌جا پر می‌شود
+      { onCall: callRecorder(this.store) }
+    );
 
     this.status = 'running';
     this.emitEvent('started', { runId: this.runId, baseURL: target.baseURL });

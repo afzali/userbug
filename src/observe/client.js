@@ -26,10 +26,13 @@ export const INIT_SCRIPT = () => {
 /**
  * @param {import('@playwright/test').Page} page
  * @param {(event: object) => void} sink مقصد رخدادها
- * @param {{onDialog?: (d: import('@playwright/test').Dialog) => Promise<boolean>}} [opts]
- *   `onDialog` اگر `true` برگرداند یعنی خودش پنجره را بست؛ وگرنه dismiss می‌شود.
+ * @param {object} [opts]
+ * @param {(d: import('@playwright/test').Dialog) => Promise<boolean>} [opts.onDialog]
+ *   اگر `true` برگرداند یعنی خودش پنجره را بست؛ وگرنه dismiss می‌شود.
+ * @param {(call: {method: string, url: string, status: number}) => void} [opts.onCall]
+ *   هر تماسِ API که **موفق** بود. جدا از `sink` است چون یافته نیست.
  */
-export function attachClientObservers(page, sink, { onDialog } = {}) {
+export function attachClientObservers(page, sink, { onDialog, onCall } = {}) {
   page.on('console', (m) => {
     const type = m.type();
     if (type !== 'error' && type !== 'warning') return;
@@ -64,6 +67,28 @@ export function attachClientObservers(page, sink, { onDialog } = {}) {
 
   page.on('response', (r) => {
     const status = r.status();
+
+    /**
+     * تماسِ **موفق** هم ثبت می‌شود — ولی به‌عنوان فکت، نه یافته.
+     *
+     * ── چرا این خط تا امروز نبود ──
+     *
+     * `if (status < 400) return` یعنی هر پاسخِ سالم دور ریخته می‌شد. منطقی
+     * به نظر می‌رسید («خطا نیست، پس خبری نیست») ولی دقیقاً همان‌ها ثابت
+     * می‌کنند **کجا را آزموده‌ایم**. پوشش یک تفریق است و این نیمه‌اش گم بود:
+     * روی نپی ۲۱ endpointِ بک‌اند داریم و هیچ راهی نبود بفهمیم کدامشان
+     * واقعاً صدا زده شده.
+     *
+     * فقط `xhr`/`fetch`/`document`: عکس و فونت و CSS پوششِ رفتاری نیستند و
+     * فقط فایل را بزرگ می‌کنند.
+     */
+    if (onCall) {
+      const kind = r.request().resourceType();
+      if (kind === 'xhr' || kind === 'fetch' || kind === 'document') {
+        onCall({ method: r.request().method(), url: r.url(), status });
+      }
+    }
+
     if (status < 400) return;
     sink({
       source: 'http',

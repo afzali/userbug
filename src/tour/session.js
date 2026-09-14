@@ -34,6 +34,7 @@ import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import { callRecorder } from '../knowledge/endpoints.js';
 import { knowledgeDir } from '../knowledge/store.js';
 import { loadTarget } from '../target.js';
 import { INIT_SCRIPT, attachClientObservers } from '../observe/client.js';
@@ -210,7 +211,10 @@ export class TourSession extends EventEmitter {
 
   /** رصدگرها روی هر صفحه، از جمله تب‌هایی که کاربر بعداً باز می‌کند. */
   attach(page) {
-    attachClientObservers(page, (raw) => this.onObserved(raw));
+    attachClientObservers(page, (raw) => this.onObserved(raw), {
+      // گشت هم پوشش می‌سازد: هرجا آدم رفته، endpointش صدا خورده
+      onCall: callRecorder(this.store),
+    });
     page.on('framenavigated', (frame) => {
       if (frame !== page.mainFrame()) return;
       this.lastActivity = Date.now();

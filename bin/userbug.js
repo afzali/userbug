@@ -146,6 +146,10 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --watch <شناسه>             یافته ثبت کن، ولی نشکن (پیش‌فرض)
       --expect <شناسه>            سخت بشکن — یعنی «این قاعده است»
 
+  userbug coverage <هدف>          endpointهای بک‌اند: چه هست و صدایش نزده‌ایم
+      --all                       مسیرهایی که صدا خوردند و در سورس نبودند
+      --verbose                   شمارشِ آشکارسازها
+
   userbug entry <هدف>             ساختِ «مسیرِ ورود» از سناریویی که کار کرد
       --from <سناریو>             منبع؛ بی آن، خودش نامزدها را نشان می‌دهد
       --account <شناسه>           مقدارها به حسابِ ذخیره‌شده بسته شوند
@@ -923,6 +927,105 @@ async function cmdTour({ flags, positional }) {
   if (written.scenario) console.log(`  پیش‌نویس: scenarios/${name}/${written.scenario}`);
   console.log(`  پرونده: ${written.dossier.replaced} تازه · ${written.dossier.conflicts} تعارض`);
   console.log('\n  پیش‌نویس را بازبینی و اجرا کنید؛ تا اجرا نشده، سناریو نیست.\n');
+}
+
+/**
+ * پوششِ بک‌اند — «چه چیزی در سورس هست و صدایش نزده‌ایم».
+ *
+ * ── چرا این فرمان لازم شد ──
+ *
+ * روی نپی اندازه گرفتیم: ۷۸۸ فایلِ سورس، و تنها ۱۱ فکت از آن درمی‌آمد —
+ * هر یازده تا از فرانت. بک‌اند کاملاً نامرئی بود، با اینکه خودِ اسکنر
+ * می‌گفت `backend: php`. حالا ۲۱ endpoint پیدا می‌شود و در برابر تماس‌های
+ * واقعیِ اجراها گذاشته می‌شود.
+ *
+ * ── چرا هیچ فراخوانیِ مدلی ندارد ──
+ *
+ * هر دو طرفِ تفریق نحوی‌اند: `case 'GET /health'` در سورس، و رشتهٔ URL در
+ * اجرا. حدس لازم ندارند.
+ */
+async function cmdCoverage({ flags, positional }) {
+  const target = positional[0];
+  if (!target) throw new Error('نام هدف لازم است: userbug coverage <هدف>');
+
+  const [{ discoverEndpoints, endpointCoverage }, sourceAccess, { runDir }, { loadTarget }] = await Promise.all([
+    import('../src/knowledge/endpoints.js'),
+    import('../src/source-access.js'),
+    import('../src/store/run-store.js'),
+    import('../src/target.js'),
+  ]);
+
+  const config = await loadTarget(target);
+  const roots = await sourceAccess.resolveSourceRoots({ key: target, source: config.source });
+  const files = await sourceAccess.listAllSourceFiles(roots);
+  const read = async (relative) =>
+    (await sourceAccess.readAnySourceFile(roots, relative).catch(() => ({ content: '' }))).content || '';
+
+  const { endpoints, byDetector } = await discoverEndpoints({ files, read });
+
+  /* تماس‌های واقعی، از همهٔ اجراهای همین هدف */
+  const calls = [];
+  const runsRoot = path.dirname(runDir('x'));
+  const runIds = fs.existsSync(runsRoot)
+    ? fs.readdirSync(runsRoot, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
+    : [];
+  for (const runId of runIds) {
+    const dir = runDir(runId);
+    let meta = null;
+    try {
+      meta = JSON.parse(fs.readFileSync(path.join(dir, 'run.json'), 'utf8'));
+    } catch {
+      // اجرایی که وسطِ نوشتن است یا خراب شده؛ پوشش بی آن هم معنا دارد
+    }
+    if (meta?.target !== target) continue;
+    const file = path.join(dir, 'calls.ndjson');
+    if (!fs.existsSync(file)) continue;
+    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        calls.push(JSON.parse(line));
+      } catch {
+        // خط ناقصِ در حالِ نوشتن؛ بقیه سالم‌اند
+      }
+    }
+  }
+
+  const coverage = endpointCoverage(endpoints, calls);
+  const touched = coverage.endpoints.length - coverage.untouched.length;
+
+  console.log(`\n  پوششِ بک‌اندِ ${target}\n  ` + '-'.repeat(46));
+  console.log(`  ${endpoints.length} endpoint در سورس  ·  ${calls.length} تماسِ ثبت‌شده`);
+  console.log(`  آزموده: ${touched}  ·  نیازموده: ${coverage.untouched.length}\n`);
+
+  if (!calls.length) {
+    console.log('  هنوز هیچ تماسی ثبت نشده. یک اجرا یا خزش بروید تا پوشش معنا پیدا کند.\n');
+  }
+
+  if (coverage.untouched.length) {
+    console.log('  هیچ اجرایی صدایشان نزده:');
+    for (const row of coverage.untouched) {
+      console.log(`   • ${(row.methods.join(',') || '?').padEnd(12)} ${row.path}`);
+    }
+    console.log('');
+  }
+
+  if (coverage.partial.length) {
+    console.log('  مسیر آزموده شده ولی این فعل‌ها نه:');
+    for (const row of coverage.partial) console.log(`   • ${row.untried.join(',').padEnd(12)} ${row.path}`);
+    console.log('');
+  }
+
+  /**
+   * مسیری که اپ صدا زده و در سورس نبود، خودش یک خبر است: یا آشکارساز کور
+   * است یا سرویسِ بیرونی در کار است. سکوت دربارهٔ آن یعنی پوششِ خوش‌بینانه.
+   */
+  if (coverage.unknown.length && flags.all) {
+    console.log('  صدا زده شد ولی در سورس پیدا نشد:');
+    for (const row of coverage.unknown.slice(0, 20)) console.log(`   • ${row}`);
+    console.log('');
+  }
+
+  if (flags.verbose) console.log('  آشکارسازها: ' + JSON.stringify(byDetector) + '\n');
 }
 
 /**
@@ -1783,6 +1886,9 @@ try {
       break;
     case 'entry':
       await cmdEntry(parsed);
+      break;
+    case 'coverage':
+      await cmdCoverage(parsed);
       break;
     case 'checks':
       cmdChecks(parsed);
