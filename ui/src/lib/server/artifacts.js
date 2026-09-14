@@ -274,8 +274,53 @@ export async function aggregateTriage(target) {
   }
 
   return [...grouped.values()]
-    .map((item) => ({ ...item, triage: state[item.fingerprint] || { status: 'open', note: '' } }))
-    .sort((a, b) => String(b.lastSeen || '').localeCompare(String(a.lastSeen || '')));
+    .map((item) => {
+      const triage = state[item.fingerprint] || { status: 'open', note: '' };
+      return { ...item, triage, ...regressionOf(item, triage) };
+    })
+    /**
+     * برگشته‌ها اول.
+     *
+     * ── چرا نه فقط «تازه‌ترین اول» ──
+     *
+     * نقصی که یک بار رفع اعلام شده و دوباره آمده، مهم‌ترین سطرِ این صفحه
+     * است: یعنی یا اصلاح نگرفته یا برگشته. با مرتب‌سازیِ زمانی، همان سطر
+     * وسطِ چهل ردیفِ هم‌شکل گم می‌شد.
+     */
+    .sort(
+      (a, b) =>
+        Number(b.regressed) - Number(a.regressed) ||
+        String(b.lastSeen || '').localeCompare(String(a.lastSeen || ''))
+    );
+}
+
+/**
+ * «گفتم رفع شده، دوباره آمد.»
+ *
+ * ── چرا این محاسبه لازم بود ──
+ *
+ * تا امروز تریاژ فقط «الان چه وضعی دارد» را نگه می‌داشت. اگر نقصی را
+ * `resolved` می‌کردید و هفتهٔ بعد دوباره پیدا می‌شد، همان ردیفِ سبز سرِ
+ * جایش می‌ماند و هیچ‌کس نمی‌فهمید — بدترین حالت، چون **دقیقاً همان چیزی
+ * است که باید فریاد بزند**: اصلاح یا نگرفته یا برگشته.
+ *
+ * محاسبه‌اش ساده است چون داده‌اش از قبل بود: زمانِ آخرین تصمیم
+ * (`updatedAt`) در برابر زمانِ آخرین دیده‌شدن.
+ *
+ * `ignored` هم حساب می‌شود ولی نرم‌تر: «نادیده» یعنی می‌دانیم هست، پس
+ * دیده شدنش خبر نیست — مگر اینکه کسی بخواهد بداند هنوز زنده است.
+ */
+export function regressionOf(item, triage) {
+  const decidedAt = Date.parse(triage?.updatedAt || '');
+  const seenAt = Date.parse(item?.lastSeen || '');
+  if (!Number.isFinite(decidedAt) || !Number.isFinite(seenAt)) return { regressed: false, seenAfterDecision: false };
+
+  const seenAfterDecision = seenAt > decidedAt;
+  return {
+    seenAfterDecision,
+    // فقط «رفع‌شده» برگشت شمرده می‌شود؛ بقیه وضعیت‌ها ادعای رفع ندارند
+    regressed: seenAfterDecision && triage?.status === 'resolved',
+  };
 }
 
 export async function saveTriage(target, fingerprint, patch) {
@@ -311,10 +356,35 @@ export async function saveTriage(target, fingerprint, patch) {
     await fsp.mkdir(TRIAGE_DIR, { recursive: true });
     const file = path.join(TRIAGE_DIR, `${key}.json`);
     const state = (await readJson(file, {})) || {};
-    const saved = { status, note, updatedAt: new Date().toISOString() };
+    const before = state[print] || null;
+    const at = new Date().toISOString();
+    const saved = { status, note, updatedAt: at };
     // برچسبِ قبلی می‌ماند مگر اینکه برچسبِ تازه‌ای داده شود
-    const keptVerdict = verdict ?? state[print]?.verdict ?? null;
+    const keptVerdict = verdict ?? before?.verdict ?? null;
     if (keptVerdict) saved.verdict = keptVerdict;
+
+    /**
+     * تاریخچهٔ تصمیم‌ها — افزودنی، نه جایگزین.
+     *
+     * ── چرا لازم شد ──
+     *
+     * «رفع شد» و بعد «دوباره پیدا شد» و بعد «این بار واقعاً رفع شد» سه
+     * تصمیمِ متفاوت‌اند و هر سه معنا دارند. با نگه داشتنِ فقط آخری، هفتهٔ
+     * بعد کسی نمی‌فهمد این نقص بار اول هم رفع اعلام شده بود — و همان است
+     * که می‌گوید «به این یکی مشکوک باش».
+     *
+     * فقط **تغییر** ثبت می‌شود، نه هر ذخیره: کسی که فقط یادداشتش را
+     * ویرایش می‌کند، تاریخچه را شلوغ نمی‌کند. و سقفِ بیست، چون این فایل
+     * دستی هم خوانده می‌شود.
+     */
+    const changed =
+      !before || before.status !== status || (before.note || '') !== note || (before.verdict || null) !== keptVerdict;
+    const history = [...(before?.history || [])];
+    if (changed) {
+      history.push({ at, status, note: note || '', verdict: keptVerdict || '' });
+    }
+    if (history.length) saved.history = history.slice(-20);
+
     state[print] = saved;
     const temporary = `${file}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
     try {

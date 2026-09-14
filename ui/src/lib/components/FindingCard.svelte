@@ -19,6 +19,21 @@
   <!-- «فقط موبایل» با «همه‌جا» یک باگ نیست؛ داخل یک اجرا دستگاه ثابت است، پس
        این خط عملاً در تریاژ معنا پیدا می‌کند که بین اجراها ادغام می‌کند. -->
   {#if devices.length}<p class="mt-1 text-xs text-muted-foreground">دستگاه: {devices.join(' · ')}</p>{/if}
-  {#if finding.detail}<pre class="scroll-thin mt-3 max-h-40 overflow-auto rounded-lg bg-muted p-3 text-xs leading-6" dir="ltr">{typeof finding.detail === 'string' ? finding.detail : JSON.stringify(finding.detail, null, 2)}</pre>{/if}
+  <!--
+    جزئیاتِ خام، تاشده.
+
+    ── چرا دیگر باز نیست ──
+
+    یافتهٔ `contract` بیست خط JSON داشت و همان‌طور چاپ می‌شد. کارت را پر
+    می‌کرد و کسی هم نمی‌خواندش؛ همان اطلاعات حالا در تریاژ به‌شکل «چه باید
+    می‌بود» خوانا نوشته می‌شود. ولی حذف نمی‌شود: وقتی چیزی نمی‌خواند، خامش
+    تنها چیزی است که جواب می‌دهد.
+  -->
+  {#if finding.detail}
+    <details class="mt-3">
+      <summary class="cursor-pointer text-xs text-muted-foreground">جزئیاتِ خام</summary>
+      <pre class="scroll-thin mt-2 max-h-40 overflow-auto rounded-lg bg-muted p-3 text-xs leading-6" dir="ltr">{typeof finding.detail === 'string' ? finding.detail : JSON.stringify(finding.detail, null, 2)}</pre>
+    </details>
+  {/if}
   {#if children}<div class="mt-4 border-t pt-4">{@render children()}</div>{/if}
 </article>
