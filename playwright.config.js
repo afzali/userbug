@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import { newRunId } from './src/store/run-store.js';
-import { loadTarget } from './src/target.js';
+import { loadTargetOrPlaceholder } from './src/target.js';
 
 const targetName = process.env.UB_TARGET || 'nepi';
 
@@ -29,7 +29,20 @@ const otherTargetDirs = fs
 // config پیش از globalSetup، reporter و workerها بار می‌شود؛ همه یک هویت ثابت
 // را به ارث می‌برند. CLI برای هر device مقدار خودش را از قبل تنظیم می‌کند.
 process.env.UB_RUN_ID ||= newRunId(targetName);
-const target = await loadTarget(targetName);
+/**
+ * هدفی که نیست، نباید کلِ خودآزما را ببندد.
+ *
+ * ── چرا این لازم شد ──
+ *
+ * پس از پاکسازیِ کامل — یا روی یک clone تازه — هیچ `targets/*.config.js`
+ * وجود ندارد، و `loadTarget` با `ERR_MODULE_NOT_FOUND` می‌مرد **پیش از**
+ * اجرای هر تست. یعنی سیصد خودآزمای خالص که هدف لازم ندارند و ریشهٔ موقتِ
+ * خودشان را می‌سازند، به‌خاطر نبودِ یک فایلِ بی‌ربط اجرا نمی‌شدند.
+ *
+ * پیش‌فرضِ بی‌ضرر می‌نشیند و تست‌هایی که واقعاً مرورگر لازم دارند خودشان
+ * با پیامِ روشنِ «اپ بالا نیست» می‌شکنند — که خبرِ درستی است.
+ */
+const target = await loadTargetOrPlaceholder(targetName);
 
 // 'desktop' یعنی بدون emulation. بقیه مستقیم از فهرست دستگاه‌های Playwright
 // می‌آید — عمداً هیچ شبیه‌سازی سفارشی نمی‌نویسیم.

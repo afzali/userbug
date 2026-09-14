@@ -1,11 +1,19 @@
-import { loadTarget } from './target.js';
+import { loadTargetOrPlaceholder } from './target.js';
 import { GUI_RUN_MARKER, RunStore, getCurrentRun, setCurrentRun } from './store/run-store.js';
 import { runHooks } from './hooks.js';
 
 /** یک اجرا = یک فراخوانی. اینجا پوشه‌اش ساخته می‌شود و بقیه فقط داخلش می‌نویسند. */
 export default async function globalSetup() {
   const targetName = process.env.UB_TARGET || 'nepi';
-  const target = await loadTarget(targetName);
+
+  /**
+   * همان پیش‌فرضِ `playwright.config.js`.
+   *
+   * روی یک clone تازه — یا بعد از پاکسازیِ کامل — هیچ کانفیگِ هدفی نیست و
+   * این خط کلِ خودآزما را می‌بست، پیش از اجرای حتی یک تستِ خالص. تستی که
+   * واقعاً مرورگر لازم دارد، خودش با «اپ بالا نیست» می‌شکند.
+   */
+  const target = await loadTargetOrPlaceholder(targetName);
   const runId = getCurrentRun();
 
   const store = new RunStore(runId);

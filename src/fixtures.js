@@ -9,7 +9,7 @@
  * نظر است. این همان چیزی است که «تست بدون سناریو» را ممکن می‌کند.
  */
 import { test as base, expect } from '@playwright/test';
-import { loadTarget } from './target.js';
+import { loadTargetOrPlaceholder } from './target.js';
 import { attachClientObservers, INIT_SCRIPT } from './observe/client.js';
 import { createServerCollectors, startAll, drainAll } from './observe/server.js';
 import { judge, fingerprint, normalizeMessage } from './observe/oracle.js';
@@ -25,7 +25,7 @@ import { listPages, writePage } from './knowledge/store.js';
 export const test = base.extend({
   target: [
     async ({}, use) => {
-      await use(await loadTarget(process.env.UB_TARGET || 'nepi'));
+      await use(await loadTargetOrPlaceholder(process.env.UB_TARGET || 'nepi'));
     },
     { scope: 'worker' },
   ],
