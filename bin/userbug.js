@@ -112,6 +112,9 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
   userbug tour <هدف> [--device <نام>] [--name <عنوان>]
                                   گشتِ زنده: مرورگر باز می‌شود، شما کار
                                   می‌کنید، و ابزار ضبط و شناخت می‌سازد
+      --profile                   نشست را نگه دار؛ حساب و تنظیماتی که اینجا
+                                  با دست ساختی، خزشِ بعدی با «همان مرورگر»
+                                  می‌بیندشان
 
   userbug map <هدف> [گزینه‌ها]    نقشهٔ اپ: هر حالتی که می‌شود به آن رسید
       --from <سناریو>             مسیرِ ورود؛ قدم‌هایش پیش از خزش بازپخش می‌شوند
@@ -851,7 +854,13 @@ async function cmdTour({ flags, positional }) {
   const { TourSession } = await import('../src/tour/session.js');
   const { emitTour } = await import('../src/tour/emit.js');
 
-  const session = new TourSession({ target: name, device: flags.device });
+  const session = new TourSession({
+    target: name,
+    device: flags.device,
+    // نشست را نگه دار: هرچه اینجا با دست تنظیم شود، خزشِ بعدی با
+    // «همان مرورگر» (`map --profile`) می‌بیندش
+    profile: Boolean(flags.profile),
+  });
 
   session.on('event', (event) => {
     if (event.type === 'step') console.log(`  ● ${event.step.label || event.step.action}`);

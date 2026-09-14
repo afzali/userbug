@@ -34,6 +34,7 @@ import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import { knowledgeDir } from '../knowledge/store.js';
 import { loadTarget } from '../target.js';
 import { INIT_SCRIPT, attachClientObservers } from '../observe/client.js';
 import { createServerCollectors, drainAll, startAll } from '../observe/server.js';
@@ -50,11 +51,25 @@ import { BINDING, describe, recorderScript, toStep } from './recorder.js';
 const IDLE_MS = 30 * 60 * 1000;
 
 export class TourSession extends EventEmitter {
-  constructor({ target, device, headless = false } = {}) {
+  constructor({ target, device, headless = false, profile = false } = {}) {
     super();
     this.targetName = target;
     this.deviceName = device;
     this.headless = headless;
+    /**
+     * نشست را نگه دار، یا هر گشت از صفر؟
+     *
+     * ── چرا این خواسته شد ──
+     *
+     * کاربر گفت: «در همان گشت، کاربر می‌سازم و تنظیماتِ خودِ اپ را انجام
+     * می‌دهم؛ بعد بگو از همان نشست استفاده کن — داده در localStorage همان
+     * مرورگر است.» حق داشت، و تا امروز ممکن نبود: پوشهٔ پروفایلِ گشت موقت
+     * بود و در پایان پاک می‌شد.
+     *
+     * با این، گشت همان پوشه‌ای را می‌گیرد که خزش هم با `--profile` می‌گیرد.
+     * یعنی چیزی که با دست تنظیم کردی، خزشِ بعدی هم می‌بیندش.
+     */
+    this.keepProfile = profile;
 
     this.status = 'starting';
     this.steps = [];
@@ -98,16 +113,31 @@ export class TourSession extends EventEmitter {
     });
 
     /**
-     * پروفایلِ ماندگار، در پوشهٔ موقت.
+     * پروفایلِ مرورگر.
      *
-     * ── چرا ماندگار و نه context ساده ──
+     * ── چرا اصلاً persistent ──
      *
      * کاربر لاگین می‌کند و ممکن است وسط گشت صفحه را رفرش کند یا تبِ تازه باز
-     * کند. `launchPersistentContext` نشست را نگه می‌دارد. پوشه‌اش موقت است تا
-     * گشتِ بعدی از صفر شروع شود — مگر اینکه روزی «ادامهٔ همان نشست» خواسته
-     * شود، که آن‌وقت مسیرِ ثابت می‌گیرد.
+     * کند. `launchPersistentContext` نشست را نگه می‌دارد.
+     *
+     * ── و چرا حالا دو حالت ──
+     *
+     * پیش‌فرض موقت است تا گشتِ بعدی از صفر شروع شود. ولی «آن روز» رسید: با
+     * `profile`، همان پوشه‌ای گرفته می‌شود که خزش هم با `--profile` می‌گیرد —
+     * `knowledge/<هدف>/profile`. آن‌وقت حساب و تنظیماتی که با دست در خودِ اپ
+     * ساختی (که در `localStorage` همان مبدأ می‌نشیند) برای خزشِ بعدی هم
+     * هست، بی آنکه سناریویی لازم باشد.
      */
-    this.profileDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'ub-tour-'));
+    this.profileDir = this.keepProfile
+      ? path.join(knowledgeDir(this.targetName), 'profile')
+      : await fsp.mkdtemp(path.join(os.tmpdir(), 'ub-tour-'));
+    await fsp.mkdir(this.profileDir, { recursive: true });
+
+    if (this.keepProfile) {
+      this.emitEvent('warning', {
+        message: 'نشست نگه داشته می‌شود: هرچه اینجا تنظیم کنید، خزشِ بعدی با «همان مرورگر» می‌بیندش.',
+      });
+    }
 
     const emulation = this.deviceName && this.deviceName !== 'desktop' ? devices[this.deviceName] : {};
     if (this.deviceName && this.deviceName !== 'desktop' && !emulation) {
@@ -553,7 +583,8 @@ export class TourSession extends EventEmitter {
     await this.saveTrace();
 
     await this.context?.close().catch(() => {});
-    await fsp.rm(this.profileDir, { recursive: true, force: true }).catch(() => {});
+    // پروفایلِ ماندگار پاک نمی‌شود — کلِ نکته‌اش ماندن است
+    if (!this.keepProfile) await fsp.rm(this.profileDir, { recursive: true, force: true }).catch(() => {});
 
     this.status = 'stopped';
     const state = this.snapshotState();

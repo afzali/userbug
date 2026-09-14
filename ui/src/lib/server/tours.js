@@ -89,14 +89,14 @@ export function tourState(target) {
   return { running: handle.session.status === 'running', ...handle.session.snapshotState() };
 }
 
-export async function startTour({ target, device }) {
+export async function startTour({ target, device, profile = false }) {
   const existing = getTour(target);
   if (existing && existing.session.status === 'running') {
     throw new Error('یک گشت روی این پروژه در حال اجراست');
   }
 
   const TourSession = await loadSession();
-  const session = new TourSession({ target, device });
+  const session = new TourSession({ target, device, profile });
   const handle = new TourHandle(session);
   state.sessions.set(target, handle);
 

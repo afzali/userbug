@@ -45,7 +45,7 @@ export async function POST(event) {
        * مرورگر است. کاربری که روی محیط تولیدی گشت می‌زند باید **پیش از**
        * دیدنِ پنجره بداند.
        */
-      await startTour({ target: project.key, device: body.device });
+      await startTour({ target: project.key, device: body.device, profile: Boolean(body.profile) });
       return json({ ...tourState(project.key), environment: project.environment });
     }
 
