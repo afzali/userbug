@@ -1,3 +1,7 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { knowledgeDir } from './store.js';
+
 /**
  * «چه چیزی در سورس هست که به آن نرسیده‌ایم» — برای بک‌اند.
  *
@@ -245,4 +249,132 @@ export async function callsOf(runDirs, readNdjson) {
     }
   }
   return calls;
+}
+
+/**
+ * انبارِ endpointها — `knowledge/<کلید>/endpoints.json`.
+ *
+ * ── چرا کش لازم شد ──
+ *
+ * کشفِ endpoint یعنی خواندنِ ۷۸۸ فایل. برای یک فرمانِ خط‌فرمان چند ثانیه
+ * قابل قبول است؛ برای بازکردنِ یک صفحه در رابط نه. صفحه‌ای که هر بار چند
+ * ثانیه سفید بماند، کسی بازش نمی‌کند.
+ *
+ * پس نتیجه روی دیسک می‌ماند و با دکمهٔ «تازه‌سازی» یا خودِ فرمان به‌روز
+ * می‌شود — و تاریخِ اسکن کنارش می‌نشیند، چون کشی که نگوید کِی ساخته شده،
+ * دیر یا زود به‌جای واقعیت خوانده می‌شود.
+ */
+export function endpointsFile(target) {
+  return path.join(knowledgeDir(target), 'endpoints.json');
+}
+
+export function readEndpoints(target) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(endpointsFile(target), 'utf8'));
+    return {
+      endpoints: raw.endpoints || [],
+      /**
+       * روت‌های فرانت هم اینجا می‌مانند، نه فقط در پرونده.
+       *
+       * ── چرا ──
+       *
+       * `dossier.routes` را `learn` پر می‌کند و `learn` مدل لازم دارد. روی
+       * نپی نتیجه‌اش این شد که صفحهٔ سورس «۵ روت» نشان داد در حالی که اسکنِ
+       * بی‌مدل ۱۱ تا پیدا می‌کرد — عددی که کمتر از واقعیت است و کسی هم
+       * نمی‌فهمد چرا.
+       */
+      routes: raw.routes || [],
+      byDetector: raw.byDetector || {},
+      at: raw.at || '',
+      files: raw.files || 0,
+    };
+  } catch {
+    return { endpoints: [], routes: [], byDetector: {}, at: '', files: 0 };
+  }
+}
+
+export function writeEndpoints(target, data) {
+  const file = endpointsFile(target);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const payload = { version: 1, target, at: new Date().toISOString(), ...data };
+  fs.writeFileSync(file, JSON.stringify(payload, null, 2) + '\n', 'utf8');
+  return payload;
+}
+
+/**
+ * تماس‌های ثبت‌شدهٔ یک هدف، از همهٔ اجراهایش.
+ *
+ * ── چرا اینجا و نه در خط فرمان ──
+ *
+ * هم `userbug coverage` لازمش دارد هم صفحهٔ سورس. دو پیاده‌سازی یعنی روزی
+ * یکی‌شان اجرایی را بشمارد که دیگری نمی‌شمارد، و دو عددِ متفاوت برای یک
+ * سؤال — که بدتر از نداشتنِ عدد است.
+ */
+export function callsFor(target, runsRoot) {
+  const calls = [];
+  if (!fs.existsSync(runsRoot)) return calls;
+
+  for (const entry of fs.readdirSync(runsRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const dir = path.join(runsRoot, entry.name);
+
+    let meta = null;
+    try {
+      meta = JSON.parse(fs.readFileSync(path.join(dir, 'run.json'), 'utf8'));
+    } catch {
+      // اجرایی که وسطِ نوشتن است یا خراب شده؛ پوشش بی آن هم معنا دارد
+    }
+    if (meta?.target !== target) continue;
+
+    const file = path.join(dir, 'calls.ndjson');
+    if (!fs.existsSync(file)) continue;
+    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        calls.push(JSON.parse(line));
+      } catch {
+        // خطِ ناقصِ در حالِ نوشتن؛ بقیه سالم‌اند
+      }
+    }
+  }
+  return calls;
+}
+
+/**
+ * یک عکسِ کاملِ پوشش: سورس چه می‌گوید، اجراها چه کردند.
+ *
+ * ── چرا این تابع وجود دارد ──
+ *
+ * سه مصرف‌کننده دارد — فرمانِ خط فرمان، صفحهٔ سورس، و دکمهٔ تازه‌سازی — و
+ * هر سه باید **یک عدد** بدهند. دو پیاده‌سازی یعنی روزی صفحه بگوید ۲۱ و
+ * فرمان بگوید ۱۹، و آدم نداند کدام را باور کند.
+ *
+ * @param {object} o
+ * @param {string} o.target
+ * @param {string} o.runsRoot پوشهٔ `runs/`
+ * @param {boolean} [o.rescan] سورس را دوباره بخوان؛ وگرنه از کش
+ * @param {object} [o.scan] `{files, read}` — فقط وقتی `rescan`
+ */
+export async function coverageSnapshot({ target, runsRoot, rescan = false, scan = null }) {
+  let stored = readEndpoints(target);
+
+  if (rescan) {
+    if (!scan) throw new Error('برای اسکنِ دوباره، فایل‌های سورس لازم است');
+    const found = await discoverEndpoints(scan);
+    stored = writeEndpoints(target, { ...found, files: scan.files.length });
+  }
+
+  const calls = callsFor(target, runsRoot);
+  const coverage = endpointCoverage(stored.endpoints, calls);
+
+  return {
+    ...coverage,
+    calls: calls.length,
+    at: stored.at,
+    files: stored.files,
+    routes: stored.routes || [],
+    byDetector: stored.byDetector,
+    /** هرگز اسکن نشده — با «اسکن شد و چیزی نبود» یکی نیست */
+    scanned: Boolean(stored.at),
+  };
 }

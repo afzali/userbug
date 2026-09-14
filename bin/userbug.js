@@ -979,7 +979,7 @@ async function cmdCoverage({ flags, positional }) {
   const target = positional[0];
   if (!target) throw new Error('نام هدف لازم است: userbug coverage <هدف>');
 
-  const [{ discoverEndpoints, endpointCoverage }, sourceAccess, { runDir }, { loadTarget }] = await Promise.all([
+  const [{ coverageSnapshot }, sourceAccess, { runDir }, { loadTarget }] = await Promise.all([
     import('../src/knowledge/endpoints.js'),
     import('../src/source-access.js'),
     import('../src/store/run-store.js'),
@@ -992,36 +992,22 @@ async function cmdCoverage({ flags, positional }) {
   const read = async (relative) =>
     (await sourceAccess.readAnySourceFile(roots, relative).catch(() => ({ content: '' }))).content || '';
 
-  const { endpoints, byDetector } = await discoverEndpoints({ files, read });
+  /**
+   * خطِ فرمان همیشه از نو می‌خواند.
+   *
+   * کسی که این فرمان را می‌زند، همین حالا جواب می‌خواهد نه عکسِ دیروز. کش
+   * برای رابط است، جایی که باز شدنِ صفحه نباید چند ثانیه طول بکشد.
+   */
+  const coverage = await coverageSnapshot({
+    target,
+    runsRoot: path.dirname(runDir('x')),
+    rescan: true,
+    scan: { files, read },
+  });
+  const endpoints = coverage.endpoints;
+  const byDetector = coverage.byDetector;
+  const calls = { length: coverage.calls };
 
-  /* تماس‌های واقعی، از همهٔ اجراهای همین هدف */
-  const calls = [];
-  const runsRoot = path.dirname(runDir('x'));
-  const runIds = fs.existsSync(runsRoot)
-    ? fs.readdirSync(runsRoot, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
-    : [];
-  for (const runId of runIds) {
-    const dir = runDir(runId);
-    let meta = null;
-    try {
-      meta = JSON.parse(fs.readFileSync(path.join(dir, 'run.json'), 'utf8'));
-    } catch {
-      // اجرایی که وسطِ نوشتن است یا خراب شده؛ پوشش بی آن هم معنا دارد
-    }
-    if (meta?.target !== target) continue;
-    const file = path.join(dir, 'calls.ndjson');
-    if (!fs.existsSync(file)) continue;
-    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        calls.push(JSON.parse(line));
-      } catch {
-        // خط ناقصِ در حالِ نوشتن؛ بقیه سالم‌اند
-      }
-    }
-  }
-
-  const coverage = endpointCoverage(endpoints, calls);
   const touched = coverage.endpoints.length - coverage.untouched.length;
 
   console.log(`\n  پوششِ بک‌اندِ ${target}\n  ` + '-'.repeat(46));

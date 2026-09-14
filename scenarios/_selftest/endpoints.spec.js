@@ -11,6 +11,9 @@
  *   ۲. آشکارساز پرحرف باشد → نُه endpoint از فایل‌های **تست** درآمد
  *      (`/p1`, `/books/b1`)، و گزارشی ساخت دربارهٔ چیزی که سرو نمی‌شود.
  */
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { test, expect } from '@playwright/test';
 import { discoverEndpoints, endpointCoverage, normalizePath } from '../../src/knowledge/endpoints.js';
 
@@ -104,4 +107,31 @@ test('آدرسِ مطلقِ بک‌اند با مسیرِ سورس یکی می�
     [{ method: 'POST', path: 'http://127.0.0.1:8081/auth/login' }]
   );
   expect(coverage.untouched).toEqual([]);
+});
+
+test('کش می‌گوید هرگز اسکن نشده، و «صفر endpoint» با آن یکی نیست', async () => {
+  /**
+   * صفحهٔ سورس روی این تمایز بند است: «هنوز نخوانده‌ایم» دعوت به اسکن است،
+   * «خواندیم و چیزی نبود» یک واقعیت. اگر هر دو صفر نشان بدهند، کاربر
+   * پروژه‌ای را بی‌بک‌اند فرض می‌کند که فقط اسکن نشده.
+   */
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ub-cov-'));
+  process.env.USERBUG_ROOT = root;
+  try {
+    const { coverageSnapshot, writeEndpoints } = await import(`../../src/knowledge/endpoints.js?cache=${Date.now()}`);
+    const runsRoot = path.join(root, 'runs');
+
+    const before = await coverageSnapshot({ target: 'demo', runsRoot });
+    expect(before.scanned).toBe(false);
+    expect(before.endpoints).toEqual([]);
+
+    writeEndpoints('demo', { endpoints: [{ path: '/a', methods: ['GET'] }], byDetector: {}, files: 3 });
+    const after = await coverageSnapshot({ target: 'demo', runsRoot });
+
+    expect(after.scanned).toBe(true);
+    expect(after.untouched.map((one) => one.path)).toEqual(['/a']);
+    expect(after.at).toBeTruthy();
+  } finally {
+    delete process.env.USERBUG_ROOT;
+  }
 });

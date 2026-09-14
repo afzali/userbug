@@ -583,6 +583,23 @@
         </Card.Content>
       </Card.Root>
 
+      <!--
+        نقشه فقط نیمی از پوشش است: صفحه‌ها را می‌بیند، بک‌اند و قاعده‌های
+        schema را نه. لینک همین‌جاست چون کسی که «در سورس هست، نرسیدیم» را
+        این پایین می‌خواند، همان لحظه سؤالِ بعدی‌اش را دارد.
+      -->
+      <Card.Root>
+        <Card.Header class="pb-3">
+          <Card.Title class="text-sm">بقیهٔ سورس</Card.Title>
+          <Card.Description>بک‌اند و قاعده‌های schema، که نقشه نمی‌بیندشان.</Card.Description>
+        </Card.Header>
+        <Card.Content>
+          <Button href={`${base}/source`} variant="outline" size="sm" class="w-full">
+            چه چیزی هست که به آن نرسیده‌ایم
+          </Button>
+        </Card.Content>
+      </Card.Root>
+
       <Card.Root>
         <Card.Header><Card.Title class="text-sm">عددها</Card.Title></Card.Header>
         <Card.Content class="space-y-2 text-sm">
