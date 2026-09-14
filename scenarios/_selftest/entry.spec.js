@@ -227,3 +227,29 @@ test('ضبطِ خام از مسیرِ ورودِ ساخته‌شده تشخیص 
   expect(looksRecorded(buildEntry({ steps: recorded }).steps)).toBe(false);
   expect(looksRecorded([])).toBe(false);
 });
+
+test('کلیکِ ناشناخته هم مشروط می‌شود، نه بی‌شرط', () => {
+  /**
+   * `CLOSERS` فقط نام‌هایی را می‌شناسد که دیده‌ایم. اپِ بعدی ممکن است
+   * دکمه‌اش «فهمیدم» باشد و همان تله دوباره بیفتد — کلیکِ بی‌شرط روی چیزی
+   * که بارِ دوم نیست. پس تکیه به فهرستِ واژه‌ها کافی نیست.
+   */
+  const built = buildEntry({
+    steps: [
+      { go: '/' },
+      { fill: { label: 'ایمیل' }, value: 'a@a.a' },
+      { click: { role: 'button', name: 'فهمیدم' } },
+      { fill: { label: 'رمز عبور' }, value: 'x' },
+      { click: { role: 'button', name: 'ورود' } },
+    ],
+    accountId: 'a',
+  });
+
+  const form = built.steps.find((step) => step.when).then;
+  const stray = form.find((step) => JSON.stringify(step).includes('فهمیدم'));
+
+  expect(stray.when).toBeTruthy();
+  expect(stray.then[0].click.name).toBe('فهمیدم');
+  // ولی دکمهٔ فرستادنِ فرم بی‌شرط می‌ماند: آن باید باشد و نبودنش خطاست
+  expect(form.at(-1).click.name).toBe('ورود');
+});

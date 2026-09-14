@@ -118,8 +118,24 @@ export function buildEntry({ steps = [], accountId = '', name = 'ورود' } = {
       notes.push(`کلیکِ «${text.trim()}» برداشته شد؛ بستنِ پنجره را «dismissBlockers» مشروط انجام می‌دهد.`);
       continue;
     }
-    if (verb === 'click' || verb === 'check' || verb === 'press') form.push(step);
-    else break;
+    /**
+     * هر کلیکِ دیگری **مشروط** می‌شود، نه بی‌شرط.
+     *
+     * ── چرا فهرستِ واژه‌ها کافی نبود ──
+     *
+     * `CLOSERS` فقط نام‌هایی را می‌شناسد که دیده‌ایم: «بستن»، «نشان نده»،
+     * «بعداً»… اپِ بعدی ممکن است دکمه‌اش «فهمیدم» یا «رد کن» باشد و همان
+     * تله دوباره بیفتد — کلیکِ بی‌شرط روی چیزی که بارِ دوم نیست.
+     *
+     * پس به‌جای تکیه به فهرست، هر قدمِ ناشناخته شرطِ **خودش** را می‌گیرد:
+     * اگر بود بزن، نبود رد شو. چیزی از دست نمی‌رود و هیچ‌وقت timeout
+     * نمی‌دهد.
+     */
+    if (verb === 'click' || verb === 'check' || verb === 'press') {
+      form.push({ when: { visible: triggerOf(step), timeout: 3000 }, then: [step] });
+      continue;
+    }
+    break;
   }
 
   if (!submitted) notes.push('دکمهٔ فرستادنِ فرم پیدا نشد؛ قدمِ آخر را خودتان بررسی کنید.');
