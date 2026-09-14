@@ -27,6 +27,11 @@
    * چون کتابی نبود.
    */
   let seed = $state('');
+
+  /** سناریوی انتخاب‌شده، برای هشدارِ «ضبطِ خام». */
+  let selectedEntry = $derived(
+    data.scenarios.find((item) => `scenarios/${target}/${item.path}` === from) || null
+  );
   let states_cap = $state(60);
   let minutes = $state(20);
   let fresh = $state(false);
@@ -299,7 +304,11 @@
                   value={`scenarios/${target}/${scenario.path}`}
                   disabled={scenario.blockers.length > 0}
                 >
-                  {scenario.name}{scenario.blockers.length ? ` — ${scenario.blockers.join('، ')} ندارد` : ''}
+                  {scenario.name}{scenario.blockers.length
+                    ? ` — ${scenario.blockers.join('، ')} ندارد`
+                    : scenario.recorded
+                      ? ' — ضبطِ خام'
+                      : ''}
                 </option>
               {/each}
             </select>
@@ -316,6 +325,31 @@
             بود — یعنی دقیقاً بعد از هدر رفتنِ چند دقیقه. حالا همان جمله
             کنارِ کشویی است، جایی که هنوز می‌شود کاری کرد.
           -->
+          <!--
+            ضبطِ خام به‌عنوان مسیرِ ورود، خزش را می‌کشد.
+
+            ── چرا این هشدار لازم شد ──
+
+            کاربر گشت رفت و بعد همان پیش‌نویسِ گشت را انتخاب کرد — طبیعی‌ترین
+            کار، چون تنها گزینهٔ کشویی بود. سه خزش پشتِ سرِ هم با صفر قدم
+            مرد: `locator.click: Timeout — «نشان نده»`. ضبطِ گشت کلیکِ بی‌شرط
+            دارد، از جمله بستنِ مودالی که فقط بارِ اول می‌آید؛ و خزش ده‌ها بار
+            به خانه برمی‌گردد.
+          -->
+          {#if selectedEntry?.recorded}
+            <div class="rounded-lg border border-destructive/40 bg-destructive/5 p-2.5 text-[11px] leading-6">
+              <p class="font-medium text-destructive">این ضبطِ خامِ گشت است، نه مسیرِ ورود.</p>
+              <p class="mt-0.5 text-muted-foreground">
+                کلیک‌هایش بی‌شرط‌اند — از جمله بستنِ پنجره‌هایی که فقط بارِ اول
+                می‌آیند. خزش ده‌ها بار به خانه برمی‌گردد و بارِ دوم همان‌جا
+                می‌شکند.
+              </p>
+              <button type="button" class="mt-1.5 underline underline-offset-2" onclick={loadEntryOptions}>
+                از رویش یک مسیرِ ورودِ درست بساز
+              </button>
+            </div>
+          {/if}
+
           {#if !from}
             <div class="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 text-[11px] leading-6">
               <p class="font-medium text-amber-700 dark:text-amber-300">بی مسیرِ ورود، خزش وارد نمی‌شود.</p>

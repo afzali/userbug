@@ -6,6 +6,7 @@ import { proposalsFor } from '../../../../../../src/knowledge/propose.js';
 import { listScenarios } from '$lib/server/projects.js';
 import { loadScenario } from '../../../../../../src/scenario/load.js';
 import { unsupportedVerbs } from '../../../../../../src/map/replay.js';
+import { looksRecorded } from '../../../../../../src/scenario/entry.js';
 import { scenarioDir } from '../../../../../../src/scenario/load.js';
 import path from 'node:path';
 
@@ -85,11 +86,15 @@ export async function load({ params }) {
         // `explore` دارد — حلقه‌ای که هیچ‌کس نمی‌خواست.
         .filter((scenario) => !scenario.path.startsWith('_quests/'))
         .map(async (scenario) => {
-        const blockers = safely(
-          () => unsupportedVerbs(loadScenario(path.join(scenarioDir(target), scenario.path)).steps),
-          ['ناخوانا']
-        );
-        return { ...scenario, blockers };
+        const steps = safely(() => loadScenario(path.join(scenarioDir(target), scenario.path)).steps, null);
+        const blockers = steps ? unsupportedVerbs(steps) : ['ناخوانا'];
+        /**
+         * ضبطِ خام، مسیرِ ورود نیست.
+         *
+         * انتخاب‌شدنی می‌ماند — شاید کسی بداند چه می‌کند — ولی علامت
+         * می‌خورد، چون سه خزشِ پشتِ سرِ هم روی همین مرد.
+         */
+        return { ...scenario, blockers, recorded: steps ? looksRecorded(steps) : false };
       })
     ),
   };

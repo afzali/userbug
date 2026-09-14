@@ -15,7 +15,16 @@
  *   ۳. تکهٔ ورود کوتاه بماند — وگرنه نیمِ اپ داخلِ «مسیرِ ورود» می‌افتد.
  */
 import { test, expect } from '@playwright/test';
-import { buildEntry, buildSeed, entryYaml, seedPrefixFrom, seedYaml, textOf, triggerOf } from '../../src/scenario/entry.js';
+import {
+  buildEntry,
+  buildSeed,
+  entryYaml,
+  looksRecorded,
+  seedPrefixFrom,
+  seedYaml,
+  textOf,
+  triggerOf,
+} from '../../src/scenario/entry.js';
 
 const RECORDED = [
   { clearState: true },
@@ -173,4 +182,48 @@ test('مسیرِ رسیدن از نقشه برداشته می‌شود، نه ا
   expect(seedPrefixFrom(map, steps)).toEqual([{ click: { role: 'button', name: 'کاربر' } }]);
   expect(seedPrefixFrom({ states: [] }, steps)).toEqual([]);
   expect(seedPrefixFrom(null, [])).toEqual([]);
+});
+
+test('کلیکِ «بستنِ پنجره» وارد مسیرِ ورود نمی‌شود', () => {
+  /**
+   * سه خزشِ واقعی پشتِ سرِ هم روی همین مردند:
+   *
+   *   locator.click: Timeout — getByRole('button', { name: 'نشان نده' })
+   *
+   * ضبطِ گشت آن کلیک را دارد چون کاربر یک بار مودال را بست. ولی آن مودال
+   * فقط بارِ اول می‌آید، و خزش ده‌ها بار به خانه برمی‌گردد.
+   *
+   * نگه داشتنش هم لازم نیست: `dismissBlockers` همان کار را **مشروط** انجام
+   * می‌دهد.
+   */
+  const built = buildEntry({
+    steps: [
+      { go: '/' },
+      { click: { role: 'button', name: 'نشان نده', exact: true } },
+      { fill: { label: 'ایمیل' }, value: 'a@a.a' },
+      { click: { role: 'button', name: 'بستن', exact: true } },
+      { fill: { label: 'رمز عبور' }, value: 'x' },
+      { click: { role: 'button', name: 'ورود / ثبت‌نام', exact: true } },
+    ],
+    accountId: 'a',
+  });
+
+  const all = JSON.stringify(built.steps);
+  expect(all).not.toContain('نشان نده');
+  expect(all).not.toContain('بستن');
+  // ولی خودِ فرم سالم مانده
+  expect(all).toContain('{{account.a.email}}');
+  expect(all).toContain('ورود / ثبت‌نام');
+});
+
+test('ضبطِ خام از مسیرِ ورودِ ساخته‌شده تشخیص داده می‌شود', () => {
+  const recorded = [
+    { go: '/' },
+    { click: { role: 'button', name: 'نشان نده' } },
+    { fill: { label: 'ایمیل' }, value: 'a' },
+  ];
+  expect(looksRecorded(recorded)).toBe(true);
+  // مسیرِ ورودِ ساخته‌شده: همه‌چیز زیر `when`
+  expect(looksRecorded(buildEntry({ steps: recorded }).steps)).toBe(false);
+  expect(looksRecorded([])).toBe(false);
 });

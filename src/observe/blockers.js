@@ -18,7 +18,7 @@
  */
 
 /** نامِ دکمه‌هایی که «ببند» معنی می‌دهند. */
-const CLOSERS = /^(بستن|بعداً|نشان نده|انصراف|باشه|متوجه شدم|Close)$/;
+export const CLOSERS = /^(بستن|بعداً|نشان نده|انصراف|باشه|متوجه شدم|Close)$/;
 
 /**
  * @param {import('@playwright/test').Page} page
