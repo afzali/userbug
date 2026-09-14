@@ -169,6 +169,18 @@
   description="چیزی که خودتان تنظیم می‌کنید: حساب‌ها، فایل‌های آپلود، و چک‌هایی که روی هر اجرا اجرا می‌شوند."
 >
   {#snippet actions()}
+    <!--
+      گرفتنِ بسته، همین‌جا.
+
+      ── چرا این صفحه ──
+
+      بسته «همه‌چیزِ این پروژه» است، و این صفحه هم همان‌جایی است که
+      چیزهای سطحِ پروژه می‌نشینند. لینکِ ساده است نه دکمهٔ جاوااسکریپتی،
+      چون مرورگر خودش بلد است فایل را دانلود کند.
+    -->
+    <Button href={`/api/bundle?target=${encodeURIComponent(data.target)}`} variant="outline" download>
+      گرفتنِ بستهٔ پروژه
+    </Button>
     <Button href={`${base}/files?kind=target`} variant="outline">فایل کانفیگ</Button>
     <Button href={`${base}/knowledge`} variant="ghost">شناخت</Button>
   {/snippet}

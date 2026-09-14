@@ -1,7 +1,9 @@
 <script>
+  import { invalidateAll } from '$app/navigation';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
+  import { Input } from '$lib/components/ui/input/index.js';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import { formatDate, formatNumber } from '$lib/format.js';
@@ -9,6 +11,71 @@
   let { data } = $props();
 
   const workspace = (key) => `/projects/${encodeURIComponent(key)}`;
+
+  /**
+   * برگرداندنِ بستهٔ پروژه.
+   *
+   * ── چرا اینجا و نه در صفحهٔ خودِ پروژه ──
+   *
+   * وارد کردنِ بسته **پروژه می‌سازد**؛ پس جایش همان‌جاست که پروژهٔ تازه
+   * ساخته می‌شود، نه داخلِ پروژه‌ای که هنوز وجود ندارد.
+   *
+   * ── و چرا اول پیش‌نمایش ──
+   *
+   * بسته فایلی است که از جای دیگری آمده. نوشتنِ بی‌دیدن روی دیسک، همان
+   * کارِ برگشت‌ناپذیری است که این ابزار همه‌جا پیش از انجامش می‌پرسد.
+   */
+  let bundle = $state(null);
+  let preview = $state(null);
+  let importAs = $state('');
+  let force = $state(false);
+  let importing = $state(false);
+  let importError = $state('');
+  let importDone = $state(null);
+
+  async function pickBundle(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    importError = '';
+    importDone = null;
+    try {
+      bundle = JSON.parse(await file.text());
+      const response = await fetch('/api/bundle', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({ bundle, preview: true }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'بسته خوانده نشد');
+      preview = payload.preview;
+      importAs = payload.preview.target;
+    } catch (cause) {
+      bundle = null;
+      preview = null;
+      importError = `بسته خوانده نشد: ${cause.message}`;
+    }
+  }
+
+  async function runImport() {
+    importing = true;
+    importError = '';
+    try {
+      const response = await fetch('/api/bundle', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({ bundle, as: importAs, force }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'وارد نشد');
+      importDone = payload;
+      // فهرستِ پروژه‌ها از سرور می‌آید، پس باید تازه شود
+      await invalidateAll();
+    } catch (cause) {
+      importError = cause.message;
+    } finally {
+      importing = false;
+    }
+  }
 
   /**
    * حذف پروژه — با نشان دادنِ آنچه از بین می‌رود.
@@ -71,8 +138,68 @@
 >
   {#snippet actions()}
     <Button href="/projects/new" variant="outline">پروژهٔ تازه</Button>
+    <label class="inline-flex cursor-pointer items-center rounded-md border px-3 py-2 text-sm hover:bg-accent">
+      واردکردنِ بسته
+      <input type="file" accept="application/json,.json" class="hidden" onchange={pickBundle} />
+    </label>
   {/snippet}
 </PageHeader>
+
+{#if importError}
+  <p class="mb-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{importError}</p>
+{/if}
+
+{#if importDone}
+  <p class="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm leading-6">
+    پروژهٔ «{importDone.target}» ساخته شد — {formatNumber(importDone.written.length)} فایل نوشته شد.
+    {#if importDone.skipped.length}
+      <span class="block text-muted-foreground">
+        {formatNumber(importDone.skipped.length)} فایل رد شد چون از قبل بود؛ برای بازنویسی «بازنویسی کن» را تیک بزنید.
+      </span>
+    {/if}
+    {#each importDone.omitted as note (note)}
+      <span class="block text-muted-foreground">! در بسته نبود: {note}</span>
+    {/each}
+    <a class="underline underline-offset-2" href={workspace(importDone.target)}>برویم سراغش</a>
+  </p>
+{/if}
+
+{#if preview && !importDone}
+  <!--
+    پیش‌نمایش پیش از نوشتن.
+
+    بسته از جای دیگری آمده و `force` می‌تواند نقشه و سناریوهای تازه‌تر را
+    ببرد. پس اول می‌گوییم چه دارد، بعد می‌پرسیم.
+  -->
+  <section class="mb-6 rounded-xl border bg-card p-4">
+    <h2 class="text-sm font-bold">بستهٔ «{preview.target}»</h2>
+    <p class="mt-1 text-xs leading-6 text-muted-foreground">
+      ساخته‌شده در {preview.at.slice(0, 16).replace('T', ' ')} ·
+      {formatNumber(preview.knowledge)} فایلِ شناخت ·
+      {formatNumber(preview.scenarios)} سناریو ·
+      {formatNumber(preview.fixtures)} فایلِ نمونه
+      {#if preview.states} · نقشه با {formatNumber(preview.states)} حالت{/if}
+    </p>
+    {#each preview.omitted as note (note)}
+      <p class="mt-1 text-xs text-amber-700 dark:text-amber-300">! داخلش نیست: {note}</p>
+    {/each}
+
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+      <label class="space-y-1 text-xs">
+        <span class="block text-muted-foreground">با چه نامی ساخته شود</span>
+        <Input bind:value={importAs} class="h-9 w-56" />
+      </label>
+      <label class="flex items-center gap-2 pb-2 text-xs">
+        <input type="checkbox" bind:checked={force} />
+        بازنویسی کن اگر از قبل هست
+      </label>
+      <Button class="mb-1" disabled={importing || !importAs.trim()} onclick={runImport}>
+        {importing ? 'در حال نوشتن…' : 'وارد کن'}
+      </Button>
+      <Button class="mb-1" variant="ghost" onclick={() => { preview = null; bundle = null; }}>انصراف</Button>
+    </div>
+  </section>
+{/if}
 
 {#if data.projects.length}
   <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
