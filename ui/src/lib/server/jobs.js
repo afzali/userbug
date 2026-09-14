@@ -466,6 +466,8 @@ export async function startJob(rawOptions = {}) {
     bench: normalizeBench(rawOptions?.bench),
     goal: rawOptions?.goal ? String(rawOptions.goal).slice(0, 300) : '',
     from: rawOptions?.from ? String(rawOptions.from).slice(0, 300) : '',
+    // دانه: یک بار در کلِ خزش، نه در هر برگشت به خانه
+    seed: rawOptions?.seed ? String(rawOptions.seed).slice(0, 300) : '',
     states: toCap(rawOptions?.states),
     minutes: toCap(rawOptions?.minutes),
     fresh: Boolean(rawOptions?.fresh),
@@ -558,6 +560,7 @@ export async function startJob(rawOptions = {}) {
   const args = [path.join(ROOT, 'bin', 'userbug.js'), options.kind, target];
   if (options.kind === 'map') {
     if (options.from) args.push('--from', options.from);
+    if (options.seed) args.push('--seed', options.seed);
     if (options.states) args.push('--states', String(options.states));
     if (options.minutes) args.push('--minutes', String(options.minutes));
     if (options.fresh) args.push('--fresh');

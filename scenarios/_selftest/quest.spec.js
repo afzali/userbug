@@ -100,8 +100,10 @@ test('مهلت با سقفِ کاوش بزرگ می‌شود و از پیش‌ف
   );
 });
 
-test('بی سقفِ عمق، سقفِ پیش‌فرضِ explore می‌ماند', () => {
-  expect(questScenario({ goal: 'هرچه' }).steps.at(-1).explore.maxSteps).toBeUndefined();
+test('بی سقفِ عمق، سقفِ خودِ کاوشِ هدف‌دار می‌نشیند نه پیش‌فرضِ explore', () => {
+  // نخستین کاوشِ واقعی با ۱۲ رفت و شش قدمش خرجِ ورود شد؛ به کتاب نرسید
+  expect(questScenario({ goal: 'هرچه' }).steps.at(-1).explore.maxSteps).toBe(25);
+  expect(questScenario({ goal: 'هرچه', depth: 4 }).steps.at(-1).explore.maxSteps).toBe(4);
 });
 
 test('نامِ فایل از هدف ساخته می‌شود و فارسی می‌ماند', () => {

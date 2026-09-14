@@ -24,6 +24,9 @@
  */
 import { focusWords } from './state.js';
 
+/** سقفِ پیش‌فرضِ قدمِ کاوش. بالاتر از پیش‌فرضِ `explore` — دلیلش پایین. */
+export const DEFAULT_STEPS = 25;
+
 /**
  * واژه‌هایی که در امتیازدهی نباید شمرده شوند.
  *
@@ -115,8 +118,22 @@ export function questScenario({ goal, entrySteps = [], path = [], depth }) {
    * حتی وقتی بسته شد.
    */
   const entry = entrySteps.length ? entrySteps : [{ go: '/' }, { dismissBlockers: { wait: 5000 } }];
+  /**
+   * سقفِ قدمِ کاوش — و چرا پیش‌فرضِ `explore` اینجا کافی نیست.
+   *
+   * ── چه شد ──
+   *
+   * نخستین کاوشِ واقعیِ کاربر («لاگین کن و همه دکمه‌ها را روی متنِ کتاب
+   * بزن») با پیش‌فرضِ ۱۲ رفت، و شش قدمِ اولش خرجِ **ورود** شد: پر کردنِ
+   * ایمیل و رمز، ثبت‌نام، تیکِ کد بازیابی. تا رسید به کتاب، سقف تمام شده
+   * بود و پیش‌نویس وسطِ راه بسته شد.
+   *
+   * حالا که مسیرِ ورود از نقشه می‌آید و رایگان است، هر قدمِ مدل صرفِ خودِ
+   * هدف می‌شود — ولی «همهٔ دکمه‌های یک صفحه» ذاتاً بیش از دوازده قدم است.
+   * بیست‌وپنج عددِ گشاد‌دستانه‌ای است در برابرِ اجرایی که چیزی ننویسد.
+   */
   const steps = [...entry, ...path];
-  steps.push(depth ? { explore: { goal, maxSteps: depth, author: true } } : { explore: { goal, author: true } });
+  steps.push({ explore: { goal, maxSteps: depth || DEFAULT_STEPS, author: true } });
 
   /**
    * مهلت، وگرنه کاوش وسطِ کار بریده می‌شود.
@@ -128,7 +145,7 @@ export function questScenario({ goal, entrySteps = [], path = [], depth }) {
    * سقفِ کاوش (`maxSteps`) پیش‌فرضِ `explore` ۱۲ است، و هر قدمش یک فراخوانی
    * مدل و یک کنش در مرورگر: ۴۵ ثانیه برای هر کدام دست‌ودل‌بازانه ولی امن.
    */
-  const steps_ = depth || 12;
+  const steps_ = depth || DEFAULT_STEPS;
 
   return {
     name: `کاوشِ هدف‌دار: ${String(goal).slice(0, 80)}`,

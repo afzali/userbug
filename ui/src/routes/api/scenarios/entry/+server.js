@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import path from 'node:path';
-import { buildEntry, entryYaml } from '../../../../../../src/scenario/entry.js';
+import { buildEntry, buildSeed, entryYaml, seedPrefixFrom, seedYaml } from '../../../../../../src/scenario/entry.js';
+import { readMap } from '../../../../../../src/map/store.js';
 import { loadScenario, scenarioDir } from '../../../../../../src/scenario/load.js';
 import { listAccounts } from '../../../../../../src/knowledge/credentials.js';
 import { listProjects } from '$lib/server/projects.js';
@@ -38,7 +39,10 @@ export async function GET({ url }) {
       if (item.kind !== 'yaml' || item.status === 'invalid') continue;
       try {
         const steps = loadScenario(path.join(scenarioDir(target), item.path)).steps;
-        if (buildEntry({ steps }).found) candidates.push({ path: item.path, name: item.name });
+        const kinds = [];
+        if (buildEntry({ steps }).found) kinds.push('entry');
+        if (buildSeed({ steps }).found) kinds.push('seed');
+        if (kinds.length) candidates.push({ path: item.path, name: item.name, kinds });
       } catch {
         // فایلِ خراب اینجا خطا نیست، فقط نامزد نیست
       }
@@ -81,13 +85,32 @@ export async function POST(event) {
     }
 
     const steps = loadScenario(path.join(scenarioDir(target), relative)).steps;
-    const built = buildEntry({ steps, accountId });
-    if (!built.found) throw new Error(built.notes.join('\n'));
+    const wantSeed = body?.kind === 'seed';
 
-    const out = 'ورود.yml';
+    const built = wantSeed ? buildSeed({ steps }) : buildEntry({ steps, accountId });
+    if (!built.found) throw new Error(built.notes.join(String.fromCharCode(10)));
+
+    /**
+     * دانه‌ای که به منویی بسته بازمی‌گردد، مسیرش را از نقشه می‌گیرد.
+     *
+     * نخستین دانهٔ واقعی همین‌جا شکست: «وارد کردن اطلاعات» منوآیتم بود و
+     * کلیکِ بازکنندهٔ منو در ضبطِ گشت نیامده بود. نقشه آن را می‌دانست.
+     */
+    if (wantSeed) {
+      const prefix = seedPrefixFrom(readMap(target), built.steps);
+      if (prefix.length) {
+        built.steps = [...prefix, ...built.steps];
+        built.notes = [...built.notes, `${prefix.length} قدمِ رسیدن از نقشه جلویش گذاشته شد.`];
+      }
+    }
+
+    const out = wantSeed ? 'دادهٔ-اولیه.yml' : 'ورود.yml';
     return json({
-      yaml: entryYaml({ ...built, accountId, source: relative }),
+      yaml: wantSeed
+        ? seedYaml({ ...built, source: relative })
+        : entryYaml({ ...built, accountId, source: relative }),
       notes: built.notes,
+      kind: wantSeed ? 'seed' : 'entry',
       // مسیرِ پیشنهادی؛ ذخیره با `createOnly` است، پس فایلِ موجود را نمی‌برد
       relative: out,
       steps: built.steps.length,

@@ -115,6 +115,9 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
 
   userbug map <هدف> [گزینه‌ها]    نقشهٔ اپ: هر حالتی که می‌شود به آن رسید
       --from <سناریو>             مسیرِ ورود؛ قدم‌هایش پیش از خزش بازپخش می‌شوند
+      --seed <سناریو>             دادهٔ اولیه؛ **یک بار** اجرا می‌شود، نه در هر
+                                  برگشت به خانه. بی آن، نقشه از اپِ خالی
+                                  درمی‌آید و صفحه‌های داده‌دار دیده نمی‌شوند
       --states <n> --actions <n> --minutes <n>
                                   سقف‌ها (پیش‌فرض ۶۰ · ۲۵ · ۲۰)
       --fresh                     از صفر، نه ادامهٔ نقشهٔ موجود
@@ -143,6 +146,7 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
   userbug entry <هدف>             ساختِ «مسیرِ ورود» از سناریویی که کار کرد
       --from <سناریو>             منبع؛ بی آن، خودش نامزدها را نشان می‌دهد
       --account <شناسه>           مقدارها به حسابِ ذخیره‌شده بسته شوند
+      --seed                      به‌جای ورود، «دانه» بساز (ایمپورتِ فایل)
       --out <نام> --force
 
   userbug quest <هدف> "<چه را بررسی کنم>"
@@ -930,7 +934,7 @@ async function cmdEntry({ flags, positional }) {
   if (!target) throw new Error('نام هدف لازم است: userbug entry <هدف> --from <سناریو> --account <شناسه>');
 
   const { loadScenario, loadScenarios, scenarioDir } = await import('../src/scenario/load.js');
-  const { buildEntry, entryYaml } = await import('../src/scenario/entry.js');
+  const { buildEntry, buildSeed, entryYaml, seedPrefixFrom, seedYaml } = await import('../src/scenario/entry.js');
   const { listAccounts } = await import('../src/knowledge/credentials.js');
 
   /**
@@ -982,16 +986,34 @@ async function cmdEntry({ flags, positional }) {
     );
   }
 
-  const built = buildEntry({ steps: loadScenario(file).steps, accountId });
-  if (!built.found) throw new Error(built.notes.join('\n'));
+  const steps = loadScenario(file).steps;
+  const relative = path.relative(scenarioDir(target), file).split(path.sep).join('/');
+  const wantSeed = Boolean(flags.seed);
 
-  const yaml = entryYaml({
-    ...built,
-    accountId,
-    source: path.relative(scenarioDir(target), file).split(path.sep).join('/'),
-  });
+  const built = wantSeed ? buildSeed({ steps }) : buildEntry({ steps, accountId });
+  if (!built.found) throw new Error(built.notes.join(String.fromCharCode(10)));
 
-  const out = flags.out && flags.out !== true ? String(flags.out) : 'ورود.yml';
+  /**
+   * دانه‌ای که به منویی بسته بازمی‌گردد، از نقشه مسیر می‌گیرد.
+   *
+   * نخستین دانهٔ واقعی دقیقاً همین‌جا شکست: «وارد کردن اطلاعات» یک منوآیتم
+   * بود و کلیکِ بازکنندهٔ منو در ضبطِ گشت نیامده بود.
+   */
+  if (wantSeed) {
+    const { readMap } = await import('../src/map/store.js');
+    const prefix = seedPrefixFrom(readMap(target), built.steps);
+    if (prefix.length) {
+      built.steps = [...prefix, ...built.steps];
+      built.notes.push(`${prefix.length} قدمِ رسیدن از نقشه جلویش گذاشته شد.`);
+    }
+  }
+
+  const yaml = wantSeed
+    ? seedYaml({ ...built, source: relative })
+    : entryYaml({ ...built, accountId, source: relative });
+
+  const out =
+    flags.out && flags.out !== true ? String(flags.out) : wantSeed ? 'دادهٔ-اولیه.yml' : 'ورود.yml';
   const destination = path.join(scenarioDir(target), out);
 
   // بازنویسیِ بی‌خبرِ مسیرِ ورود یعنی خزشِ فردا با فرمی برود که کسی ندیده
@@ -1002,11 +1024,14 @@ async function cmdEntry({ flags, positional }) {
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.writeFileSync(destination, yaml, 'utf8');
 
-  console.log(`\n  مسیرِ ورود: scenarios/${target}/${out}`);
+  console.log(`
+  ${wantSeed ? 'دانه' : 'مسیرِ ورود'}: scenarios/${target}/${out}`);
   console.log(`  از روی: ${source}`);
-  console.log(accountId ? `  با حسابِ «${accountId}»` : '  بی حسابِ ذخیره‌شده — هر اجرا کاربرِ تازه');
+  if (!wantSeed) console.log(accountId ? `  با حسابِ «${accountId}»` : '  بی حسابِ ذخیره‌شده — هر اجرا کاربرِ تازه');
   for (const note of built.notes) console.log(`  · ${note}`);
-  console.log(`\n  حالا: userbug map ${target} --from scenarios/${target}/${out}\n`);
+  console.log(`
+  حالا: userbug map ${target} --${wantSeed ? 'seed' : 'from'} scenarios/${target}/${out}
+`);
 }
 
 /**
@@ -1319,6 +1344,24 @@ async function cmdMap({ flags, positional }) {
     entryLabel = path.relative(ROOT, file).split(path.sep).join('/');
   }
 
+  /**
+   * دانه — جدا از مسیرِ ورود، چون **یک بار** اجرا می‌شود.
+   *
+   * مسیرِ ورود در هر برگشت به خانه بازپخش می‌شود، پس باید بی‌اثر باشد.
+   * «فایل نمونه را وارد کن» آنجا یعنی ده‌ها ایمپورتِ تکراری. و بی آن، نقشه
+   * از اپِ خالی درمی‌آید: روی نپی چهارده گره پیدا شد و «ویرایشِ کتاب»
+   * میانشان نبود، چون کتابی نبود.
+   */
+  let seedSteps = [];
+  let seedLabel = '';
+  if (flags.seed && flags.seed !== true) {
+    const { loadScenario } = await import('../src/scenario/load.js');
+    const file = path.resolve(String(flags.seed));
+    if (!fs.existsSync(file)) throw new Error(`سناریوی دانه پیدا نشد: ${file}`);
+    seedSteps = loadScenario(file).steps;
+    seedLabel = path.relative(ROOT, file).split(path.sep).join('/');
+  }
+
   const { MapSession } = await import('../src/map/session.js');
   const session = new MapSession({
     target,
@@ -1327,6 +1370,8 @@ async function cmdMap({ flags, positional }) {
     caps,
     entrySteps,
     entryLabel,
+    seedSteps,
+    seedLabel,
     fresh: Boolean(flags.fresh),
     allowDestructive: Boolean(flags['allow-destructive']),
     rememberAs: flags.remember && flags.remember !== true ? String(flags.remember) : '',

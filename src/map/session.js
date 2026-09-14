@@ -108,6 +108,8 @@ export class MapSession extends EventEmitter {
     caps = {},
     entrySteps = [],
     entryLabel = '',
+    seedSteps = [],
+    seedLabel = '',
     fresh = false,
     allowDestructive = false,
     rememberAs = '',
@@ -122,6 +124,21 @@ export class MapSession extends EventEmitter {
     this.caps = { ...DEFAULT_CAPS, ...caps };
     this.entrySteps = entrySteps;
     this.entryLabel = entryLabel;
+    /**
+     * دانه — **یک بار** در کلِ خزش، نه در هر برگشت به خانه.
+     *
+     * ── چرا از مسیرِ ورود جداست ──
+     *
+     * مسیرِ ورود ده‌ها بار بازپخش می‌شود (هر بار که خزنده می‌خواهد به گرهی
+     * برگردد)، پس باید بی‌اثر باشد. ولی «فایل نمونه را وارد کن» ذاتاً
+     * جهش‌زاست: اگر آنجا می‌نشست، همان فایل ده‌ها بار ایمپورت می‌شد و
+     * نقشه‌ای از اپی درمی‌آمد که هیچ کاربری نمی‌سازدش.
+     *
+     * و بی آن، نقشهٔ اپِ **خالی** ساخته می‌شود: «ویرایشِ کتاب» وقتی کتابی
+     * نیست، اصلاً وجود ندارد و در صف هم نمی‌آید.
+     */
+    this.seedSteps = seedSteps;
+    this.seedLabel = seedLabel;
     this.fresh = fresh;
     this.allowDestructive = allowDestructive;
     this.rememberAs = rememberAs;
@@ -166,6 +183,11 @@ export class MapSession extends EventEmitter {
         `مسیرِ ورود فعلی دارد که خزش اجرا نمی‌کند: ${bad.join('، ')}. ` +
           'یک سناریوی کوچکِ ورود بنویسید (go/click/fill/press/check) یا همان قدم‌ها را از آن حذف کنید.'
       );
+    }
+
+    const badSeed = unsupportedVerbs(this.seedSteps);
+    if (badSeed.length) {
+      throw new Error(`سناریوی دانه فعلی دارد که خزش اجرا نمی‌کند: ${badSeed.join('، ')}.`);
     }
 
     /**
@@ -879,7 +901,43 @@ export class MapSession extends EventEmitter {
     const settled = await this.enterRoot();
     await this.closeStep('نقشه: مسیرِ ورود', started, from);
 
-    const root = await this.observeState([], settled);
+    /**
+     * دانه، پیش از نخستین مشاهده.
+     *
+     * ترتیب عمدی است: اگر بعد از `observeState` می‌آمد، گرهِ ریشه با پروفایلِ
+     * اپِ **خالی** ثبت می‌شد و بعد از ایمپورت دیگر با خودش نمی‌خواند — یعنی
+     * هر بار که خزنده به خانه برمی‌گشت، فکر می‌کرد جای دیگری است.
+     */
+    let settledAfterSeed = settled;
+    if (this.seedSteps.length) {
+      const seedStarted = Date.now();
+      const seedFrom = this.events.length;
+      try {
+        await replayPath({
+          page: this.page,
+          steps: this.seedSteps,
+          ctx: this.replayCtx(),
+          baseURL: this.target.baseURL,
+          target: this.targetName,
+        });
+        settledAfterSeed = (await this.settle()) || settled;
+        this.emitEvent('warning', { message: `دانه اجرا شد: ${this.seedLabel || 'سناریوی داده'}` });
+      } catch (cause) {
+        /**
+         * شکستِ دانه خزش را نمی‌کشد، ولی **بلند** گفته می‌شود.
+         *
+         * نقشهٔ اپِ خالی نقشهٔ غلط نیست، ناقص است. سکوت اینجا یعنی کاربر
+         * نقشه‌ای می‌بیند بی «ویرایشِ کتاب» و فکر می‌کند اپش همین است.
+         */
+        this.emitEvent('warning', {
+          message: `دانه اجرا نشد (${cause.message.slice(0, 120)}) — نقشه از اپِ خالی درمی‌آید.`,
+        });
+      }
+      await this.closeStep('نقشه: دانه', seedStarted, seedFrom);
+    }
+    this.map.seed = this.seedSteps.length ? { scenario: this.seedLabel, steps: this.seedSteps.length } : null;
+
+    const root = await this.observeState([], settledAfterSeed);
     if (!root) throw new Error('حالتِ آغاز خوانده نشد — صفحه بالا نیامد؟');
     await this.rememberIdentity(root);
     await writeMap(this.targetName, this.map);

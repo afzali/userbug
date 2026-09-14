@@ -16,6 +16,17 @@
   let hasMap = $derived(states.length > 0);
 
   let from = $state('');
+  /**
+   * دانه — یک بار در کلِ خزش، نه در هر برگشت به خانه.
+   *
+   * ── چرا کشویی جدا از «مسیرِ ورود» ──
+   *
+   * مسیرِ ورود ده‌ها بار بازپخش می‌شود، پس باید بی‌اثر باشد. «فایل نمونه را
+   * وارد کن» آنجا یعنی ده‌ها ایمپورتِ تکراری. و بی آن، نقشه از اپِ **خالی**
+   * درمی‌آید: روی nepi چهارده گره پیدا شد و «ویرایشِ کتاب» میانشان نبود،
+   * چون کتابی نبود.
+   */
+  let seed = $state('');
   let states_cap = $state(60);
   let minutes = $state(20);
   let fresh = $state(false);
@@ -46,6 +57,8 @@
   let entryAccount = $state('');
   let entryOptions = $state(null);
   let entryDraft = $state(null);
+  /** «ورود» یا «دانه» — یک فرم، دو خروجی. */
+  let entryKind = $state('entry');
   let entryBusy = $state(false);
   let entryError = $state('');
 
@@ -62,7 +75,7 @@
       const response = await fetch('/api/scenarios/entry', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ target, from: entrySource, account: entryAccount }),
+        body: JSON.stringify({ target, from: entrySource, account: entryAccount, kind: entryKind }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'ساخته نشد');
@@ -92,7 +105,8 @@
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'ذخیره نشد');
-      from = `scenarios/${target}/${payload.relative}`;
+      if (entryDraft.kind === 'seed') seed = `scenarios/${target}/${payload.relative}`;
+      else from = `scenarios/${target}/${payload.relative}`;
       entryDraft = null;
       // فهرستِ کشویی از سرور می‌آید، پس باید تازه شود تا فایلِ نو در آن باشد
       await invalidateAll();
@@ -198,6 +212,7 @@
           target,
           kind: 'map',
           from,
+          seed,
           states: states_cap,
           minutes,
           fresh,
@@ -326,6 +341,18 @@
             -->
             <div class="space-y-2 rounded-lg border p-2.5">
               {#if entryOptions.candidates.length}
+                <div class="flex gap-1 text-[11px]">
+                  {#each [['entry', 'مسیرِ ورود'], ['seed', 'دادهٔ اولیه']] as [value, label] (value)}
+                    <button
+                      type="button"
+                      class={`flex-1 rounded-md border px-2 py-1 ${entryKind === value ? 'border-primary bg-accent' : ''}`}
+                      onclick={() => { entryKind = value; entryDraft = null; }}
+                    >
+                      {label}
+                    </button>
+                  {/each}
+                </div>
+
                 <label class="block space-y-1">
                   <span class="text-[11px] text-muted-foreground">از روی کدام سناریو</span>
                   <select bind:value={entrySource} class="h-8 w-full rounded-md border bg-background px-2 text-xs">
@@ -336,7 +363,7 @@
                   </select>
                 </label>
 
-                <label class="block space-y-1">
+                <label class="block space-y-1" hidden={entryKind === 'seed'}>
                   <span class="text-[11px] text-muted-foreground">با کدام حساب</span>
                   <select bind:value={entryAccount} class="h-8 w-full rounded-md border bg-background px-2 text-xs">
                     <option value="">— هر اجرا کاربرِ تازه بسازد —</option>
@@ -383,6 +410,32 @@
               {/if}
             </div>
           {/if}
+
+          <!--
+            دانه — جدا، چون **یک بار** اجرا می‌شود.
+
+            اگر در «مسیرِ ورود» می‌نشست، در هر برگشت به خانه دوباره ایمپورت
+            می‌شد و نقشه از اپی درمی‌آمد که هیچ کاربری نمی‌سازدش.
+          -->
+          <label class="block space-y-1">
+            <span class="text-xs text-muted-foreground">دادهٔ اولیه (اختیاری)</span>
+            <select bind:value={seed} class="h-9 w-full rounded-md border bg-background px-2 text-sm">
+              <option value="">— بدون داده؛ اپ همان است که هست —</option>
+              {#each data.scenarios as scenario (scenario.path)}
+                <option
+                  value={`scenarios/${target}/${scenario.path}`}
+                  disabled={scenario.blockers.length > 0}
+                >
+                  {scenario.name}{scenario.blockers.length ? ` — ${scenario.blockers.join('، ')} ندارد` : ''}
+                </option>
+              {/each}
+            </select>
+            <span class="block text-[11px] leading-5 text-muted-foreground">
+              <strong>یک بار</strong> پیش از خزش اجرا می‌شود — مثلاً وارد کردنِ
+              فایلِ نمونه. بی آن، نقشه از اپِ خالی درمی‌آید و صفحه‌هایی که به
+              داده نیاز دارند اصلاً دیده نمی‌شوند.
+            </span>
+          </label>
 
           <div class="grid grid-cols-2 gap-2">
             <label class="block space-y-1">

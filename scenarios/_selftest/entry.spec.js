@@ -15,7 +15,7 @@
  *   ۳. تکهٔ ورود کوتاه بماند — وگرنه نیمِ اپ داخلِ «مسیرِ ورود» می‌افتد.
  */
 import { test, expect } from '@playwright/test';
-import { buildEntry, entryYaml, textOf, triggerOf } from '../../src/scenario/entry.js';
+import { buildEntry, buildSeed, entryYaml, seedPrefixFrom, seedYaml, textOf, triggerOf } from '../../src/scenario/entry.js';
 
 const RECORDED = [
   { clearState: true },
@@ -28,6 +28,14 @@ const RECORDED = [
   { click: { role: 'button', name: 'ادامه', exact: true, visible: true } },
   { click: { role: 'button', name: 'افزودن کتاب', exact: true, visible: true } },
   { fill: { label: 'عنوان', visible: true }, value: 'کتابِ من' },
+];
+
+const WITH_UPLOAD = [
+  ...RECORDED.slice(0, 8),
+  { click: { role: 'menuitem', name: 'وارد کردن اطلاعات', visible: true } },
+  { upload: { to: { label: 'فایل' }, file: 'fixtures/data.json' } },
+  { click: { role: 'button', name: 'وارد کردن اطلاعات', visible: true } },
+  { click: { role: 'menuitem', name: 'تنظیمات', visible: true } },
 ];
 
 test('مقدارها به حسابِ ذخیره‌شده بسته می‌شوند', () => {
@@ -114,4 +122,55 @@ test('سرصفحه می‌گوید از کجا آمده و با کدام حسا�
   expect(yaml).toContain('_drafts/x.yml');
   expect(yaml).toContain('«a»');
   expect(yaml).toContain('status: draft');
+});
+
+test('دانه فقط پنجرهٔ دورِ آپلود را برمی‌دارد، نه کلِ گشت', () => {
+  // بی این، نیمِ گشتِ کاربر داخلِ دانه می‌افتاد و هر خزش ده کلیکِ بی‌ربط می‌زد
+  const seed = buildSeed({ steps: WITH_UPLOAD });
+  expect(seed.found).toBe(true);
+  expect(seed.steps.map((step) => Object.keys(step).filter((k) => k !== 'as' && k !== 'value')[0])).toEqual([
+    'click',
+    'upload',
+    'click',
+  ]);
+  expect(seed.files).toEqual(['fixtures/data.json']);
+});
+
+test('«ادامه»ی گفت‌وگوی ورود داخلِ دانه نمی‌افتد', () => {
+  // یک بار واقعاً افتاد: دنبالهٔ ورود است، نه آغازِ ایمپورت
+  expect(JSON.stringify(buildSeed({ steps: WITH_UPLOAD }).steps)).not.toContain('ادامه');
+});
+
+test('سناریوی بی‌آپلود دانه نمی‌شود و صریح می‌گوید', () => {
+  const seed = buildSeed({ steps: [{ go: '/' }, { click: 'یک دکمه' }] });
+  expect(seed.found).toBe(false);
+  expect(seed.notes.join(' ')).toContain('آپلود');
+});
+
+test('سرصفحهٔ دانه فایل‌های لازم را نام می‌برد', () => {
+  const seed = buildSeed({ steps: WITH_UPLOAD });
+  const yaml = seedYaml({ ...seed, source: '_drafts/x.yml' });
+  expect(yaml).toContain('fixtures/data.json');
+  expect(yaml).toContain('یک بار');
+});
+
+test('مسیرِ رسیدن از نقشه برداشته می‌شود، نه از حدس', () => {
+  // نخستین دانهٔ واقعی شکست: «وارد کردن اطلاعات» منوآیتم بود و کلیکِ
+  // بازکنندهٔ منو در ضبطِ گشت نیامده بود. نقشه آن را می‌دانست.
+  const map = {
+    states: [
+      { route: '/x', view: '', path: [], actions: [{ label: 'وارد کردن اطلاعات' }] },
+      {
+        route: '/x',
+        view: 'منوی کاربر',
+        path: [{ click: { role: 'button', name: 'کاربر' } }],
+        actions: [{ label: 'وارد کردن اطلاعات' }],
+      },
+    ],
+  };
+  const steps = [{ click: { role: 'menuitem', name: 'وارد کردن اطلاعات' } }];
+  // گرهِ بی‌نما مسیر ندارد، پس آن یکی برنده است
+  expect(seedPrefixFrom(map, steps)).toEqual([{ click: { role: 'button', name: 'کاربر' } }]);
+  expect(seedPrefixFrom({ states: [] }, steps)).toEqual([]);
+  expect(seedPrefixFrom(null, [])).toEqual([]);
 });

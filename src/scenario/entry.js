@@ -212,3 +212,115 @@ export function entryYaml({ steps, notes = [], accountId = '', source = '', name
     YAML.stringify({ name, status: 'draft', persona: 'pro', steps })
   );
 }
+
+/**
+ * «دانه» — قدم‌هایی که اپ را **پُر** می‌کنند، یک بار.
+ *
+ * ── چرا از مسیرِ ورود جداست ──
+ *
+ * مسیرِ ورود ده‌ها بار بازپخش می‌شود، پس باید بی‌اثر باشد. ولی وارد کردنِ
+ * فایلِ نمونه ذاتاً جهش‌زاست: در مسیرِ ورود، همان فایل ده‌ها بار ایمپورت
+ * می‌شد.
+ *
+ * و بی آن، نقشه از اپِ **خالی** درمی‌آید. روی نپی دقیقاً همین شد: خزش وارد
+ * شد و چهارده گره پیدا کرد، ولی «ویرایشِ کتاب» میانشان نبود — چون کتابی
+ * نبود. صفحه‌ای که داده ندارد، دکمه‌هایش هم ندارد.
+ *
+ * ── چرا پنجرهٔ کوچک دورِ `upload` ──
+ *
+ * ایمپورت معمولاً سه قدم است: دکمه‌ای که پنجره را باز می‌کند، خودِ فایل، و
+ * دکمه‌ای که تأیید می‌کند. برداشتنِ کلِ سناریو یعنی نیمِ گشتِ کاربر داخلِ
+ * دانه بیفتد و هر بار خزش، ده کلیکِ بی‌ربط بزند.
+ */
+export function buildSeed({ steps = [] } = {}) {
+  const at = steps.findIndex((step) => stepVerb(step) === 'upload');
+  if (at < 0) return { steps: [], files: [], found: false, notes: ['قدمِ آپلودی در این سناریو نیست.'] };
+
+  /* دکمه‌ای که پنجرهٔ ایمپورت را باز می‌کند: تا سه قدم به عقب، بی ردِ ورود */
+  let start = at;
+  for (let back = at - 1; back >= 0 && at - back <= 3; back--) {
+    const verb = stepVerb(steps[back]);
+    const text = textOf(steps[back]);
+    if (!['click', 'fill', 'check'].includes(verb)) break;
+    // `AFTER` هم مرز است: «ادامه»ی گفت‌وگوی کد بازیابی دنبالهٔ ورود است،
+    // نه آغازِ ایمپورت — و یک بار واقعاً داخلِ دانه افتاد
+    if (IDENTITY.test(text) || SECRET.test(text) || SUBMIT.test(text) || AFTER.test(text)) break;
+    start = back;
+  }
+
+  /* و تأییدی که بلافاصله بعدش می‌آید */
+  let end = at;
+  for (let ahead = at + 1; ahead < steps.length && ahead - at <= 2; ahead++) {
+    if (stepVerb(steps[ahead]) !== 'click') break;
+    end = ahead;
+    break;
+  }
+
+  const slice = steps.slice(start, end + 1);
+  const files = slice
+    .filter((step) => stepVerb(step) === 'upload')
+    .flatMap((step) => [].concat(step.upload?.file ?? step.upload?.files ?? []))
+    .filter(Boolean);
+
+  return {
+    steps: slice,
+    files,
+    found: true,
+    notes: files.length ? [] : ['قدمِ آپلود فایلی نام نبرده؛ خودتان بررسی کنید.'],
+  };
+}
+
+/** سناریوی دانه، با سرصفحه‌ای که می‌گوید چرا فقط یک بار اجرا می‌شود. */
+export function seedYaml({ steps, files = [], source = '', name = 'دادهٔ اولیه' }) {
+  const header = [
+    '# دانه — ساختهٔ `userbug entry --seed`.',
+    '#',
+    `# از روی: ${source || '(قدم‌های داده‌شده)'}`,
+    '#',
+    '# ── چرا این از «مسیرِ ورود» جداست ──',
+    '#',
+    '# مسیرِ ورود در هر برگشت به خانه بازپخش می‌شود؛ این یکی **یک بار** در',
+    '# کلِ خزش. اگر آنجا می‌نشست، همان فایل ده‌ها بار ایمپورت می‌شد.',
+    '#',
+    '# بی این، نقشه از اپِ خالی درمی‌آید و «ویرایشِ کتاب» اصلاً وجود ندارد.',
+  ];
+
+  if (files.length) {
+    header.push('#', '# فایل‌هایی که لازم دارد (باید در knowledge/<پروژه>/fixtures/ باشند):');
+    for (const file of files) header.push(`#   ${file}`);
+  }
+
+  header.push('#', '# در صفحهٔ نقشه، کشویی «دادهٔ اولیه» انتخابش کنید.', '');
+
+  return header.join('\n') + YAML.stringify({ name, status: 'draft', persona: 'pro', steps });
+}
+
+/**
+ * مسیرِ رسیدن به نخستین قدمِ دانه — از نقشه.
+ *
+ * ── چرا لازم شد ──
+ *
+ * نخستین دانهٔ واقعی شکست: «وارد کردن اطلاعات» یک `menuitem` است و منویش
+ * بسته بود. در ضبطِ گشت، کلیکی که آن منو را باز کرده بود نیامده — ضبط‌کننده
+ * همیشه همه‌چیز را نمی‌گیرد.
+ *
+ * ولی نقشه **می‌داند**: همان برچسب را در گرهِ «منوی … کاربر سامانه» دیده و
+ * مسیرِ رسیدنش را ثبت کرده. پس به‌جای حدس زدن، از چیزی که یک بار قطعی طی
+ * شده استفاده می‌شود — همان کاری که `quest` می‌کند.
+ *
+ * بی نقشه (خزشِ نخست) خالی برمی‌گردد و دانه همان است که بود؛ آن‌وقت اگر
+ * شکست، پیامش می‌گوید چرا.
+ */
+export function seedPrefixFrom(map, steps = []) {
+  const first = steps[0];
+  const wanted = textOf(first).trim();
+  if (!wanted) return [];
+
+  for (const state of map?.states || []) {
+    // گرهِ بی‌نما همان صفحه است؛ مسیرش چیزی به دانه اضافه نمی‌کند
+    if (!state.view || !state.path?.length) continue;
+    const has = (state.actions || []).some((action) => String(action.label || '').trim() === wanted);
+    if (has) return state.path;
+  }
+  return [];
+}
