@@ -174,6 +174,14 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --depth <n>                 سقفِ قدمِ کاوش
       --model <اسلاگ> --headed
 
+  userbug expect <هدف> --from <سناریو>
+                                  «انتظار داشتیم چه ببینیم؟» — انتظارها را
+                                  پیشنهاد می‌دهد، از عنصرهای واقعیِ گشت و نقشه
+      --list                      فقط فهرستِ عنصرهای واقعی (رایگان)
+      --apply                     واقعاً در فایل بنویس
+      --hard                      expect به‌جای assert (همان‌جا بشکند)
+      --model <اسلاگ>
+
   userbug mission <هدف> "<جمله>"  جمله → نقشهٔ کار (یک فراخوانی)، ذخیره در
                                   فایل تا اصلاحش کنید — بعد خزشِ محدود
       --name <نام> --model <اسلاگ>
@@ -1499,6 +1507,129 @@ async function cmdQuest({ flags, positional }) {
 }
 
 /**
+ * «انتظار داشتیم چه ببینیم؟» — افزودنِ انتظار به یک سناریوی موجود.
+ *
+ * ── چرا این فرمان لازم شد ──
+ *
+ * سناریوی ورودی که همین ابزار ساخته بود، چهل‌وهفت خط `fill` و `click` داشت
+ * و **صفر `expect`**. یعنی ابزار می‌گفت «چیزی نشکست»، نه «کار درست انجام
+ * شد» — و کاربر دقیقاً دومی را می‌خواست.
+ *
+ * ── چرا بی `--apply` چیزی نمی‌نویسد ──
+ *
+ * انتظارِ غلط بدتر از نبودِ انتظار است: سناریو برای همیشه قرمز می‌ماند و
+ * آدم یاد می‌گیرد قرمزها را نادیده بگیرد. پس پیش‌فرض **نشان دادن** است و
+ * نوشتن یک پرچمِ صریح می‌خواهد.
+ */
+async function cmdExpect({ flags, positional }) {
+  const target = positional[0];
+  if (!target) throw new Error('نام هدف لازم است: userbug expect <هدف> --from <سناریو>');
+
+  const YAML = (await import('yaml')).default;
+  const { applyExpectations, candidatesFor, describeExpectation, proposeExpectations } = await import(
+    '../src/scenario/expect.js'
+  );
+  const { knowledgeFor } = await import('../src/knowledge/select.js');
+  const { scenarioDir } = await import('../src/scenario/load.js');
+
+  /* ── فهرستِ نامزدها: رایگان، و بی سناریو هم معنا دارد ── */
+  if (flags.list) {
+    const candidates = candidatesFor(target);
+    if (!candidates.length) {
+      throw new Error(
+        'هیچ نامزدی نیست: این پروژه نه گشتِ ثبت‌شده دارد نه نقشه.\n' +
+          '  اول یکی از آن دو، وگرنه هر انتظاری فقط حدس است.'
+      );
+    }
+    console.log(`\n  ${candidates.length} عنصرِ واقعی در «${target}»:\n`);
+    for (const one of candidates) {
+      console.log(`  ${one.ref.padEnd(5)} ${one.route}${one.view ? ` ▸ ${one.view}` : ''}  ${one.label}`);
+    }
+    console.log('');
+    return;
+  }
+
+  const from = flags.from && flags.from !== true ? String(flags.from) : '';
+  if (!from) throw new Error('سناریو لازم است: userbug expect <هدف> --from <سناریو>   (یا --list)');
+
+  const file = path.isAbsolute(from) ? from : path.join(scenarioDir(target), from);
+  if (!fs.existsSync(file)) throw new Error(`سناریو پیدا نشد: ${file}`);
+
+  const before = fs.readFileSync(file, 'utf8');
+  const scenario = YAML.parse(before);
+  if (!scenario?.steps?.length) throw new Error('این سناریو قدمی ندارد');
+
+  const models = resolveModel({
+    global: await loadGlobalConfig(),
+    role: 'author',
+    model: flags.model && flags.model !== true ? assertModelSlug(flags.model) : undefined,
+  });
+
+  console.log(`\n  انتظارها برای «${scenario.name || from}» با ${models.model}…`);
+
+  const result = await proposeExpectations({
+    scenario,
+    target,
+    models,
+    knowledge: knowledgeFor({ target, text: scenario.name || '', budget: 1200 }),
+  });
+
+  if (!result.expectations.length) {
+    console.log('\n  مدل هیچ انتظارِ معتبری پیشنهاد نداد.');
+    for (const note of result.dropped) console.log(`  ! ${note}`);
+    console.log(`\n  فهرستِ عنصرهای واقعی: userbug expect ${target} --list\n`);
+    return;
+  }
+
+  console.log('');
+  for (const item of result.expectations) {
+    const mark = item.confidence === 'low' ? '?' : '·';
+    console.log(`  ${mark} ${describeExpectation(item)}`);
+    if (item.why) console.log(`      ${item.why}`);
+  }
+  /**
+   * آنچه افتاد، چاپ می‌شود.
+   *
+   * مدل گاهی عنصری می‌گوید که وجود ندارد؛ حذفِ بی‌صدایش یعنی کاربر فکر کند
+   * آن هم سنجیده می‌شود.
+   */
+  for (const note of result.dropped) console.log(`  ! ${note}`);
+
+  if (!flags.apply) {
+    console.log(`\n  چیزی نوشته نشد. برای افزودن: همین فرمان با --apply`);
+    console.log(`  (و --hard اگر می‌خواهید به‌جای assert، expect باشند — یعنی همان‌جا بشکنند)\n`);
+    return;
+  }
+
+  /**
+   * `assert` پیش‌فرض است، `expect` با پرچم.
+   *
+   * حرفِ نیازموده‌ی مدل نباید بتواند بقیهٔ سناریو را از اجرا بیندازد: یافته
+   * ثبت می‌کند و می‌گذرد. سخت‌شدنش تصمیمِ آدم است.
+   */
+  const hard = Boolean(flags.hard);
+  const next = applyExpectations(scenario, result.expectations.map((one) => ({ ...one, hard })));
+
+  const header = before.split(/\r?\n/);
+  const keep = [];
+  for (const line of header) {
+    if (line.trim().startsWith('#') || !line.trim()) keep.push(line);
+    else break;
+  }
+  while (keep.length && !keep.at(-1).trim()) keep.pop();
+
+  const note = [
+    '#',
+    `# ${result.expectations.length} انتظار با «userbug expect» اضافه شد (${hard ? 'expect' : 'assert'}).`,
+    '# هر کدام به عنصری اشاره می‌کند که در گشت یا خزش واقعاً دیده شده.',
+  ];
+
+  fs.writeFileSync(file, [...keep, ...note, YAML.stringify(next)].join('\n'), 'utf8');
+  console.log(`\n  ${result.expectations.length} انتظار اضافه شد: ${path.relative(ROOT, file).split(path.sep).join('/')}`);
+  console.log('  یک بار اجرا کنید و ببینید کدامشان واقعاً می‌خورند.\n');
+}
+
+/**
  * «مأموریت» — جمله → نقشهٔ کار → اصلاحِ آدم → خزشِ محدود.
  *
  * ── چرا این گام میانی ساخته شد ──
@@ -2354,6 +2485,9 @@ try {
       break;
     case 'mission':
       await cmdMission(parsed);
+      break;
+    case 'expect':
+      await cmdExpect(parsed);
       break;
     case 'entry':
       await cmdEntry(parsed);

@@ -6,6 +6,7 @@
   import PageHeader from '$lib/components/PageHeader.svelte';
   import ScenarioList from '$lib/components/ScenarioList.svelte';
   import CodeView from '$lib/components/CodeView.svelte';
+  import ExpectPanel from '$lib/components/ExpectPanel.svelte';
   import ModelPicker from '$lib/components/ModelPicker.svelte';
 
   let { data } = $props();
@@ -84,6 +85,14 @@
   let wish = $state('');
   let entryPick = $state('');
   let showRevise = $state(false);
+  /**
+   * «انتظار» جدا از «بازنویسی».
+   *
+   * هر دو سناریو را عوض می‌کنند ولی دو پرسشِ متفاوت‌اند: آن یکی «این را
+   * طورِ دیگری بنویس»، این یکی «بگو چه باید دیده شود». یکی کردنشان یعنی
+   * کسی که فقط انتظار می‌خواهد، مجبور شود جمله‌ای برای مدل بنویسد.
+   */
+  let showExpect = $state(false);
 
   // پروژه از لایهٔ فضای کاری می‌آید، پس کشویی انتخاب پروژه اینجا لازم نیست.
   let project = $derived(data.project);
@@ -362,12 +371,30 @@
           و مفسرِ سناریو نمی‌شناسدش.
         -->
         {#if data.kind === 'scenario' && data.file}
-          <Button variant="outline" onclick={() => { showRevise = !showRevise; }}>
+          <Button variant="outline" onclick={() => { showRevise = !showRevise; showExpect = false; }}>
             {showRevise ? 'بستنِ بازنویسی' : 'بازنویسی با هوش مصنوعی'}
+          </Button>
+          <!--
+            سناریویی که انتظار ندارد، فقط می‌گوید «چیزی نشکست».
+            این دکمه همان‌جایی است که آدم فایل را باز کرده و می‌بیند چه ندارد.
+          -->
+          <Button variant="outline" onclick={() => { showExpect = !showExpect; showRevise = false; }}>
+            {showExpect ? 'بستنِ انتظارها' : 'انتظار اضافه کن'}
           </Button>
         {/if}
         <Button onclick={save} disabled={!dirty || saving || !data.file}>{saving ? 'در حال بررسی…' : 'اعتبارسنجی و ذخیره'}</Button>
       </div></div>
+
+    {#if showExpect && data.kind === 'scenario' && data.file}
+      <div class="border-b bg-muted/30 px-5 py-4">
+        <ExpectPanel
+          target={data.target}
+          relative={data.file.relative}
+          yaml={content}
+          onapplied={(payload) => { revision = payload; showExpect = false; }}
+        />
+      </div>
+    {/if}
 
     {#if showRevise && data.kind === 'scenario' && data.file}
       <div class="space-y-4 border-b bg-muted/30 px-5 py-4">
@@ -420,7 +447,18 @@
           </p>
         </div>
 
-        {#if revision}
+      </div>
+    {/if}
+
+    <!--
+      تفاوت، بیرون از پنلِ بازنویسی.
+
+      دو کار به آن می‌رسند — بازنویسی و افزودنِ انتظار — و پیش‌تر داخلِ یکی
+      از آن دو نشسته بود. یعنی انتظارها که اضافه می‌شد، تفاوتش زیر پنلی
+      پنهان می‌ماند که اصلاً باز نبود.
+    -->
+    {#if revision}
+      <div class="border-b bg-muted/30 px-5 py-4">
           <!--
             تفاوت، نه متنِ تازه.
 
@@ -444,6 +482,12 @@
 
             {#if revision.changed}
               <p class="text-xs leading-6 text-muted-foreground">{revision.changed}</p>
+            {/if}
+            <!-- چه انتظارهایی اضافه شد — به جمله، نه به YAML -->
+            {#if revision.expectationsAdded?.length}
+              <ul class="space-y-0.5 text-xs leading-6">
+                {#each revision.expectationsAdded as line (line)}<li>· {line}</li>{/each}
+              </ul>
             {/if}
             {#if revision.notes}
               <p class="rounded-md bg-amber-500/10 p-2 text-xs leading-6">باید بازبینی شود: {revision.notes}</p>
@@ -484,7 +528,6 @@
               دکمهٔ «اعتبارسنجی و ذخیره» است.
             </p>
           </div>
-        {/if}
       </div>
     {/if}
     {#if data.file}<CodeView bind:value={content} language={data.file.relative?.endsWith('.js') ? 'js' : 'yaml'} minHeight="70vh" />{:else}<div class="grid min-h-[60vh] place-items-center text-muted-foreground">{data.fileError || 'فایلی انتخاب نشده است'}</div>{/if}
