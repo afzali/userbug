@@ -4,7 +4,6 @@ import path from 'node:path';
 import {
   assertMission,
   listMissions,
-  missionToJob,
   proposeMission,
   removeMission,
   saveMission,
@@ -16,7 +15,6 @@ import { listAccounts } from '../../../../../src/knowledge/credentials.js';
 import { readEndpoints } from '../../../../../src/knowledge/endpoints.js';
 import { assertModelSlug, loadGlobalConfig, resolveModel } from '../../../../../src/models/config.js';
 import { listProjects, listScenarios } from '$lib/server/projects.js';
-import { startJob } from '$lib/server/jobs.js';
 import { jsonError } from '$lib/server/http.js';
 import { assertMutationRequest } from '$lib/server/security.js';
 
@@ -25,15 +23,16 @@ import { assertMutationRequest } from '$lib/server/security.js';
  *
  * ── چرا سه کار از یک در ──
  *
- * پیشنهاد، ذخیره، و اجرا سه فعلِ یک چیزند و هر سه به همان دنیا نگاه
+ * پیشنهاد، ذخیره، و حذف سه فعلِ یک چیزند و هر سه به همان دنیا نگاه
  * می‌کنند (روت‌ها، حساب‌ها، سناریوها). جدا کردنشان یعنی روزی یکی‌شان
  * فهرستی را بشناسد که آن یکی نمی‌شناسد — و همان لحظه دامنه‌ای ذخیره می‌شود
  * که خزش هرگز پیدایش نمی‌کند.
  *
- * ── چرا اجرا هم از اینجا می‌گذرد و نه مستقیم از `/api/jobs` ──
+ * ── چرا اجرا اینجا نیست ──
  *
- * چون مأموریت باید بداند چه اجراهایی از دلش درآمده. اگر رابط خودش job را
- * می‌ساخت، پیوند در مرورگر می‌ماند و با بستنِ تب می‌رفت.
+ * یک بار بود و اشتباه بود: دو درِ شروعِ اجرا یعنی دیر یا زود یکی‌شان چیزی
+ * را می‌فرستد که آن یکی نمی‌فرستد. شروعِ هر اجرا از `POST /api/jobs` است و
+ * «از کدام مأموریت» فقط یک فیلدِ کنارِ آن — همان‌جا در فایل ثبت می‌شود.
  */
 
 /** دنیایی که مدل مجاز است از آن نام ببرد — یک بار، برای هر سه فعل. */
@@ -141,30 +140,6 @@ export async function POST(event) {
       });
     }
 
-    if (action === 'run') {
-      const mission = listMissions(target).find((one) => one.slug === String(body?.slug ?? ''));
-      if (!mission) throw new Error('این مأموریت ذخیره نشده است');
-
-      const options = missionToJob(mission, {
-        target,
-        states: Number(body?.states) || 40,
-        minutes: Number(body?.minutes) || 12,
-      });
-      const job = await startJob({ ...options, headed: Boolean(body?.headed) });
-
-      /**
-       * اجرا در خودِ فایلِ مأموریت ثبت می‌شود.
-       *
-       * «چه سناریوهایی از این مأموریت درآمد» پرسشی است که هفتهٔ بعد پرسیده
-       * می‌شود، نه همین حالا؛ و تا آن موقع تبِ مرورگر بسته شده.
-       */
-      saveMission(target, {
-        ...mission,
-        runs: [{ job: job.id, at: new Date().toISOString(), by: 'ui' }, ...(mission.runs || [])].slice(0, 20),
-      });
-      return json({ job, mission: mission.slug }, { status: 201 });
-    }
-
     /* ── پیشنهاد: تنها فعلی که پول خرج می‌کند ── */
     const world = await worldOf(target);
     const models = resolveModel({
@@ -190,7 +165,6 @@ export async function POST(event) {
     // ذخیره نمی‌شود: نقشهٔ کار اول باید جلوی چشمِ آدم اصلاح شود
     return json({ target, mission });
   } catch (cause) {
-    const status = cause?.code === 'JOB_ACTIVE' ? 409 : 400;
-    return jsonError(cause, status);
+    return jsonError(cause, 400);
   }
 }
