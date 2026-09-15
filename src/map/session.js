@@ -61,7 +61,7 @@ import {
   writeMap,
 } from './store.js';
 import { callRecorder } from '../knowledge/endpoints.js';
-import { makeScope } from './scope.js';
+import { gatewayRoutes, makeScope } from './scope.js';
 import { replayPath, unsupportedVerbs } from './replay.js';
 
 /** بیشتر از این از یک یافته ثبت نمی‌شود. خزش همان باگ را صدها بار می‌بیند. */
@@ -1046,7 +1046,58 @@ export class MapSession extends EventEmitter {
      * خزشی که ۹۰٪ وقتش را در بازپخش بگذراند، نقشه‌ای نمی‌سازد که ترتیبش مهم
      * باشد.
      */
+    /**
+     * دروازهٔ دامنه — رفتنِ مستقیم به جایی که گفته‌ای بگرد.
+     *
+     * ── چه شد که لازم شد ──
+     *
+     * نخستین مأموریتِ واقعی دامنه‌اش `/content/f2e9a6d428` بود (یک کتاب). خزش
+     * تمام شد و گزارش داد «۱۵ حالت بیرونِ دامنه ماند» — یعنی **هیچ کنشی
+     * امتحان نشد**، چون رسیدن به کتاب از کلیک روی کارتِ کتاب در `/contents`
+     * می‌گذرد و آن کلیک خودش بیرونِ دامنه بود.
+     *
+     * قاعدهٔ «دامنه فقط گشتن را محدود می‌کند نه رسیدن را» درست است، ولی
+     * رسیدن هم با امتحان کردنِ کنش انجام می‌شود. پس دامنهٔ عمیق، بی یک درِ
+     * مستقیم، غیرقابلِ دسترس بود — و شکستش خاموش: «صف تمام شد».
+     *
+     * حلش همان کاری است که آدم می‌کند: آدرس را در نوار می‌زند. رایگان،
+     * قطعی، و مسیرِ ثبت‌شده‌اش (`[{go}]`) خودکفاست — پس سناریویی که بعداً از
+     * این گره دربیاید، بی این خزش هم به همان‌جا می‌رسد.
+     *
+     * فقط روتِ مشخص، نه الگو: `/content/[id]` آدرس نیست و مرورگر نمی‌تواند
+     * برود. آن یکی باید با کلیک پیدا شود.
+     */
     let current = root;
+    for (const route of gatewayRoutes(this.scope)) {
+      const gateStarted = Date.now();
+      const gateFrom = this.events.length;
+      try {
+        await replayPath({
+          page: this.page,
+          steps: [{ go: route }],
+          ctx: this.replayCtx(),
+          baseURL: this.target.baseURL,
+          target: this.targetName,
+        });
+        const here = await this.settle();
+        const state = await this.observeState([{ go: route }], here);
+        if (state) {
+          current = state;
+          this.emitEvent('warning', { message: `دروازهٔ دامنه: مستقیم رفت به ${route}` });
+        }
+      } catch (cause) {
+        /**
+         * باز نشدنِ در، خزش را نمی‌کشد ولی **بلند** گفته می‌شود: بی این،
+         * نقشه‌ای درمی‌آید که فقط بیرونِ دامنه را دیده و «موفق» گزارش می‌شود.
+         */
+        this.emitEvent('warning', {
+          message: `دروازهٔ دامنه «${route}» باز نشد (${cause.message.slice(0, 120)})`,
+        });
+      }
+      await this.closeStep(`نقشه: دروازهٔ دامنه ${route}`, gateStarted, gateFrom);
+    }
+    await writeMap(this.targetName, this.map);
+
     let reason = '';
     while (true) {
       /**

@@ -179,6 +179,8 @@
       {formatNumber(preview.scenarios)} سناریو ·
       {formatNumber(preview.fixtures)} فایلِ نمونه
       {#if preview.states} · نقشه با {formatNumber(preview.states)} حالت{/if}
+      {#if preview.missions} · {formatNumber(preview.missions)} مأموریت{/if}
+      {#if preview.brief} · توضیحِ پروژه{/if}
     </p>
     {#each preview.omitted as note (note)}
       <p class="mt-1 text-xs text-amber-700 dark:text-amber-300">! داخلش نیست: {note}</p>

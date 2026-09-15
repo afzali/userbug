@@ -11,7 +11,7 @@
  *      افتاد در حالی که خواسته کتاب بود.
  */
 import { test, expect } from '@playwright/test';
-import { makeScope, outsideScope } from '../../src/map/scope.js';
+import { gatewayRoutes, makeScope, outsideScope } from '../../src/map/scope.js';
 
 test('نبودِ دامنه یعنی همه‌جا، نه هیچ‌جا', () => {
   // پیش‌فرض باید همان رفتارِ همیشگی بماند
@@ -61,4 +61,19 @@ test('آنچه بیرون ماند شمرده می‌شود — نقشهٔ مح�
   expect(outsideScope(map, makeScope(['/content/[id]']))).toHaveLength(2);
   // بی دامنه، هیچ‌چیز «بیرون» نیست
   expect(outsideScope(map, null)).toEqual([]);
+});
+
+test('دروازه فقط روتِ مشخص است — الگو آدرس نیست', () => {
+  /**
+   * ── چرا این تست ──
+   *
+   * نخستین مأموریتِ واقعی دامنه‌اش یک کتاب بود و خزش هیچ‌وقت به آن نرسید:
+   * درِ ورودش کلیک در `/contents` بود و آن کلیک بیرونِ دامنه افتاد. گزارشش
+   * «صف تمام شد» بود — یعنی شبیهِ موفقیت.
+   *
+   * حالا روتِ مشخص مستقیم رفته می‌شود. ولی `/content/[id]` آدرس نیست: دادنش
+   * به مرورگر یک ۴۰۴ می‌سازد که شبیهِ یافته به نظر می‌رسد.
+   */
+  expect(gatewayRoutes(makeScope(['/content/f2e9', '/content/[id]', 'ویرایش']))).toEqual(['/content/f2e9']);
+  expect(gatewayRoutes(null)).toEqual([]);
 });

@@ -92,6 +92,30 @@ export function exportBundle(target, { fixtures = true } = {}) {
   }
 
   /**
+   * مأموریت‌ها هم می‌آیند.
+   *
+   * ── چرا ──
+   *
+   * هدفِ کلِ این بسته این بود که «یک پروژه را بارها نسازم». نقشهٔ کار دقیقاً
+   * همان چیزی است که ساختنش هزینه داشته: یک فراخوانی مدل و یک دور اصلاحِ
+   * دستی. نیامدنش یعنی همان کار دوباره.
+   */
+  for (const name of walk(path.join(know, 'missions'))) {
+    const data = readJson(path.join(know, 'missions', name));
+    if (data) bundle.knowledge[`missions/${name}`] = data;
+  }
+
+  /**
+   * توضیحِ صاحبِ پروژه — جدا، چون markdown است نه JSON.
+   *
+   * و مهم‌تر از خیلی چیزهای دیگرِ این بسته: هر prompt با آن شروع می‌شود.
+   * پروژه‌ای که وارد شود و این را نداشته باشد، مدلش دوباره از نامِ دکمه‌ها
+   * حدس می‌زند که «کتاب» یعنی چه.
+   */
+  const brief = readText(path.join(know, 'brief.md'));
+  if (brief !== null) bundle.brief = brief;
+
+  /**
    * حساب‌ها بی رمز.
    *
    * شناسه و ایمیل ساختارند و بی آن‌ها سناریوهای `{{account.…}}` معنا
@@ -167,6 +191,8 @@ export function importBundle(bundle, { as = '', force = false } = {}) {
   };
 
   if (bundle.config) put(path.join(root, 'targets', `${target}.config.js`), bundle.config);
+  // متن است نه JSON، پس از حلقهٔ `knowledge` رد نمی‌شود
+  if (typeof bundle.brief === 'string') put(path.join(know, 'brief.md'), bundle.brief);
 
   for (const [name, data] of Object.entries(bundle.knowledge || {})) {
     put(path.join(know, name), JSON.stringify(data, null, 2) + '\n');
@@ -191,6 +217,8 @@ export function describeBundle(bundle) {
     knowledge: count(bundle?.knowledge),
     scenarios: count(bundle?.scenarios),
     fixtures: count(bundle?.fixtures),
+    brief: Boolean(bundle?.brief),
+    missions: Object.keys(bundle?.knowledge || {}).filter((one) => one.startsWith('missions/')).length,
     states: bundle?.knowledge?.['map.json']?.states?.length || 0,
     pages: Object.keys(bundle?.knowledge || {}).filter((one) => one.startsWith('pages/')).length,
     omitted: bundle?.omitted || [],

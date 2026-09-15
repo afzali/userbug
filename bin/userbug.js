@@ -174,6 +174,14 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --depth <n>                 سقفِ قدمِ کاوش
       --model <اسلاگ> --headed
 
+  userbug mission <هدف> "<جمله>"  جمله → نقشهٔ کار (یک فراخوانی)، ذخیره در
+                                  فایل تا اصلاحش کنید — بعد خزشِ محدود
+      --name <نام> --model <اسلاگ>
+  userbug mission list <هدف>      مأموریت‌های ذخیره‌شده
+  userbug mission run <هدف> <نام> اجرای همان نقشهٔ کار
+      --states <n> --minutes <n> --headed
+  userbug mission remove <هدف> <نام>
+
   userbug ai                      تنظیمات هوش مصنوعی: کلید، مدلِ هر نقش، بودجه
       --check                     هر مدل را با ارزان‌ترین درخواست بسنج
       --role <نقش>=<اسلاگ>        مدلِ یک نقش (resolve|author|analyze|default)
@@ -1084,6 +1092,7 @@ async function cmdBundle({ flags, positional }) {
     const size = (fs.statSync(out).size / 1024).toFixed(0);
     console.log(`\n  بسته: ${out}  (${size} کیلوبایت)`);
     console.log(`  ${info.knowledge} فایلِ شناخت · ${info.scenarios} سناریو · ${info.fixtures} فایلِ نمونه`);
+    if (info.missions || info.brief) console.log(`  ${info.missions} مأموریت${info.brief ? ' · توضیحِ پروژه' : ''}`);
     if (info.states) console.log(`  نقشه: ${info.states} حالت · ${info.pages} صفحهٔ ثبت‌شده`);
     for (const note of info.omitted) console.log(`  ! نیامد: ${note}`);
     console.log(`\n  بازگرداندن: userbug bundle import ${out}\n`);
@@ -1101,6 +1110,7 @@ async function cmdBundle({ flags, positional }) {
     if (flags.show) {
       console.log(`\n  هدف: ${info.target}  ·  ساخته‌شده: ${info.at.slice(0, 16).replace('T', ' ')}`);
       console.log(`  ${info.knowledge} فایلِ شناخت · ${info.scenarios} سناریو · ${info.fixtures} فایلِ نمونه`);
+    if (info.missions || info.brief) console.log(`  ${info.missions} مأموریت${info.brief ? ' · توضیحِ پروژه' : ''}`);
       if (info.states) console.log(`  نقشه: ${info.states} حالت`);
       for (const note of info.omitted) console.log(`  ! داخلش نیست: ${note}`);
       console.log('');
@@ -1372,6 +1382,210 @@ async function cmdQuest({ flags, positional }) {
 }
 
 /**
+ * «مأموریت» — جمله → نقشهٔ کار → اصلاحِ آدم → خزشِ محدود.
+ *
+ * ── چرا این گام میانی ساخته شد ──
+ *
+ * `quest` و `map` هر دو مستقیم شروع می‌کنند. اگر جمله را بد فهمیده باشند،
+ * بیست‌وپنج قدم و چند دقیقه و چند فراخوانی رفته تا معلوم شود. اصلاحِ یک
+ * **نقشه** رایگان است؛ اصلاحِ یک **اجرا** گران.
+ *
+ * ── چرا خروجی یک فایل است و همان‌جا باز نمی‌شود ──
+ *
+ * در خط فرمان، «اصلاح» یعنی ویرایشِ فایل. پس نقشهٔ کار ذخیره می‌شود و مسیرش
+ * چاپ؛ نه پرسشِ تعاملی، نه ویرایشگری که باز شود. همان فایل را رابط هم
+ * می‌خواند و می‌نویسد.
+ */
+async function cmdMission({ flags, positional }) {
+  const {
+    listMissions,
+    missionSlug,
+    missionToJob,
+    proposeMission,
+    removeMission,
+    saveMission,
+  } = await import('../src/map/mission.js');
+
+  const USAGE =
+    'userbug mission <هدف> "<جمله>"  |  mission list <هدف>  |  mission run <هدف> <نام>  |  mission remove <هدف> <نام>';
+
+  /**
+   * فعل اول، مثل `bundle`.
+   *
+   * پروژه‌ای که نامش «run» باشد اینجا گیر می‌کند — پذیرفته است: نامِ فرمان
+   * پیش‌بینی‌پذیر بودن ارزشش بیشتر از آن حالتِ نادر است.
+   */
+  const verbs = new Set(['list', 'run', 'remove']);
+  const verb = verbs.has(positional[0]) ? positional[0] : 'new';
+  const target = verb === 'new' ? positional[0] : positional[1];
+  if (!target) throw new Error(USAGE);
+
+  const show = (mission) => {
+    console.log(`\n  ${mission.goal}`);
+    if (mission.why) console.log(`  چرا: ${mission.why}`);
+    const start = mission.start || {};
+    const how =
+      start.mode === 'session'
+        ? 'ادامهٔ نشستِ ذخیره‌شدهٔ گشت'
+        : start.mode === 'account'
+          ? `با حسابِ «${start.account}»${start.entry ? ` و سناریوی ${start.entry}` : ''}`
+          : 'کاربرِ تازه می‌سازد';
+    console.log(`  شروع: ${how}`);
+    console.log(`  دامنه: ${mission.scope?.length ? mission.scope.join('، ') : '(همه‌جا — تنگش کنید)'}`);
+    for (const one of mission.look || []) console.log(`    · ${one}`);
+    if (mission.notes) console.log(`  یادداشت: ${mission.notes}`);
+    /**
+     * آنچه افتاد، چاپ می‌شود.
+     *
+     * دامنه‌ای که مدل اختراع کرده بی‌صدا حذف شود، خزش به جایی می‌رود که هیچ
+     * کنشی امتحان نمی‌شود — و گزارشش «صف تمام شد» است، یعنی شبیهِ موفقیت.
+     */
+    for (const one of mission.dropped || []) console.log(`  ! ${one}`);
+  };
+
+  if (verb === 'list') {
+    const missions = listMissions(target);
+    if (!missions.length) {
+      console.log(`\n  هنوز مأموریتی نیست.\n  ساختنش: userbug mission ${target} "برو داخل کتاب و ابزارهای متن را ببین"\n`);
+      return;
+    }
+    console.log('');
+    for (const mission of missions) {
+      const runs = mission.runs?.length ? ` · ${mission.runs.length} اجرا` : '';
+      console.log(`  ${mission.slug}${runs}`);
+      console.log(`    ${mission.goal}`);
+      console.log(`    دامنه: ${mission.scope?.length ? mission.scope.join('، ') : 'همه‌جا'}`);
+    }
+    console.log('');
+    return;
+  }
+
+  if (verb === 'remove') {
+    const slug = positional[2];
+    if (!slug) throw new Error('نام مأموریت لازم است: userbug mission remove <هدف> <نام>');
+    removeMission(target, slug);
+    console.log(`\n  حذف شد: ${slug}\n`);
+    return;
+  }
+
+  if (verb === 'run') {
+    const slug = positional[2];
+    if (!slug) throw new Error('نام مأموریت لازم است: userbug mission run <هدف> <نام>');
+    const mission = listMissions(target).find((one) => one.slug === slug);
+    if (!mission) throw new Error(`مأموریتی به نام «${slug}» نیست. فهرست: userbug mission list ${target}`);
+
+    show(mission);
+    const job = missionToJob(mission, { target });
+    /**
+     * ترجمه یک جاست: `missionToJob`.
+     *
+     * اگر اینجا و در رابط هر کدام ترجمهٔ خودشان را داشتند، دیر یا زود یکی‌شان
+     * `profile` را می‌فرستاد و آن یکی نه — و کاربر می‌دید که «همان مأموریت»
+     * در دو جا دو جور اجرا می‌شود.
+     */
+    const mapFlags = { ...flags };
+    if (job.from) mapFlags.from = job.from;
+    if (job.profile) mapFlags.profile = true;
+    if (job.remember) mapFlags.remember = job.remember;
+    if (job.scope) mapFlags.scope = job.scope;
+    if (job.focus) mapFlags.focus = job.focus;
+    if (mapFlags.states === undefined) mapFlags.states = job.states;
+    if (mapFlags.minutes === undefined) mapFlags.minutes = job.minutes;
+
+    console.log(`  خزشِ محدود شروع می‌شود…\n`);
+    const session = await cmdMap({ flags: mapFlags, positional: [target] });
+
+    /**
+     * اجرا در خودِ فایلِ مأموریت ثبت می‌شود — مثل رابط.
+     *
+     * «چه چیزی از این مأموریت درآمد» پرسشی است که هفتهٔ بعد پرسیده می‌شود.
+     * اگر فقط رابط ثبتش می‌کرد، همان مأموریت بسته به اینکه از کجا اجرا شده
+     * دو تاریخچهٔ متفاوت می‌داشت.
+     */
+    if (session?.runId) {
+      saveMission(target, {
+        ...mission,
+        runs: [{ run: session.runId, at: new Date().toISOString(), by: 'cli' }, ...(mission.runs || [])].slice(0, 20),
+      });
+    }
+    return;
+  }
+
+  /* ── ساختنِ نقشهٔ کار: تنها جایی که پول خرج می‌شود ── */
+  const text = positional.slice(1).join(' ').trim();
+  if (text.length < 5) throw new Error(USAGE);
+
+  const { readMap } = await import('../src/map/store.js');
+  const { knowledgeFor } = await import('../src/knowledge/select.js');
+  const { listAccounts } = await import('../src/knowledge/credentials.js');
+  const { readEndpoints } = await import('../src/knowledge/endpoints.js');
+  const { knowledgeDir } = await import('../src/knowledge/store.js');
+  const { scenarioDir } = await import('../src/scenario/load.js');
+
+  const safely = (fn, fallback) => {
+    try {
+      return fn();
+    } catch {
+      return fallback;
+    }
+  };
+
+  const map = safely(() => readMap(target), null);
+  const states = map?.states || [];
+  const dossier = safely(() => readDossier(target), null);
+
+  /**
+   * روت‌ها از سه جا، نه فقط از نقشه.
+   *
+   * نقشه فقط جایی را می‌شناسد که رفته. مأموریتی که می‌خواهد جایی را بگردد
+   * که هنوز نرفته‌ایم — دقیقاً ارزشمندترین حالت — با فهرستِ نقشه به
+   * «دامنه‌ای که نشناختیم» می‌خورد و می‌افتد.
+   */
+  const routes = [
+    ...new Set([
+      ...states.map((one) => one.route).filter(Boolean),
+      ...(dossier?.routes || []).map((one) => one.path).filter(Boolean),
+      ...safely(() => readEndpoints(target).routes.map((one) => one.path), []).filter(Boolean),
+    ]),
+  ];
+
+  const dir = safely(() => scenarioDir(target), '');
+  const scenarios = dir && fs.existsSync(dir) ? fs.readdirSync(dir).filter((name) => name.endsWith('.yml')) : [];
+
+  const models = resolveModel({
+    global: await loadGlobalConfig(),
+    role: 'author',
+    model: flags.model && flags.model !== true ? assertModelSlug(flags.model) : undefined,
+  });
+
+  console.log(`\n  نقشهٔ کار با ${models.model}…`);
+
+  const mission = await proposeMission({
+    text,
+    target,
+    models,
+    map,
+    knowledge: knowledgeFor({ target, text, budget: 1200 }),
+    routes,
+    views: [...new Set(states.map((one) => one.view).filter(Boolean))],
+    accounts: safely(() => listAccounts(target).map((one) => one.id), []),
+    scenarios,
+    hasSession: fs.existsSync(path.join(knowledgeDir(target), 'profile')),
+  });
+
+  const saved = saveMission(target, {
+    ...mission,
+    slug: flags.name && flags.name !== true ? missionSlug(String(flags.name)) : undefined,
+  });
+  show(saved);
+
+  const file = path.relative(ROOT, path.join(knowledgeDir(target), 'missions', `${saved.slug}.json`));
+  console.log(`\n  فایل: ${file.split(path.sep).join('/')}`);
+  console.log('  اصلاحش کنید (رایگان)، بعد:');
+  console.log(`    userbug mission run ${target} ${saved.slug}\n`);
+}
+
+/**
  * تنظیماتِ هوش مصنوعی.
  *
  * ── چرا `--check` هست ──
@@ -1622,9 +1836,29 @@ async function cmdMap({ flags, positional }) {
     const outside = outsideScope(map, session.scope);
     console.log(`  دامنه: ${session.scope.patterns.join('، ')}`);
     if (outside.length) console.log(`  ${outside.length} حالت بیرونِ دامنه ماند و گشته نشد.`);
+
+    /**
+     * دامنه‌ای که هیچ حالتی را نگرفت، **شکست است** نه نتیجه.
+     *
+     * نخستین مأموریتِ واقعی همین‌طور تمام شد: «صف تمام شد» و صفر کنش داخلِ
+     * دامنه — یعنی گزارشی که شبیهِ موفقیت است و نیست. این همان شکستِ خاموشی
+     * است که کلِ این ابزار برای شکارش ساخته شده، پس در خودش هم بلند گفته
+     * می‌شود.
+     */
+    const inside = (map.states || []).length - outside.length;
+    if (!inside) {
+      console.log('');
+      console.log('  ! هیچ حالتی داخلِ دامنه نبود؛ عملاً هیچ‌چیز گشته نشد.');
+      console.log('    یا الگو با روت و نمای واقعی نمی‌خواند، یا رسیدن به آنجا');
+      console.log('    از جایی می‌گذرد که خودش بیرونِ دامنه است. الگوی گشاد‌تر');
+      console.log('    بدهید، یا روتِ مشخص تا مستقیم برود.');
+    }
   }
   console.log(`\n  یافته‌ها: ${session.findings.length} ثبت‌شده از ${session.seenFindings.size} یکتا`);
   console.log(`  نقشه: knowledge/${target}/map.json  ·  اجرا: runs/${session.runId}/report.html\n`);
+
+  // فراخوان (مثلاً `mission run`) باید بداند این خزش کدام اجرا بود
+  return session;
 }
 
 /**
@@ -1997,6 +2231,9 @@ try {
       break;
     case 'quest':
       await cmdQuest(parsed);
+      break;
+    case 'mission':
+      await cmdMission(parsed);
       break;
     case 'entry':
       await cmdEntry(parsed);

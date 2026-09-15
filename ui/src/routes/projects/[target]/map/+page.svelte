@@ -4,6 +4,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
+  import MissionPlanner from '$lib/components/MissionPlanner.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import { formatNumber } from '$lib/format.js';
   import { pickState } from '../../../../../../src/map/quest.js';
@@ -345,9 +346,28 @@
 
 <div class="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
   <div class="space-y-4">
+    <!--
+      مأموریت، پیش از فرمِ خزش.
+
+      ── چرا اول ──
+
+      فرمِ پایین همهٔ تصمیم‌ها را از آدم می‌خواهد: از کجا شروع کند، کجا را
+      بگردد، تا کجا. کسی که تازه پروژه‌اش را ساخته هیچ‌کدام را نمی‌داند —
+      و همان‌جا یا بی‌دامنه می‌زند (و نیمی از بودجه جای بی‌ربط خرج می‌شود)
+      یا صفحه را می‌بندد.
+
+      یک جمله را ولی می‌داند. نقشهٔ کار همان جمله را به همین تصمیم‌ها ترجمه
+      می‌کند و **پیش از خرج** جلوی چشمش می‌گذارد. فرمِ دستی می‌ماند، برای
+      وقتی که آدم دقیقاً می‌داند چه می‌خواهد.
+    -->
+    <MissionPlanner {target} onstarted={() => goto(`/projects/${encodeURIComponent(target)}`)} />
+
     <Card.Root>
       <Card.Header>
-        <Card.Title class="text-sm">{hasMap ? 'خزشِ دوباره' : 'شروع خزش'}</Card.Title>
+        <Card.Title class="text-sm">{hasMap ? 'خزشِ دوباره — دستی' : 'شروع خزش — دستی'}</Card.Title>
+        <Card.Description>
+          وقتی خودت دقیقاً می‌دانی چه می‌خواهی. بی فراخوانی مدل.
+        </Card.Description>
       </Card.Header>
       <Card.Content>
         <form class="space-y-4" onsubmit={start}>

@@ -30,6 +30,12 @@ function withProject() {
     JSON.stringify({ accounts: [{ id: 'a', email: 'a@a.a', password: 'راز', note: 'تست' }] })
   );
   fs.writeFileSync(path.join(know, 'fixtures', 'seed.json'), 'دادهٔ نمونه');
+  fs.writeFileSync(path.join(know, 'brief.md'), 'این اپ یک کتاب‌خوان است.');
+  fs.mkdirSync(path.join(know, 'missions'), { recursive: true });
+  fs.writeFileSync(
+    path.join(know, 'missions', 'کتاب.json'),
+    JSON.stringify({ version: 1, slug: 'کتاب', goal: 'ابزارهای متن', scope: ['/content/[id]'] })
+  );
 
   const scen = path.join(root, 'scenarios', 'demo');
   fs.mkdirSync(path.join(scen, '_drafts'), { recursive: true });
@@ -104,4 +110,30 @@ test('نامِ هدفِ خطرناک وارد نمی‌شود', async () => {
   const { importBundle } = await import(`../../src/knowledge/bundle.js?e=${Date.now()}`);
   // نامِ هدف به مسیرِ فایل تبدیل می‌شود؛ `../` یعنی نوشتن بیرون از پروژه
   expect(() => importBundle({ version: 1, target: '../evil' })).toThrow(/نامِ هدف/);
+});
+
+test('توضیحِ پروژه و مأموریت‌ها هم در بسته‌اند', async () => {
+  /**
+   * ── چرا این دو جداگانه سنجیده می‌شوند ──
+   *
+   * فهرستِ بسته یک whitelist است، نه یک `walk` روی کلِ پوشه. هر چیزِ تازه‌ای
+   * که به `knowledge/` اضافه شود، **پیش‌فرض بیرون می‌ماند** — و بیرون ماندنش
+   * خطا نمی‌دهد: بسته ساخته می‌شود، وارد هم می‌شود، و هفته‌ها بعد معلوم
+   * می‌شود.
+   *
+   * و هزینهٔ نبودنشان بالاست: توضیحِ پروژه سرِ هر prompt می‌نشیند، و هر
+   * مأموریت یک فراخوانی مدل به‌علاوهٔ یک دور اصلاحِ دستی است.
+   */
+  const root = withProject();
+  const { exportBundle, importBundle, describeBundle } = await import(`../../src/knowledge/bundle.js?f=${Date.now()}`);
+  const bundle = exportBundle('demo');
+
+  expect(bundle.brief).toContain('کتاب‌خوان');
+  expect(bundle.knowledge['missions/کتاب.json'].goal).toBe('ابزارهای متن');
+  expect(describeBundle(bundle)).toMatchObject({ brief: true, missions: 1 });
+
+  importBundle(bundle, { as: 'copy' });
+  // markdown باید متن برگردد، نه JSONِ نقل‌قول‌دار
+  expect(fs.readFileSync(path.join(root, 'knowledge', 'copy', 'brief.md'), 'utf8')).toBe('این اپ یک کتاب‌خوان است.');
+  expect(fs.existsSync(path.join(root, 'knowledge', 'copy', 'missions', 'کتاب.json'))).toBe(true);
 });
