@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { ACTIVE, onFinished, run, startJob as startShared } from '$lib/run-store.svelte.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
@@ -10,10 +11,8 @@
   import Onboarding from '$lib/components/Onboarding.svelte';
   import HealthTable from '$lib/components/HealthTable.svelte';
   import RunCard from '$lib/components/RunCard.svelte';
-  import StatusBadge from '$lib/components/StatusBadge.svelte';
-  import { formatNumber, sourceLabel } from '$lib/format.js';
+  import { formatNumber } from '$lib/format.js';
 
-  const ACTIVE_JOB_STATUSES = new Set(['starting', 'running', 'cancelling']);
 
   let { data } = $props();
   // این‌ها snapshot اولیه‌اند چون کاربر در همین صفحه آن‌ها را تغییر می‌دهد.
@@ -40,19 +39,19 @@
   let repeat = $state(1);
   let headed = $state(false);
   let author = $state(false);
-  let submitting = $state(false);
   let error = $state('');
   let showSchedule = $state(false);
   let scheduleBusy = $state(false);
   let scheduleForm = $state({ key: '', time: '02:00', frequency: 'daily', days: 'MON' });
-  // svelte-ignore state_referenced_locally
-  let job = $state(data.activeJob || null);
-  let liveSteps = $state([]);
-  let liveFindings = $state([]);
-  let liveErrors = $state([]);
-  let output = $state([]);
-  let lastEventId = $state(0);
-  let stream = null;
+  /**
+   * اجرای زنده از **حالتِ مشترک** می‌آید، نه از این صفحه.
+   *
+   * ── چرا بیرون رفت ──
+   *
+   * پیش‌تر همهٔ حالتِ اجرا اینجا بود، پس نمای زنده فقط در همین صفحه دیده
+   * می‌شد. حالا پلیر روی هر صفحه‌ای هست و این صفحه هم از همان می‌خواند —
+   * دو نسخه یعنی روزی یکی‌شان رخدادی را بگیرد که آن یکی نبیند.
+   */
 
   // هدف از مسیر می‌آید، پس دیگر یک `$state` نیست که بشود بی‌صدا عوضش کرد.
   let target = $derived(data.target);
@@ -73,7 +72,7 @@
    * شرط «هیچ اجرایی هم نبوده» عمدی است: پروژه‌ای که سناریوهایش پاک شده ولی
    * تاریخچه دارد، کاربرِ تازه‌کار نیست و نباید راهنمای شروع ببیند.
    */
-  let blank = $derived(!project.scenarios?.length && !runs.length && !job);
+  let blank = $derived(!project.scenarios?.length && !runs.length && !run.job);
 
   /** سناریوهای اجراشدنی، یک بار — هم برای تیک‌ها، هم برای کشویی. */
   let runnableScenarios = $derived((project?.scenarios || []).filter((item) => item.executable));
@@ -233,75 +232,19 @@
       },
     ];
   });
-  let busy = $derived(ACTIVE_JOB_STATUSES.has(job?.status));
-  let canCancel = $derived(['starting', 'running'].includes(job?.status));
-  let latestStep = $derived(liveSteps.at(-1));
-  let activeRun = $derived(job?.activeRun || job?.runs?.at(-1));
-
-  function resetLive() {
-    liveSteps = [];
-    liveFindings = [];
-    liveErrors = [];
-    output = [];
-    lastEventId = 0;
-  }
-
-  function applyEvent(event) {
-    lastEventId = Math.max(lastEventId, Number(event.id || 0));
-    if (event.type === 'state' || event.type === 'complete') job = event.job;
-    if (event.type === 'run') job = { ...job, activeRun: event.runId, runs: [...new Set([...(job?.runs || []), event.runId])] };
-    if (event.type === 'run-state' && job) job = { ...job, activeRun: event.runId };
-    if (event.type === 'step') liveSteps = [...liveSteps, { ...event.step, runId: event.runId }];
-    if (event.type === 'finding' && !event.finding?.synthetic) liveFindings = [...liveFindings, { ...event.finding, runId: event.runId }];
-    if (event.type === 'event' && event.event?.severity === 'error') liveErrors = [...liveErrors, { ...event.event, runId: event.runId }];
-    if (event.type === 'output') output = [...output.slice(-79), `[${event.stream}] ${event.line}`];
-    if (event.type === 'complete') {
-      stream?.close();
-      refreshRuns();
-    }
-  }
-
-  function connect(jobId) {
-    stream?.close();
-    stream = new EventSource(`/api/jobs/${encodeURIComponent(jobId)}/events?after=${lastEventId}`);
-    stream.onmessage = (message) => applyEvent(JSON.parse(message.data));
-    stream.onerror = () => {
-      if (!ACTIVE_JOB_STATUSES.has(job?.status)) stream?.close();
-    };
-  }
-
-  async function refreshRuns() {
-    // فقط اجراهای همین پروژه، وگرنه فهرست با اجرای پروژهٔ دیگری پر می‌شد
-    const response = await fetch(`/api/runs?limit=60&target=${encodeURIComponent(target)}`);
-    if (response.ok) runs = (await response.json()).runs;
-  }
+  let job = $derived(run.job);
+  let busy = $derived(ACTIVE.has(run.job?.status));
 
   /**
-   * شروعِ هر کاری، یک راه.
+   * شروعِ هر کاری، یک راه — و حالا آن راه بیرون از این صفحه است.
    *
-   * فرمِ کناری و نوارِ فرمان هر دو از اینجا می‌گذرند. دو مسیرِ شروع یعنی
-   * روزی یکی‌شان `resetLive` را فراموش کند و جریانِ زندهٔ اجرای قبلی روی
-   * اجرای تازه بماند.
+   * فرمِ کناری و نوارِ فرمان هر دو از `run-store` می‌گذرند، همان‌جا که
+   * پلیر هم از آن می‌خواند.
    */
   async function startJob(options) {
-    error = '';
-    submitting = true;
-    resetLive();
-    try {
-      const response = await fetch('/api/jobs', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ target, ...options }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'اجرا شروع نشد');
-      job = payload.job;
-      connect(job.id);
-    } catch (cause) {
-      error = cause.message;
-    } finally {
-      submitting = false;
-    }
+    const job = await startShared(target, options);
+    if (!job) error = run.error;
+    return job;
   }
 
   async function start(event) {
@@ -320,16 +263,6 @@
     });
   }
 
-  async function cancel() {
-    if (!job) return;
-    const response = await fetch(`/api/jobs/${encodeURIComponent(job.id)}`, {
-      method: 'DELETE',
-      headers: { 'x-userbug-request': '1' },
-    });
-    const payload = await response.json();
-    if (response.ok) job = payload.job;
-    else error = payload.error || 'لغو انجام نشد';
-  }
 
   /**
    * زمان‌بندی، با همان پرچم‌هایی که در فرم بالا انتخاب شده‌اند.
@@ -380,14 +313,13 @@
     return scheduleRequest(`/api/schedules/${encodeURIComponent(key)}`, { method: 'DELETE' });
   }
 
-  onMount(() => {
-    if (data.activeJob) {
-      resetLive();
-      for (const event of data.activeJob.events || []) applyEvent(event);
-      if (ACTIVE_JOB_STATUSES.has(data.activeJob.status)) connect(data.activeJob.id);
-    }
-    return () => stream?.close();
-  });
+  /**
+   * تاریخچه بعد از پایانِ اجرا تازه می‌شود.
+   *
+   * وصل شدن به جریان کارِ لایه است، نه این صفحه. ولی «اجراهای اخیر» مالِ
+   * همین صفحه است و کسی جز خودش نمی‌داند باید تازه شود.
+   */
+  onMount(() => onFinished(refreshRuns));
 </script>
 
 <PageHeader eyebrow={`${project.environment} · ${project.baseURL}`} title={project.name} description="بگویید چه می‌خواهید، یا از فرمِ کناری دقیق انتخاب کنید.">
@@ -406,7 +338,7 @@
   نوارِ پیشرفتِ زیرش وضعیت را می‌گوید («۲۷٪ · ۱۱ پیشنهاد») و آن تابلوی
   وضعیت است نه قدمِ بعد. این یکی قدمِ بعد را می‌گیرد و می‌زند.
 -->
-<CommandBar {target} busy={busy || submitting} onRun={startJob} />
+<CommandBar {target} busy={busy || run.submitting} onRun={startJob} />
 
 <!--
   نوارِ مسیر — همیشه، نه فقط روی پروژهٔ خالی.
@@ -626,13 +558,13 @@
           <label class="flex items-center gap-2"><input type="checkbox" bind:checked={author} disabled={busy} /> ساخت پیش‌نویس کاوش</label>
         </div>
         {#if error}<p class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>{/if}
-        {#if job?.status === 'cancelling'}
-          <Button type="button" variant="outline" class="w-full" disabled>در حال لغو…</Button>
-        {:else if canCancel}
-          <Button type="button" variant="destructive" class="w-full" onclick={cancel}>لغو اجرا</Button>
-        {:else}
-          <Button type="submit" class="w-full" disabled={submitting || busy || !target}>{submitting ? 'در حال شروع…' : 'شروع اجرا'}</Button>
-        {/if}
+        <!--
+          لغو به پلیر رفت: همان‌جایی که اجرا دیده می‌شود، همان‌جا هم متوقف
+          می‌شود. دو دکمهٔ لغو در دو جا یعنی روزی یکی‌شان وضعیت را تازه نکند.
+        -->
+        <Button type="submit" class="w-full" disabled={run.submitting || busy || !target}>
+          {run.submitting ? 'در حال شروع…' : busy ? 'اجرایی در جریان است' : 'شروع اجرا'}
+        </Button>
       </form>
     </Card.Content>
 
@@ -690,61 +622,16 @@
   </Card.Root>
 
   <section class="min-w-0 space-y-6">
-    {#if job}
-      <Card.Root class="overflow-hidden gap-0 py-0">
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
-          <div class="flex items-center gap-3"><StatusBadge status={job.status === 'finished' ? job.outcome : job.status} /><span class="code-value text-muted-foreground">{job.id}</span></div>
-          <div class="flex items-center gap-2">
-            <!--
-              اجرا که تمام شد، قدمِ بعد تریاژ است.
+    <!--
+      نمای زندهٔ اجرا از این صفحه رفت.
 
-              پیش‌تر فقط «صفحهٔ اجرا» بود — که روایتِ همین یک اجراست. ولی
-              کارِ بعدی خواندنِ روایت نیست، قضاوت دربارهٔ یافته‌هاست؛ و آن
-              قضاوت به شناخت برمی‌گردد. دکمه فقط وقتی می‌آید که واقعاً
-              یافته‌ای باشد.
-            -->
-            {#if !busy && liveFindings.length}
-              <Button href={`/projects/${encodeURIComponent(target)}/triage`} size="sm">
-                تریاژِ {formatNumber(liveFindings.length)} یافته
-              </Button>
-            {/if}
-            {#if activeRun}<Button href={`/runs/${encodeURIComponent(activeRun)}`} variant="outline" size="sm">صفحهٔ اجرا</Button>{/if}
-          </div>
-        </div>
-        <div class="grid gap-0 md:grid-cols-[minmax(0,1fr)_18rem]">
-          <div class="min-h-80 p-5">
-            {#if latestStep?.shot && activeRun}
-              <img src={`/api/runs/${encodeURIComponent(latestStep.runId || activeRun)}/assets/${latestStep.shot.split('/').map(encodeURIComponent).join('/')}`} alt={`عکس قدم ${latestStep.step}`} class="max-h-[32rem] w-full rounded-xl border bg-muted object-contain" />
-              <div class="mt-3 flex items-center justify-between gap-3"><strong class="text-sm">{latestStep.step}</strong><span class="text-xs text-muted-foreground">{latestStep.route || ''}</span></div>
-            {:else}
-              <div class="grid min-h-72 place-items-center rounded-xl border border-dashed bg-muted/30 text-center text-sm text-muted-foreground">
-                <div><span class="mx-auto mb-3 block size-8 animate-pulse rounded-full border-4 border-primary/20 border-t-primary"></span>{busy ? 'منتظر نخستین قدم و عکس…' : 'این اجرا عکسی ثبت نکرده است'}</div>
-              </div>
-            {/if}
-          </div>
-          <div class="border-t bg-muted/30 p-4 md:border-t-0 md:border-r">
-            <div class="mb-4 grid grid-cols-3 gap-2 text-center">
-              <div><strong class="block text-lg">{formatNumber(liveSteps.length)}</strong><small class="text-muted-foreground">قدم</small></div>
-              <div><strong class="block text-lg text-destructive">{formatNumber(liveFindings.length)}</strong><small class="text-muted-foreground">یافته</small></div>
-              <div><strong class="block text-lg">{formatNumber(liveErrors.length)}</strong><small class="text-muted-foreground">خطا</small></div>
-            </div>
-            <div class="scroll-thin max-h-[28rem] space-y-2 overflow-auto">
-              {#each [...liveFindings, ...liveErrors].slice(-30).reverse() as item}
-                <div class="rounded-lg border bg-background p-3 text-xs leading-6"><Badge variant={item.source === 'server' ? 'destructive' : 'secondary'}>{sourceLabel(item.source)}</Badge><p class="mt-2 break-words">{item.normalized || item.message}</p></div>
-              {:else}<p class="py-8 text-center text-xs text-muted-foreground">هنوز خطایی دیده نشده است.</p>{/each}
-            </div>
-          </div>
-        </div>
-        {#if output.length}
-          <details class="border-t"><summary class="cursor-pointer px-5 py-3 text-sm font-medium">خروجی اجراگر ({formatNumber(output.length)} خط آخر)</summary><pre class="scroll-thin max-h-64 overflow-auto border-t bg-slate-950 p-4 text-xs leading-6 text-slate-200" dir="auto">{output.join('\n')}</pre></details>
-        {/if}
-      </Card.Root>
-    {:else}
-      <Card.Root class="border-dashed bg-card/70">
-        <Card.Content class="grid min-h-52 place-items-center text-center"><div><span class="text-4xl">◎</span><h2 class="mt-3 font-bold">آمادهٔ مشاهدهٔ زنده</h2><p class="mt-2 text-sm text-muted-foreground">یک اجرا را از فرم کناری شروع کنید.</p></div></Card.Content>
-      </Card.Root>
-    {/if}
+      ── چرا ──
 
+      کاربر گفت «اجرا در هر گامی ممکن است باشد؛ مثل پلیری که هر جا لازم شد
+      دیده شود». حالا `RunPlayer` در لایه‌بندی است و روی **هر** صفحه‌ای
+      همراه است. نگه‌داشتنِ یک نسخهٔ دوم اینجا یعنی دو جا یک چیز را نشان
+      دهند و دیر یا زود یکی‌شان رخدادی را نبیند.
+    -->
     <!--
       سلامتِ سفرها، پیش از تاریخچهٔ اجراها.
 

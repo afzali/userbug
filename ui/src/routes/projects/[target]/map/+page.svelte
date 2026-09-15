@@ -26,7 +26,8 @@
    * کمکت می‌کنم، یا برو هر چه می‌خواهی بگرد». یعنی دو حالت، و سومی که از
    * قبل بود (کاوشِ عمیق با مدل). همان سه، به‌صورتِ یک انتخابِ یکی‌از‌سه.
    */
-  import { goto, invalidateAll } from '$app/navigation';
+  import { invalidateAll } from '$app/navigation';
+  import { startJob } from '$lib/run-store.svelte.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
@@ -377,17 +378,12 @@
               mission: mode === 'scoped' ? missionSlug : '',
             };
 
-      const response = await fetch('/api/jobs', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify(body),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'شروع نشد');
-      // اجرای زنده در فضای کاری دیده می‌شود؛ خزش هم یک اجراست
-      await goto(`/projects/${encodeURIComponent(target)}`);
+      // پلیر همین‌جا می‌آید؛ لازم نیست کاربر از فرمی که پرش کرده بیرون برود
+      const job = await startJob(target, body);
+      if (!job) throw new Error('شروع نشد');
     } catch (cause) {
       error = cause.message;
+    } finally {
       busy = false;
     }
   }

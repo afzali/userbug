@@ -16,7 +16,7 @@
    * فقط می‌گوید «چیزی نشکست». سبزِ آن با سبزِ سناریویی که واقعاً چیزی را
    * تضمین می‌کند یکی نیست، و تا وقتی این عدد دیده نشود، کسی نمی‌فهمد.
    */
-  import { goto } from '$app/navigation';
+  import { startJob } from '$lib/run-store.svelte.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
@@ -65,16 +65,20 @@
     busy = label;
     error = '';
     try {
-      const response = await fetch('/api/jobs', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ target, kind: 'run', only: names }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'اجرا شروع نشد');
-      await goto(base);
+      /**
+        * از حالتِ مشترک می‌گذرد، نه مستقیم.
+        *
+        * ── چرا دیگر `goto(base)` نمی‌کند ──
+        *
+        * پیش‌تر بعد از شروع، کاربر را به صفحهٔ خانه می‌برد — چون نمای زنده
+        * فقط آنجا بود. حالا پلیر همین‌جا می‌آید، پس بردنِ آدم از فهرستی که
+        * دارد رویش کار می‌کند، فقط گم کردنِ جای اوست.
+        */
+      const job = await startJob(target, { kind: 'run', only: names });
+      if (!job) throw new Error('اجرا شروع نشد');
     } catch (cause) {
       error = cause.message;
+    } finally {
       busy = '';
     }
   }

@@ -4,6 +4,8 @@
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button/index.js';
+  import RunPlayer from '$lib/components/RunPlayer.svelte';
+  import { attach, close } from '$lib/run-store.svelte.js';
 
   let { children } = $props();
   let dark = $state(false);
@@ -42,6 +44,21 @@
   $effect(() => {
     if (known) remembered = known;
   });
+
+  /**
+   * وصل شدن به اجرایی که سرور می‌گوید در جریان است.
+   *
+   * ── چرا اینجا و نه در صفحه ──
+   *
+   * `EventSource` باید از ناوبری جان سالم ببرد. اگر در صفحه بود، با هر رفتن
+   * و آمدن قطع و وصل می‌شد و رخدادهای همان لحظه گم می‌شدند. اینجا یک بار
+   * وصل می‌شود و تا وقتی تب باز است می‌ماند.
+   */
+  $effect(() => {
+    attach(known, page.data.activeJob || null);
+  });
+
+  onMount(() => close);
 
   const KEEPS_PROJECT = new Set(['/settings']);
   let target = $derived(known || (KEEPS_PROJECT.has(page.url.pathname) ? remembered : ''));
@@ -325,7 +342,23 @@
       <span class="flex items-center gap-2 text-xs text-muted-foreground"><span class="size-2 rounded-full bg-emerald-500"></span> آمادهٔ اجرای محلی</span>
     </header>
     <main class="surface-grid min-h-[calc(100vh-3.5rem)] p-4 sm:p-6 lg:p-8">
-      <div class="mx-auto max-w-[1500px]">{@render children()}</div>
+      <!--
+        فضای ته صفحه برای پلیر.
+
+        بی این، نوارِ ثابت روی آخرین ردیفِ هر فهرست می‌نشیند — و آن ردیف
+        معمولاً همانی است که دنبالش بوده‌ای.
+      -->
+      <div class="mx-auto max-w-[1500px] pb-20">{@render children()}</div>
     </main>
   </div>
 </div>
+
+<!--
+  پلیرِ اجرا — بیرونِ `main`، چون به هیچ صفحه‌ای تعلق ندارد.
+
+  کاربر گفت «اجرا در همهٔ اینهاست و در هر گامی ممکن است باشد؛ بهتر است شبیه
+  پلیری باشد که هر جا لازم شد دیده شود». پیش‌تر نمای زنده فقط در صفحهٔ خانه
+  بود، یعنی همان لحظه که خزش را شروع می‌کردی و جای دیگری می‌رفتی، دیگر
+  نمی‌دیدی چه می‌شود.
+-->
+<RunPlayer />
