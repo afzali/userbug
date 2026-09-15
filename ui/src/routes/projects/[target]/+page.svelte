@@ -9,7 +9,6 @@
   import PageHeader from '$lib/components/PageHeader.svelte';
   import CommandBar from '$lib/components/CommandBar.svelte';
   import Onboarding from '$lib/components/Onboarding.svelte';
-  import HealthTable from '$lib/components/HealthTable.svelte';
   import RunCard from '$lib/components/RunCard.svelte';
   import { formatNumber } from '$lib/format.js';
 
@@ -341,37 +340,15 @@
 <CommandBar {target} busy={busy || run.submitting} onRun={startJob} />
 
 <!--
-  نوارِ مسیر — همیشه، نه فقط روی پروژهٔ خالی.
+  نوارِ پنج‌قدمی از اینجا رفت — به منو.
 
   ── چرا ──
 
-  کارتِ «از کجا شروع کنیم» فقط وقتی می‌آمد که پروژه هیچ نداشت، پس دقیقاً
-  وقتی ناپدید می‌شد که کار تازه جدی شده بود: کسی که یک اجرا داشت، دیگر
-  هیچ‌جا نمی‌دید که نقشه نکشیده و شناختش نصفه مانده.
-
-  این نوار همان پنج قدم است با **عدد**، و عددها از منبعِ خودشان می‌آیند.
-  قدمی که هنوز انجام نشده، دعوت است؛ قدمی که انجام شده، وضعیت.
+  درست بود ولی فقط روی همین صفحه دیده می‌شد: تا می‌رفتی سراغِ «کشف»، دیگر
+  نمی‌دانستی کجای کاری. کاربر گفت «همهٔ اینها هم معلوم باشد که کجاییم و چه
+  باید بکنیم» — و چیزی که باید همیشه معلوم باشد، جایش در منوست، نه در یک
+  صفحه. حالا هر ردیفِ منو عددِ خودش را زیرِ نامش دارد.
 -->
-<section class="mb-6 overflow-hidden rounded-xl border">
-  <ol class="grid divide-y sm:grid-cols-5 sm:divide-x sm:divide-y-0 sm:divide-x-reverse">
-    {#each steps as step (step.href)}
-      <li>
-        <a
-          href={step.href}
-          class="flex h-full flex-col gap-1 p-3 transition-colors hover:bg-accent/60 {step.done ? '' : 'bg-muted/30'}"
-        >
-          <span class="flex items-center gap-2 text-xs font-medium">
-            <span class="grid size-5 shrink-0 place-items-center rounded-full border text-[10px] {step.done ? 'border-primary/40 bg-primary/10 text-primary' : 'text-muted-foreground'}">
-              {step.done ? '✓' : step.index}
-            </span>
-            {step.label}
-          </span>
-          <span class="text-[11px] leading-5 text-muted-foreground">{step.state}</span>
-        </a>
-      </li>
-    {/each}
-  </ol>
-</section>
 
 {#if blank}
   <!--
@@ -633,15 +610,15 @@
       دهند و دیر یا زود یکی‌شان رخدادی را نبیند.
     -->
     <!--
-      سلامتِ سفرها، پیش از تاریخچهٔ اجراها.
+      جدولِ سلامت از اینجا رفت — به «مأموریت‌ها».
 
-      ── چرا بالاتر ──
+      ── چرا ──
 
-      فهرستِ اجراها تاریخِ **کارِ ابزار** است: کی چه چیزی را بردیم. ولی
-      پرسشی که آدم صبح با آن می‌آید این نیست؛ این است که «اپم سالم است؟».
-      تا امروز هیچ‌جای این رابط آن را جواب نمی‌داد.
+      همان فهرست، با همان داده، در دو صفحه بود. دو نمایشِ یک حقیقت یعنی
+      روزی یکی‌شان عقب می‌ماند و کسی نمی‌فهمد کدام درست است. آنجا خانهٔ
+      اوست (ستونِ «انتظار» و دکمهٔ اجرای هر سفر آنجاست)؛ اینجا خانهٔ
+      **اجراها**ست. عددِ سلامت در منو همیشه دمِ دست است.
     -->
-    <HealthTable rows={data.health || []} base={`/projects/${encodeURIComponent(target)}`} />
 
     <div>
       <div class="mb-4 flex flex-wrap items-end justify-between gap-3">

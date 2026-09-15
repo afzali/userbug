@@ -1,6 +1,5 @@
 import { listSchedules } from '../../../../../src/schedule.js';
-import { healthFor, listRuns } from '$lib/server/artifacts.js';
-import { loadScenarios } from '../../../../../src/scenario/load.js';
+import { listRuns } from '$lib/server/artifacts.js';
 import { getActiveJob } from '$lib/server/jobs.js';
 import { coverageOf } from '../../../../../src/knowledge/coverage.js';
 import { listPages } from '../../../../../src/knowledge/store.js';
@@ -30,21 +29,7 @@ export async function load({ params }) {
     schedules = [];
   }
 
-  /**
-   * سلامتِ سفرها — همان پرسشی که این صفحه تا امروز جوابش را نمی‌داد.
-   *
-   * سناریوهای روی دیسک هم می‌آیند، حتی آن‌هایی که هرگز اجرا نشده‌اند: فهرستی
-   * که خطرناک‌ترین ردیفش را نشان ندهد، سبزِ دروغین است.
-   */
-  let known = [];
-  try {
-    known = loadScenarios(params.target).map((one) => one.name);
-  } catch {
-    known = [];
-  }
-
   return {
-    health: await healthFor(params.target, { known }).catch(() => []),
     runs: await listRuns({ target: params.target, limit: 60 }),
     activeJob: getActiveJob(true, params.target),
     schedules,
