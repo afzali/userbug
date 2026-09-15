@@ -5,6 +5,7 @@
   import * as Card from '$lib/components/ui/card/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import { formatNumber } from '$lib/format.js';
   import { pickState } from '../../../../../../src/map/quest.js';
 
   let { data } = $props();
@@ -617,14 +618,44 @@
             </div>
 
             <label class="flex items-center gap-2 text-xs">
-              <input type="checkbox" bind:checked={fresh} />
-              از صفر، نه ادامهٔ نقشهٔ موجود
-            </label>
-            <label class="flex items-center gap-2 text-xs">
               <input type="checkbox" bind:checked={headed} />
               مرورگر دیده شود
             </label>
           </fieldset>
+
+          <!--
+            تکلیفِ نقشهٔ موجود — پرسشِ چهارم، و فقط وقتی نقشه‌ای هست.
+
+            ── چرا از «تا کجا بگردد» بیرون آمد ──
+
+            کاربر پرسید: «چرا هنوز ـاز صفر، نه ادامهٔ نقشهٔ موجودـ را داریم؟
+            مگر در بالا انتخاب نکرده‌ام؟»
+
+            حق داشت که گیج شود، هرچند این دو یکی نیستند: بالا دربارهٔ
+            **مرورگر و هویت** است (چطور وارد شود)، این یکی دربارهٔ **فایلِ
+            نقشه** (آنچه از خزش‌های قبلی مانده). ولی هر دو واژهٔ «تازه» را
+            داشتند و این یکی زیرِ عنوانِ «تا کجا بگردد» نشسته بود — که اصلاً
+            سقف نیست.
+
+            حالا نامش خودِ نقشه را می‌گوید، عددِ حالت‌های فعلی کنارش است تا
+            پیامد ملموس باشد، و روی پروژه‌ای که هنوز نقشه ندارد اصلاً نشان
+            داده نمی‌شود — گزینه‌ای که هیچ کاری نمی‌کند، فقط گیج می‌کند.
+          -->
+          {#if hasMap}
+            <fieldset class="space-y-1.5 border-t pt-3">
+              <legend class="text-xs font-semibold">۴. با نقشهٔ موجود چه کند؟</legend>
+              <label class="flex items-start gap-2 text-xs">
+                <input type="checkbox" bind:checked={fresh} class="mt-0.5" />
+                <span>
+                  نقشه را از نو بساز
+                  <span class="block text-[11px] leading-5 text-muted-foreground">
+                    نقشهٔ فعلی ({formatNumber(states.length)} حالت) دور ریخته می‌شود.
+                    خالی یعنی روی همان ادامه می‌دهد و فقط چیزهای تازه را اضافه می‌کند.
+                  </span>
+                </span>
+              </label>
+            </fieldset>
+          {/if}
 
           {#if error}<p class="text-xs text-destructive">{error}</p>{/if}
 
