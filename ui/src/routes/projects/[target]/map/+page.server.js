@@ -1,13 +1,15 @@
 import { readMap } from '../../../../../../src/map/store.js';
 import { extraRoutes, stuckAtLogin, unreachedRoutes } from '../../../../../../src/map/render.js';
 import { mispredictions } from '../../../../../../src/map/classify.js';
-import { readDossier } from '../../../../../../src/knowledge/store.js';
+import { knowledgeDir, readDossier } from '../../../../../../src/knowledge/store.js';
+import { listAccounts } from '../../../../../../src/knowledge/credentials.js';
 import { proposalsFor } from '../../../../../../src/knowledge/propose.js';
 import { listScenarios } from '$lib/server/projects.js';
 import { loadScenario } from '../../../../../../src/scenario/load.js';
 import { unsupportedVerbs } from '../../../../../../src/map/replay.js';
 import { looksRecorded } from '../../../../../../src/scenario/entry.js';
 import { scenarioDir } from '../../../../../../src/scenario/load.js';
+import fs from 'node:fs';
 import path from 'node:path';
 
 /**
@@ -66,6 +68,25 @@ export async function load({ params }) {
      * چه چیزی تولید کرده — و اگر صفر باشد، همان صفر هم یک خبر است.
      */
     fromMap: safely(() => proposalsFor(target).proposals.filter((item) => item.kind === 'state').length, 0),
+
+    /**
+     * نشستِ ذخیره‌شدهٔ گشت هست؟
+     *
+     * بی این، گزینهٔ «ادامهٔ همان نشست» یا همیشه نشان داده می‌شد (و روی
+     * پروژه‌ای که گشت نرفته، خزش را روی مرورگرِ خالی می‌برد) یا هرگز.
+     */
+    hasProfile: fs.existsSync(path.join(knowledgeDir(target), 'profile')),
+
+    /**
+     * حساب‌ها — فقط شناسه و ایمیل.
+     *
+     * رمز اینجا کاری ندارد: کشویی فقط می‌گوید «با کدام»، و مقدارش را خودِ
+     * مفسر از `knowledge` برمی‌دارد.
+     */
+    accounts: safely(
+      () => listAccounts(target).map((item) => ({ id: item.id, email: item.email })),
+      []
+    ),
     /**
      * کدام سناریو **واقعاً** می‌تواند مسیرِ ورود باشد.
      *

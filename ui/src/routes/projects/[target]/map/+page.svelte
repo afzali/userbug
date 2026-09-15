@@ -37,9 +37,31 @@
   let fresh = $state(false);
   let headed = $state(false);
   /** شناسهٔ حسابی که خزش می‌سازد و به خاطر می‌سپارد. خالی یعنی هویتِ تازه هر بار. */
-  let remember = $state('crawler');
-  /** پروفایلِ ماندگار: نشستِ خزشِ قبلی می‌ماند، پس ورود یک‌بار است. */
-  let profile = $state(true);
+  /**
+   * «از کجا شروع کند» — یک انتخاب، نه سه تنظیمِ جدا.
+   *
+   * ── چرا این حالت اضافه شد ──
+   *
+   * سه فیلدِ قبلی (`from`، `remember`، `profile`) سه راهِ متفاوتِ **یک** کار
+   * بودند: رساندنِ خزنده به حالتِ وارد‌شده. ولی کنار هم مثل سه تنظیمِ مستقل
+   * نشسته بودند و هیچ‌جا نوشته نبود که با هم چه می‌کنند — پس کاربر یا
+   * هیچ‌کدام را می‌زد و خزش پشتِ صفحهٔ ورود می‌ماند، یا هر سه را.
+   *
+   * پیش‌فرض از خودِ پروژه می‌آید: اگر نشستی از گشت مانده، همان؛ وگرنه
+   * حسابی اگر هست؛ وگرنه کاربرِ تازه.
+   */
+  let startMode = $state(data.hasProfile ? 'session' : data.accounts.length ? 'account' : 'fresh');
+  let remember = $state(data.accounts[0]?.id || '');
+  /**
+   * پرچم‌های واقعی از انتخابِ بالا مشتق می‌شوند.
+   *
+   * یک منبعِ حقیقت: رابط یک پرسش می‌پرسد و همین‌جا به زبانِ خزش ترجمه
+   * می‌شود. اگر هر کدام `state` جدا می‌ماندند، دو جا می‌دانستند «ادامهٔ
+   * نشست یعنی چه» و دیر یا زود واگرا می‌شدند.
+   */
+  let profile = $derived(startMode === 'session');
+  /** هویتِ ذخیره‌شده فقط در حالتِ «با حسابی که دارم» معنا دارد. */
+  let rememberId = $derived(startMode === 'account' ? remember : '');
   /** واژه‌هایی که اول سراغشان برود. فیلتر نیست، اولویت است. */
   let focus = $state('');
   let busy = $state(false);
@@ -216,13 +238,19 @@
         body: JSON.stringify({
           target,
           kind: 'map',
-          from,
+          /**
+           * در حالتِ «ادامهٔ نشست» مسیرِ ورود فرستاده نمی‌شود.
+           *
+           * مرورگر از قبل وارد است؛ بازپخشِ فرمِ ورود روی صفحه‌ای که فرم
+           * ندارد، در هر برگشت به خانه یک شکستِ بی‌دلیل است.
+           */
+          from: startMode === 'session' ? '' : from,
           seed,
           states: states_cap,
           minutes,
           fresh,
           headed,
-          remember,
+          remember: rememberId,
           profile,
           focus,
         }),
@@ -293,30 +321,111 @@
         <Card.Title class="text-sm">{hasMap ? 'خزشِ دوباره' : 'شروع خزش'}</Card.Title>
       </Card.Header>
       <Card.Content>
-        <form class="space-y-3" onsubmit={start}>
-          <label class="block space-y-1">
-            <span class="text-xs text-muted-foreground">مسیرِ ورود (سناریو)</span>
-            <select bind:value={from} class="h-9 w-full rounded-md border bg-background px-2 text-sm">
-              <option value="">— بدون ورود؛ از صفحهٔ اول —</option>
-              {#each data.scenarios as scenario (scenario.path)}
-                <!-- سناریویی که خزش نمی‌تواند بازپخشش کند، انتخاب‌شدنی نیست -->
-                <option
-                  value={`scenarios/${target}/${scenario.path}`}
-                  disabled={scenario.blockers.length > 0}
-                >
-                  {scenario.name}{scenario.blockers.length
-                    ? ` — ${scenario.blockers.join('، ')} ندارد`
-                    : scenario.recorded
-                      ? ' — ضبطِ خام'
-                      : ''}
-                </option>
-              {/each}
-            </select>
-            <span class="block text-[11px] leading-5 text-muted-foreground">
-              اپی که ورود دارد، برای ناشناس یک صفحه است. یک سناریوی کوچکِ ورود
-              بدهید تا نقشه از داخل شروع شود.
-            </span>
-          </label>
+        <form class="space-y-4" onsubmit={start}>
+          <!--
+            سه پرسش، نه هشت فیلد.
+
+            ── چرا این صفحه بازنویسی شد ──
+
+            کاربر گفت: «طراحی این صفحه گیجم کرده. می‌خواهم بتوانم به راحتی
+            بگویم چطور خزش کن، دنبالِ چی باش، از کجا شروع کن.»
+
+            فرمِ قبلی هشت کنترلِ هم‌وزن بود — مسیرِ ورود، دادهٔ اولیه، «حسابی
+            که به خاطر بسپارد»، «همان مرورگرِ خزشِ قبلی» — و رابطهٔ میانشان
+            هیچ‌جا نوشته نبود. بدتر: **سه تای اول سه راهِ متفاوتِ یک کار
+            بودند** (شروع کردن از حالتِ وارد‌شده) ولی کنار هم مثل سه تنظیمِ
+            مستقل نشسته بودند، پس کاربر یا هیچ‌کدام را می‌زد یا هر سه را.
+
+            حالا همان سه پرسش‌اند، و اولی یک انتخابِ **یکی‌از‌سه** است.
+          -->
+          <fieldset class="space-y-2">
+            <legend class="text-xs font-semibold">۱. از کجا شروع کند؟</legend>
+
+            <!--
+              ادامهٔ نشستِ گشت — اول، چون بعد از گشت طبیعی‌ترین کار است.
+
+              این گزینه از قبل بود ولی نامش «همان مرورگرِ خزشِ قبلی» بود: کسی
+              که تازه گشت رفته و تیکِ «نشست بماند» را زده، هیچ دلیلی نداشت فکر
+              کند این جمله دربارهٔ اوست.
+            -->
+            <label class="flex items-start gap-2 rounded-lg border p-2.5 text-xs {startMode === 'session' ? 'border-primary bg-accent/40' : ''}">
+              <input type="radio" bind:group={startMode} value="session" class="mt-0.5" disabled={!data.hasProfile} />
+              <span>
+                <strong>ادامهٔ همان نشست</strong>
+                {#if data.hasProfile}
+                  <span class="block text-[11px] leading-5 text-muted-foreground">
+                    همان مرورگری که در گشت واردش شدی — نشست و کَش سرِ جایشان‌اند،
+                    پس خزش از همان‌جا ادامه می‌دهد و ورود لازم ندارد.
+                  </span>
+                {:else}
+                  <span class="block text-[11px] leading-5 text-muted-foreground">
+                    نشستی ذخیره نشده. یک <a class="underline underline-offset-2" href={`${base}/tour`}>گشت</a>
+                    با تیکِ «نشست بماند» بروید تا این گزینه فعال شود.
+                  </span>
+                {/if}
+              </span>
+            </label>
+
+            <!-- با حسابِ ذخیره‌شده: ورود را سناریو می‌زند، با مقدارهای همان حساب -->
+            <label class="flex items-start gap-2 rounded-lg border p-2.5 text-xs {startMode === 'account' ? 'border-primary bg-accent/40' : ''}">
+              <input type="radio" bind:group={startMode} value="account" class="mt-0.5" />
+              <span class="min-w-0 flex-1">
+                <strong>با حسابی که دارم</strong>
+                <span class="block text-[11px] leading-5 text-muted-foreground">
+                  هر بار از نو وارد می‌شود، با ایمیل و رمزِ همان حساب.
+                </span>
+                {#if startMode === 'account'}
+                  <select bind:value={remember} class="mt-1.5 h-8 w-full rounded-md border bg-background px-2 text-xs">
+                    <option value="">— حساب را انتخاب کنید —</option>
+                    {#each data.accounts as account (account.id)}
+                      <option value={account.id}>{account.id}{account.email ? ` — ${account.email}` : ''}</option>
+                    {/each}
+                  </select>
+                  {#if !data.accounts.length}
+                    <span class="mt-1 block text-[11px] text-amber-700 dark:text-amber-300">
+                      حسابی ذخیره نشده.
+                      <a class="underline underline-offset-2" href={`${base}/config`}>در «پیکربندی» یکی بسازید</a>
+                      — ایمیل و رمزِ کاربری که خودتان در اپ ساخته‌اید.
+                    </span>
+                  {/if}
+                {/if}
+              </span>
+            </label>
+
+            <!-- کاربرِ تازه: سناریوی ورود ثبت‌نام می‌کند و هویت ذخیره می‌شود -->
+            <label class="flex items-start gap-2 rounded-lg border p-2.5 text-xs {startMode === 'fresh' ? 'border-primary bg-accent/40' : ''}">
+              <input type="radio" bind:group={startMode} value="fresh" class="mt-0.5" />
+              <span>
+                <strong>کاربرِ تازه بساز</strong>
+                <span class="block text-[11px] leading-5 text-muted-foreground">
+                  هر خزش با هویتِ نو ثبت‌نام می‌کند و اپِ خالی را می‌بیند. برای
+                  آزمودنِ مسیرِ نخستین‌بار خوب است، برای دیدنِ صفحه‌های داده‌دار نه.
+                </span>
+              </span>
+            </label>
+
+            <!-- مسیرِ ورود فقط وقتی معنا دارد که خزش باید خودش وارد شود -->
+            {#if startMode !== 'session'}
+              <label class="block space-y-1 ps-6">
+                <span class="text-[11px] text-muted-foreground">با کدام سناریو وارد شود</span>
+                <select bind:value={from} class="h-8 w-full rounded-md border bg-background px-2 text-xs">
+                  <option value="">— بدون ورود؛ از صفحهٔ اول —</option>
+                  {#each data.scenarios as scenario (scenario.path)}
+                    <!-- سناریویی که خزش نمی‌تواند بازپخشش کند، انتخاب‌شدنی نیست -->
+                    <option
+                      value={`scenarios/${target}/${scenario.path}`}
+                      disabled={scenario.blockers.length > 0}
+                    >
+                      {scenario.name}{scenario.blockers.length
+                        ? ` — ${scenario.blockers.join('، ')} ندارد`
+                        : scenario.recorded
+                          ? ' — ضبطِ خام'
+                          : ''}
+                    </option>
+                  {/each}
+                </select>
+              </label>
+            {/if}
 
           <!--
             هشدار **پیش از** خزش، نه بعدش.
@@ -350,7 +459,14 @@
             </div>
           {/if}
 
-          {#if !from}
+          <!--
+            هشدارِ «ورود ندارد» فقط وقتی که واقعاً لازم است.
+
+            در حالتِ «ادامهٔ نشست» مرورگر از قبل وارد است و مسیرِ ورود اصلاً
+            معنا ندارد؛ نمایشِ این هشدار آنجا یعنی گفتنِ حرفی که غلط است —
+            و بدتر از سکوت.
+          -->
+          {#if startMode !== 'session' && !from}
             <div class="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 text-[11px] leading-6">
               <p class="font-medium text-amber-700 dark:text-amber-300">بی مسیرِ ورود، خزش وارد نمی‌شود.</p>
               <p class="mt-0.5 text-muted-foreground">
@@ -445,6 +561,11 @@
             </div>
           {/if}
 
+          </fieldset>
+
+          <fieldset class="space-y-2 border-t pt-3">
+            <legend class="text-xs font-semibold">۲. دنبالِ چه بگردد؟</legend>
+
           <!--
             دانه — جدا، چون **یک بار** اجرا می‌شود.
 
@@ -452,7 +573,7 @@
             می‌شد و نقشه از اپی درمی‌آمد که هیچ کاربری نمی‌سازدش.
           -->
           <label class="block space-y-1">
-            <span class="text-xs text-muted-foreground">دادهٔ اولیه (اختیاری)</span>
+            <span class="text-[11px] text-muted-foreground">دادهٔ اولیه (اختیاری)</span>
             <select bind:value={seed} class="h-9 w-full rounded-md border bg-background px-2 text-sm">
               <option value="">— بدون داده؛ اپ همان است که هست —</option>
               {#each data.scenarios as scenario (scenario.path)}
@@ -471,55 +592,39 @@
             </span>
           </label>
 
-          <div class="grid grid-cols-2 gap-2">
-            <label class="block space-y-1">
-              <span class="text-xs text-muted-foreground">سقف حالت</span>
-              <Input type="number" min="1" max="1000" bind:value={states_cap} />
-            </label>
-            <label class="block space-y-1">
-              <span class="text-xs text-muted-foreground">سقف دقیقه</span>
-              <Input type="number" min="1" max="1000" bind:value={minutes} />
-            </label>
-          </div>
-
           <label class="block space-y-1">
-            <span class="text-xs text-muted-foreground">اول سراغِ چه برود</span>
-            <Input bind:value={focus} placeholder="مثلاً: کتاب واژه‌نامه — خالی یعنی همه‌جا" />
+            <span class="text-[11px] text-muted-foreground">اول سراغِ چه برود</span>
+            <Input bind:value={focus} placeholder="مثلاً: کتاب واژه‌نامه — خالی یعنی همه‌جا" class="h-8" />
             <span class="block text-[11px] leading-5 text-muted-foreground">
               فیلتر نیست، <strong>اولویت</strong> است: چیزی حذف نمی‌شود، فقط
               زودتر دیده می‌شود. روت‌هایی که در سورس هست و خزش ندیده، خودکار
               اولویت می‌گیرند.
             </span>
           </label>
+          </fieldset>
 
-          <label class="block space-y-1">
-            <span class="text-xs text-muted-foreground">حسابی که به خاطر بسپارد</span>
-            <Input bind:value={remember} placeholder="crawler — خالی یعنی هر بار کاربر تازه" />
-            <span class="block text-[11px] leading-5 text-muted-foreground">
-              <strong>خودش وارد نمی‌شود</strong> — فرم را سناریوی ورودِ بالا پر
-              می‌کند. این فقط می‌گوید هویتی که آنجا ساخته شد، با چه شناسه‌ای
-              ذخیره بماند تا دفعهٔ بعد همان باشد.
-            </span>
-          </label>
+          <fieldset class="space-y-2 border-t pt-3">
+            <legend class="text-xs font-semibold">۳. تا کجا بگردد؟</legend>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="block space-y-1">
+                <span class="text-[11px] text-muted-foreground">سقف حالت</span>
+                <Input type="number" min="1" max="1000" bind:value={states_cap} class="h-8" />
+              </label>
+              <label class="block space-y-1">
+                <span class="text-[11px] text-muted-foreground">سقف دقیقه</span>
+                <Input type="number" min="1" max="1000" bind:value={minutes} class="h-8" />
+              </label>
+            </div>
 
-          <label class="flex items-start gap-2 text-xs">
-            <input type="checkbox" bind:checked={profile} class="mt-0.5" />
-            <span>
-              همان مرورگرِ خزشِ قبلی
-              <span class="block text-[11px] leading-5 text-muted-foreground">
-                نشست و کش می‌مانند، پس بعد از بارِ اول ورود لازم نیست.
-              </span>
-            </span>
-          </label>
-
-          <label class="flex items-center gap-2 text-xs">
-            <input type="checkbox" bind:checked={fresh} />
-            از صفر، نه ادامهٔ نقشهٔ موجود
-          </label>
-          <label class="flex items-center gap-2 text-xs">
-            <input type="checkbox" bind:checked={headed} />
-            مرورگر دیده شود
-          </label>
+            <label class="flex items-center gap-2 text-xs">
+              <input type="checkbox" bind:checked={fresh} />
+              از صفر، نه ادامهٔ نقشهٔ موجود
+            </label>
+            <label class="flex items-center gap-2 text-xs">
+              <input type="checkbox" bind:checked={headed} />
+              مرورگر دیده شود
+            </label>
+          </fieldset>
 
           {#if error}<p class="text-xs text-destructive">{error}</p>{/if}
 
