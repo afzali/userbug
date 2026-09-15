@@ -145,7 +145,7 @@ export async function tourAction(target, action, body = {}) {
  * بالاتر است: کاربر ممکن است گشتی را بی‌خروجی رها کند (اشتباه شروع کرده)، و
  * جلسه‌ای که همیشه بنویسد، پیش‌نویسِ بی‌ارزش در مخزن جا می‌گذارد.
  */
-export async function stopTour(target, { name, discard = false } = {}) {
+export async function stopTour(target, { name, purpose = '', discard = false } = {}) {
   const handle = getTour(target);
   if (!handle) throw new Error('گشتی نیست');
 
@@ -155,6 +155,6 @@ export async function stopTour(target, { name, discard = false } = {}) {
   if (discard) return { discarded: true, state: result };
 
   const landing = !name;
-  const written = await emitTour({ target, state: result, name, landing });
+  const written = await emitTour({ target, state: result, name, purpose, landing });
   return { written, state: result };
 }

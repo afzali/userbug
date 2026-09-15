@@ -55,6 +55,8 @@
   let purpose = $state('');
   let noteText = $state('');
   let scenarioName = $state('');
+  /** «دربارهٔ چه بود» — در سرصفحهٔ سناریو می‌نشیند، نه در نام. */
+  let scenarioPurpose = $state('');
   let busy = $state('');
   /**
    * نشست بماند؟
@@ -239,7 +241,12 @@
   }
 
   async function stop(discard) {
-    const payload = await send({ action: 'stop', name: scenarioName || undefined, discard });
+    const payload = await send({
+      action: 'stop',
+      name: scenarioName || undefined,
+      purpose: scenarioPurpose || undefined,
+      discard,
+    });
     if (!payload) return;
     running = false;
     close();
@@ -487,8 +494,30 @@
       <Button variant="outline" disabled={Boolean(busy) || !noteText.trim()} onclick={note}>ثبت ایراد</Button>
     </div>
 
-    <div class="mt-3">
-      <Input bind:value={scenarioName} placeholder="نام سناریو (خالی = «آشنایی با سامانه»)" disabled={Boolean(busy)} />
+    <!--
+      عنوان و «دربارهٔ چه بود» — همین‌جا، در حینِ گشت.
+
+      ── چرا این دو فیلد لازم شدند ──
+
+      گشت گران‌ترین ورودیِ این ابزار است: وقتِ آدم. ولی همه‌شان بی‌نام در یک
+      پرونده ادغام می‌شدند و بعد از یک هفته پنج فایلِ هم‌شکل می‌ماند به‌نامِ
+      «گشتِ ضبط‌شده». هیچ‌جا نمی‌ماند که سومی دربارهٔ اشتراک‌گذاری بود و
+      چهارمی دربارهٔ واردکردنِ فایل.
+
+      و جایشان اینجاست نه در پایان: وقتی کاربر وسطِ کار است، می‌داند دارد چه
+      می‌کند. پرسیدن پس از بستنِ مرورگر، پرسیدن از حافظه است.
+    -->
+    <div class="mt-3 space-y-2">
+      <Input bind:value={scenarioName} placeholder="نامِ این گشت (خالی = «آشنایی با سامانه»)" disabled={Boolean(busy)} />
+      <Input
+        bind:value={scenarioPurpose}
+        placeholder="دربارهٔ چه بود؟ — مثلاً: مسیرِ اشتراک‌گذاری کتاب با کاربرِ دیگر"
+        disabled={Boolean(busy)}
+      />
+      <p class="text-[11px] leading-5 text-muted-foreground">
+        هر پروژه می‌تواند چند گشت داشته باشد. نام و توضیح در سرصفحهٔ سناریو
+        می‌نشینند تا بعداً معلوم باشد هر کدام چه چیزی یاد داد.
+      </p>
     </div>
   </section>
 {/if}

@@ -45,7 +45,7 @@ import { readDossier, writeDossier, writePage } from '../knowledge/store.js';
  * سناریو به‌جای آزمودنِ پیوند، از رویش می‌پرد — و آن پیوند دقیقاً همان چیزی
  * است که ممکن است شکسته باشد.
  */
-export function stepsToYaml({ steps, pages, name, startPath = '/' }) {
+export function stepsToYaml({ steps, pages, name, purpose = '', startPath = '/' }) {
   const out = [{ clearState: true }, { go: startPath }];
 
   let lastUrl = null;
@@ -83,6 +83,14 @@ export function stepsToYaml({ steps, pages, name, startPath = '/' }) {
     '# کلیکِ تکراری هم ضبط شده، و `expect` جایی که مهم بوده نوشته نشده.',
     ''
   );
+
+  /**
+   * «دربارهٔ چه بود» در سرصفحه می‌نشیند، نه در `name`.
+   *
+   * نام باید کوتاه بماند چون در فهرست‌ها و در `--grep` استفاده می‌شود؛
+   * توضیح جای دیگری لازم است — همان‌جا که آدم فایل را باز می‌کند.
+   */
+  if (purpose) header.splice(1, 0, '#', `# دربارهٔ چه بود: ${purpose}`);
 
   return header.join('\n') + YAML.stringify({ name, status: 'draft', persona: 'novice', steps: out });
 }
@@ -151,8 +159,19 @@ function slugify(value) {
  * @param {string} [o.name] نامِ سناریو
  * @param {boolean} [o.landing] این نخستین گشتِ پروژه است؟
  */
-export async function emitTour({ target, state, name, landing = false }) {
+export async function emitTour({ target, state, name, purpose = '', landing = false }) {
   const title = String(name || '').trim() || (landing ? 'آشنایی با سامانه' : 'گشتِ ضبط‌شده');
+  /**
+   * «این گشت دربارهٔ چه بود» — به زبانِ خودِ آدم.
+   *
+   * ── چرا لازم شد ──
+   *
+   * گشت گران‌ترین ورودیِ این ابزار است: وقتِ آدم. ولی همه‌شان در یک پرونده
+   * ادغام می‌شدند و هیچ‌جا نمی‌ماند که گشتِ سوم دربارهٔ «اشتراک‌گذاری» بود و
+   * چهارمی دربارهٔ «واردکردنِ فایل». بعد از یک هفته، پنج فایلِ هم‌شکل
+   * می‌ماند به‌نامِ «گشتِ ضبط‌شده».
+   */
+  const why = String(purpose || '').trim().slice(0, 500);
   const written = { pages: 0, cached: 0, scenario: null, dossier: null };
 
   // ۱. صفحه‌ها
@@ -190,7 +209,13 @@ export async function emitTour({ target, state, name, landing = false }) {
     const file = path.join(dir, `${landing ? 'آشنایی' : 'tour'}-${slugify(title)}.yml`);
     fs.writeFileSync(
       file,
-      stepsToYaml({ steps, pages: state.pages || [], name: title, startPath: (state.pages || [])[0]?.path || '/' }),
+      stepsToYaml({
+        steps,
+        pages: state.pages || [],
+        name: title,
+        purpose: why,
+        startPath: (state.pages || [])[0]?.path || '/',
+      }),
       'utf8'
     );
     written.scenario = path.relative(scenarioDir(target), file).split(path.sep).join('/');

@@ -1,5 +1,6 @@
 import { coverageOf } from '../../../../../../src/knowledge/coverage.js';
 import { readHistory } from '../../../../../../src/knowledge/history.js';
+import { readBrief } from '../../../../../../src/knowledge/brief.js';
 import { knowledgeDir, listPages, readDossier } from '../../../../../../src/knowledge/store.js';
 import { listDocs } from '../../../../../../src/knowledge/docs.js';
 
@@ -30,6 +31,13 @@ export async function load({ params }) {
   };
 
   return {
+    /**
+     * توضیحِ خودِ آدم — جدا از پرونده، چون مالکش فرق دارد.
+     *
+     * پرونده را اتوماسیون می‌نویسد (`learn`، گشت، تریاژ). این متن `by: user`
+     * است و در فایلِ خودش می‌نشیند تا هیچ اجرایی رویش ننویسد.
+     */
+    brief: safely(() => readBrief(target), ''),
     dossier: safely(() => readDossier(target), null),
     pages: safely(() => listPages(target), []),
     coverage: safely(() => coverageOf(target), null),

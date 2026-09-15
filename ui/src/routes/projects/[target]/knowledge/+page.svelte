@@ -18,9 +18,49 @@
   import { Input } from '$lib/components/ui/input/index.js';
   import ModelPicker from '$lib/components/ModelPicker.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import { Textarea } from '$lib/components/ui/textarea/index.js';
   import { formatDate } from '$lib/format.js';
 
   let { data } = $props();
+
+  /**
+   * «این پروژه چیست» — متنی که خودت می‌نویسی.
+   *
+   * ── چرا این کادر لازم بود ──
+   *
+   * همهٔ این صفحه چیزهایی است که **ماشین** فهمیده: روت از سورس، واژه از
+   * گشت، خلاصه از مدل. جایی نبود که آدم بنویسد «این اپ چیست، این اصطلاح
+   * اینجا یعنی چه» — و همان چیزی است که مدل از سورس درنمی‌آورد.
+   *
+   * هرچه اینجا بنویسی، بالای **هر** prompt می‌نشیند: ساختِ سناریو، کاوش،
+   * بازنویسی، و «چرا این شد؟».
+   */
+  // svelte-ignore state_referenced_locally
+  let brief = $state(data.brief || '');
+  // svelte-ignore state_referenced_locally
+  let briefSaved = $state(data.brief || '');
+  let briefBusy = $state(false);
+  let briefNote = $state('');
+
+  async function saveBrief() {
+    briefBusy = true;
+    briefNote = '';
+    try {
+      const response = await fetch('/api/brief', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({ target: data.target, text: brief }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'ذخیره نشد');
+      briefSaved = brief;
+      briefNote = 'ذخیره شد — از این به بعد بالای هر prompt می‌نشیند.';
+    } catch (cause) {
+      briefNote = cause.message;
+    } finally {
+      briefBusy = false;
+    }
+  }
 
   // svelte-ignore state_referenced_locally
   let dossier = $state(data.dossier);
@@ -163,6 +203,41 @@
 {#if feedback}
   <div class="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">{feedback}</div>
 {/if}
+
+<!--
+  «این پروژه چیست» — اولِ صفحه، چون زمینه پیش از فهرست می‌آید.
+
+  بقیهٔ این صفحه چیزهایی است که ماشین فهمیده. این یکی تنها جایی است که
+  خودِ آدم حرف می‌زند، و همان چیزی است که مدل از سورس درنمی‌آورد: اینکه
+  «کتاب» و «پاراگراف» در این اپ یعنی چه.
+-->
+<section class="mb-6 rounded-xl border bg-card p-4">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 class="text-sm font-bold">این پروژه چیست؟</h2>
+    <span class="text-[11px] text-muted-foreground">
+      نوشتهٔ شما · بالای <strong>هر</strong> prompt می‌نشیند
+    </span>
+  </div>
+  <p class="mt-1 text-xs leading-6 text-muted-foreground">
+    استک، واحدهای اصلی، اصطلاحاتِ خودتان، و هر چیزی که از سورس پیدا نیست.
+    هرچه اینجا دقیق‌تر باشد، مدل کمتر از نامِ دکمه‌ها حدس می‌زند.
+  </p>
+
+  <Textarea
+    bind:value={brief}
+    rows="4"
+    class="mt-3"
+    placeholder="مثلاً: نپی یک کتاب‌خوانِ آفلاین است. «کتاب» واحدِ اصلی است و از «پاراگراف» ساخته می‌شود. همگام‌سازی اختیاری است و با سرورِ PHP کار می‌کند."
+  />
+
+  <div class="mt-2 flex flex-wrap items-center gap-2">
+    <Button size="sm" onclick={saveBrief} disabled={briefBusy || brief === briefSaved}>
+      {briefBusy ? 'در حال ذخیره…' : 'ذخیره'}
+    </Button>
+    {#if briefNote}<span class="text-xs text-muted-foreground">{briefNote}</span>{/if}
+    {#if brief !== briefSaved}<span class="text-xs text-amber-600 dark:text-amber-300">ذخیره‌نشده</span>{/if}
+  </div>
+</section>
 
 <div class="mb-6 max-w-md">
   <label class="mb-1 block text-xs text-muted-foreground" for="k-model">مدل تحلیل (اختیاری)</label>

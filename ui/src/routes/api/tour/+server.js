@@ -50,7 +50,13 @@ export async function POST(event) {
     }
 
     if (action === 'stop') {
-      return json(await stopTour(project.key, { name: body.name, discard: Boolean(body.discard) }));
+      return json(
+        await stopTour(project.key, {
+          name: body.name,
+          purpose: body.purpose,
+          discard: Boolean(body.discard),
+        })
+      );
     }
 
     return json(await tourAction(project.key, action, body));

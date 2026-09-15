@@ -113,6 +113,8 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
   userbug tour <هدف> [--device <نام>] [--name <عنوان>]
                                   گشتِ زنده: مرورگر باز می‌شود، شما کار
                                   می‌کنید، و ابزار ضبط و شناخت می‌سازد
+      --name <عنوان>              نامِ این گشت — هر پروژه می‌تواند چند تا داشته باشد
+      --purpose <متن>             دربارهٔ چه بود؛ در سرصفحهٔ سناریو می‌نشیند
       --profile                   نشست را نگه دار؛ حساب و تنظیماتی که اینجا
                                   با دست ساختی، خزشِ بعدی با «همان مرورگر»
                                   می‌بیندشان
@@ -957,7 +959,13 @@ async function cmdTour({ flags, positional }) {
 
   const state = session.snapshotState();
   const landing = !flags.name && state.pages.length > 0;
-  const written = await emitTour({ target: name, state, name: flags.name, landing });
+  const written = await emitTour({
+    target: name,
+    state,
+    name: flags.name,
+    purpose: flags.purpose && flags.purpose !== true ? String(flags.purpose) : '',
+    landing,
+  });
 
   console.log(`\n  گشت تمام شد: ${state.steps.length} قدم · ${state.pages.length} صفحه · ${state.findings.length} یافته`);
   console.log(`  صفحه‌های ثبت‌شده: ${written.pages}  ·  کشِ آموخته: ${written.cached} مدخل`);

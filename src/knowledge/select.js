@@ -27,6 +27,7 @@
  */
 import { keywords } from '../source-access.js';
 import { normalizeRoutePath } from './schema.js';
+import { briefFor } from './brief.js';
 import { listPages, readDossier } from './store.js';
 
 /** سقفِ پیش‌فرضِ نویسه. حدوداً ۴۰۰ توکن فارسی. */
@@ -146,6 +147,15 @@ export function knowledgeFor({ target, dossier, text = '', url = '', budget = DE
     used += line.length;
     return true;
   };
+
+  /**
+   * توضیحِ خودِ آدم، پیش از هر چیزِ دیگری.
+   *
+   * زمینه باید پیش از فهرست بیاید: مدل بی آن، روت‌ها و واژه‌ها را بی‌چارچوب
+   * می‌خواند و از نامِ دکمه‌ها حدس می‌زند که «کتاب» یعنی چه.
+   */
+  const brief = briefFor(target);
+  if (brief) push(brief);
 
   if (data.summary) push(`اپ: ${trim(data.summary, 400)}`);
 
