@@ -293,7 +293,7 @@
     <Button variant="outline" disabled={busy === 'source' || !data.found.hasSource} onclick={rescan}>
       {busy === 'source' ? 'در حال خواندن…' : 'خواندنِ دوبارهٔ سورس'}
     </Button>
-    <Button href={`/projects/${encodeURIComponent(target)}/proposals`} variant="outline">چه باید آزمود</Button>
+    <Button href={`/projects/${encodeURIComponent(target)}/missions`} variant="outline">چه باید آزمود</Button>
   </div>
 
 {#if error}
@@ -796,7 +796,7 @@
               </li>
             {/each}
           </ul>
-          <Button href={`${base}/proposals`} variant="outline" size="sm" class="w-full">
+          <Button href={`${base}/missions`} variant="outline" size="sm" class="w-full">
             پیشنهادهایی که از این‌ها درآمده
           </Button>
         {:else}

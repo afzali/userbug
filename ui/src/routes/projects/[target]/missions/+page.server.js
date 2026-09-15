@@ -1,6 +1,9 @@
 import { healthFor } from '$lib/server/artifacts.js';
-import { listScenarios } from '$lib/server/projects.js';
+import { listProjects, listScenarios } from '$lib/server/projects.js';
 import { proposalsFor } from '../../../../../../src/knowledge/propose.js';
+import { impactOf } from '../../../../../../src/knowledge/impact.js';
+import { resolveSourceRoots } from '../../../../../../src/source-access.js';
+import { sourceOf } from '$lib/server/projects.js';
 
 /**
  * «مأموریت‌ها» — سفرهایی که کاربر واقعاً می‌رود، با وضعیتشان.
@@ -23,6 +26,14 @@ import { proposalsFor } from '../../../../../../src/knowledge/propose.js';
  */
 export async function load({ params }) {
   const target = params.target;
+
+  const safely = (fn, fallback) => {
+    try {
+      return fn() ?? fallback;
+    } catch {
+      return fallback;
+    }
+  };
 
   const all = await listScenarios(target).catch(() => []);
 
@@ -65,12 +76,47 @@ export async function load({ params }) {
     }),
     /** بقیهٔ فایل‌ها — پیش‌نویس و اسکریپت — فقط برای شمارش و پیوند */
     others: all.length - scenarios.length,
-    fromMap: (() => {
-      try {
-        return proposalsFor(target).proposals.length;
-      } catch {
-        return 0;
-      }
-    })(),
+
+    /**
+     * «چه باید آزمود» — پلِ میانِ کشف و سفر.
+     *
+     * ── چرا صفحهٔ جدا نماند ──
+     *
+     * هر جایی که کشف پیدا کرده و هیچ سفری سراغش نمی‌رود، یک پیشنهاد است.
+     * صفحهٔ مستقل داشتنش یعنی کاربر باید یادش بماند چنین صفحه‌ای هست — و
+     * همان‌جا حلقهٔ «کشف → سفر» پاره می‌شد. حالا بالای همان فهرستی است که
+     * سفرها در آن زندگی می‌کنند.
+     */
+    ...proposals(target),
+
+    /**
+     * «کد عوض شد — چه باید دوباره آزمود؟»
+     *
+     * جوابِ سؤالی که توسعه‌دهنده **همین حالا** دارد. نبودِ سورس یا گیت خطای
+     * صفحه نیست؛ پیام در همان بخش می‌نشیند.
+     */
+    ...(await impact(target)),
   };
+}
+
+/** پروژه‌ای که هنوز شناخت ندارد خطا نیست — ولی بی‌صدا هم نباید بماند. */
+function proposals(target) {
+  try {
+    return { proposals: proposalsFor(target), proposalsError: '' };
+  } catch (cause) {
+    return {
+      proposals: { proposals: [], open: 0, coveredRoutes: 0, totalRoutes: 0 },
+      proposalsError: cause.message,
+    };
+  }
+}
+
+async function impact(target) {
+  try {
+    const project = (await listProjects()).find((item) => item.key === target);
+    const roots = await resolveSourceRoots({ key: target, source: sourceOf(project) });
+    return { impact: await impactOf(target, { roots, base: 'HEAD' }), impactError: '' };
+  } catch (cause) {
+    return { impact: null, impactError: cause.message };
+  }
 }

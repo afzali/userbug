@@ -215,7 +215,7 @@
       {
         index: '۴',
         label: 'سناریو',
-        href: runnable ? `${base}/files` : `${base}/proposals`,
+        href: runnable ? `${base}/files` : `${base}/missions`,
         done: runnable > 0,
         state: runnable
           ? `${runnable} سناریو${p.proposals ? ` · ${p.proposals} پیشنهادِ باز` : ''}`
@@ -431,7 +431,7 @@
           «چه باید آزمود» شکافِ میان آنچه می‌دانیم و آنچه می‌آزماییم را حساب
           می‌کند و متنِ هر سناریو را آماده می‌دهد.
         </p>
-        <Button href={`/projects/${encodeURIComponent(target)}/proposals`} variant="ghost" class="mt-3 w-full text-xs">چه باید آزمود</Button>
+        <Button href={`/projects/${encodeURIComponent(target)}/missions`} variant="ghost" class="mt-3 w-full text-xs">چه باید آزمود</Button>
       </li>
     </ol>
 

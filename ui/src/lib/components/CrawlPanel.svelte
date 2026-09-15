@@ -850,7 +850,7 @@
         <Card.Title class="text-sm">بعدش چه؟</Card.Title>
       </Card.Header>
       <Card.Content>
-        <Button href={`${base}/proposals`} class="w-full" size="sm">
+        <Button href={`${base}/missions`} class="w-full" size="sm">
           {data.found.proposals
             ? `${data.found.proposals} سناریوی پیشنهادی از این نقشه`
             : 'ببین چه باید آزمود'}

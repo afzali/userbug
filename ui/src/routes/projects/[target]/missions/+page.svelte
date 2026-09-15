@@ -21,6 +21,8 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import ImpactPanel from '$lib/components/ImpactPanel.svelte';
+  import ProposalsPanel from '$lib/components/ProposalsPanel.svelte';
   import { formatNumber } from '$lib/format.js';
   import { daysSinceGreen, summarize } from '../../../../../../src/runs/health.js';
 
@@ -33,6 +35,9 @@
 
   /** بی‌انتظارها — تنها چیزی که این صفحه می‌داند و هیچ‌جای دیگر نمی‌گوید. */
   let blind = $derived(missions.filter((one) => one.path && !one.expects).length);
+
+  /** عددِ روی عنوانِ بسته — بی آن، «باز کن تا ببینی خالی است» می‌شود. */
+  let proposalCount = $derived((data.proposals?.proposals || []).filter((one) => !one.dismissed).length);
 
   let busy = $state('');
   let error = $state('');
@@ -101,6 +106,15 @@
 />
 
 {#if error}<p class="mb-4 text-sm text-destructive">{error}</p>{/if}
+
+<!--
+  «کد عوض شد — چه باید دوباره آزمود؟» بالای فهرست می‌نشیند، چون همان فهرستی
+  است که جوابش از آن اجرا می‌شود. بسته می‌ماند تا ردیف‌ها را عقب نراند.
+-->
+<details class="mb-6 rounded-xl border p-4">
+  <summary class="cursor-pointer text-sm font-medium">کد عوض شد — چه باید دوباره آزمود؟</summary>
+  <div class="mt-4"><ImpactPanel {data} {target} /></div>
+</details>
 
 {#if !missions.length}
   <!--
@@ -251,14 +265,22 @@
     از کجا سفرِ تازه بیاورم — ته صفحه، نه بالای آن.
 
     کسی که ده سفر دارد، هر روز دنبالِ ساختنِ یازدهمی نیست؛ دنبالِ وضعیتِ همان
-    ده تاست.
+    ده تاست. ولی **پیوند** به فهرستِ پیشنهادها کافی نبود: صفحه‌ای که باید
+    یادت بماند وجود دارد، عملاً وجود ندارد. پس خودِ فهرست اینجاست، بسته.
   -->
-  <section class="mt-8 rounded-xl border bg-muted/30 p-4">
+  <section class="mt-8 space-y-3">
     <h2 class="text-sm font-semibold">سفرِ تازه از کجا بیاورم؟</h2>
-    <div class="mt-3 flex flex-wrap gap-2">
-      <Button href={`${base}/proposals`} variant="outline" size="sm">
-        {data.fromMap ? `${formatNumber(data.fromMap)} پیشنهاد از نقشه و شناخت` : 'ببین چه باید آزمود'}
-      </Button>
+
+    <details class="rounded-xl border bg-muted/30 p-4">
+      <summary class="cursor-pointer text-sm font-medium">
+        چه باید آزمود؟{proposalCount ? ` — ${formatNumber(proposalCount)} پیشنهاد از کشف` : ' — فعلاً پیشنهادی نیست'}
+      </summary>
+      <div class="mt-4">
+        <ProposalsPanel {data} {target} />
+      </div>
+    </details>
+
+    <div class="flex flex-wrap gap-2">
       <Button href={`${base}/discover`} variant="outline" size="sm">کشف</Button>
       <Button href={`${base}/files`} variant="outline" size="sm">
         فایل‌های پروژه{data.others ? ` (${formatNumber(data.others)} پیش‌نویس و اسکریپت)` : ''}
