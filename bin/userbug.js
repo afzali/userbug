@@ -192,6 +192,10 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
   userbug models [--free]         فهرست زندهٔ مدل‌های OpenRouter
   userbug repro <runId> [اثرانگشت]
                                   بازتولید یک یافته از اجرای گذشته
+  userbug health <هدف>            کدام سناریو سالم است و از کی — در طولِ همهٔ
+                                  اجراها، با آن‌هایی که هرگز اجرا نشده‌اند
+      --json                      همان داده، برای ابزارِ دیگر
+
   userbug list [--limit n]        فهرست اجراها
   userbug remove <runId>          حذف یک اجرا با همهٔ عکس‌ها و traceهایش
   userbug report <runId|latest> [--junit <مسیر>]
@@ -490,8 +494,19 @@ function cmdReplay({ flags, positional }) {
     throw new Error(`اجرای ${runId} سناریویی ثبت نکرده است؛ شاید پیش از افزوده‌شدن این قابلیت بوده`);
   }
 
-  const wanted = flags['only-findings'] ? scenarios.filter((s) => s.findings > 0) : scenarios;
-  if (!wanted.length) throw new Error('آن اجرا یافته‌ای نداشت؛ چیزی برای اجرای دوباره نیست');
+  /**
+   * «فقط آن‌هایی که قرمز بودند» — نه فقط آن‌هایی که یافته داشتند.
+   *
+   * ── چرا عوض شد ──
+   *
+   * سناریویی که `expect`اش شکسته ولی هیچ خطای کنسولی نداده، صفرِ یافته است.
+   * با معیارِ قبلی دقیقاً همان سناریویی که باید دوباره اجرا می‌شد، از فهرستِ
+   * اجرای دوباره بیرون می‌ماند.
+   */
+  const wanted = flags['only-findings']
+    ? scenarios.filter((s) => s.verdict === 'failed' || s.verdict === 'findings' || s.findings > 0)
+    : scenarios;
+  if (!wanted.length) throw new Error('آن اجرا هیچ سناریوی قرمزی نداشت؛ چیزی برای اجرای دوباره نیست');
 
   const grep = benchGrep(wanted.map((s) => s.name));
 
@@ -585,6 +600,108 @@ function cmdRemove({ positional }) {
   const dir = runDir(runId);
   fs.rmSync(dir, { recursive: true, force: true });
   console.log(`\n  حذف شد: ${runId}\n`);
+}
+
+/**
+ * «کدام سفر سالم است؟» — جدولی که تا امروز هیچ‌جا نبود.
+ *
+ * ── چرا لازم شد ──
+ *
+ * کاربر گفت مهم‌ترین چیزی که می‌خواهد بداند این است: ثبت‌نام، ورود، فراموشی
+ * رمز، افزودن کتاب، هایلایت — همه بررسی شده‌اند و سالم‌اند؟
+ *
+ * ابزار همهٔ داده‌اش را داشت و این پرسش را جواب نمی‌داد: هر اجرا جداگانه
+ * گزارش می‌شد و هیچ‌چیز در **طولِ زمان** نگاه نمی‌کرد.
+ */
+async function cmdHealth({ flags, positional }) {
+  const target = positional[0];
+  if (!target) throw new Error('نام هدف لازم است: userbug health <هدف>');
+
+  const { healthOf, summarize, daysSinceGreen } = await import('../src/runs/health.js');
+  const { loadScenarios } = await import('../src/scenario/load.js');
+
+  const runs = [];
+  for (const id of listRunIds()) {
+    let run;
+    try {
+      run = readRun(id);
+    } catch {
+      continue;
+    }
+    if (run?.target !== target) continue;
+    runs.push({ ...run, runId: run.runId || id });
+  }
+
+  /**
+   * سناریوهای روی دیسک هم می‌آیند، حتی آن‌هایی که هرگز اجرا نشده‌اند.
+   *
+   * بی این، فهرست سبز به نظر می‌رسد چون خطرناک‌ترین ردیف اصلاً در آن نیست.
+   */
+  let known = [];
+  try {
+    known = loadScenarios(target).map((one) => one.name);
+  } catch {
+    // پروژه‌ای که هنوز سناریویی ندارد؛ فهرستِ اجراها همچنان معنا دارد
+  }
+
+  const rows = healthOf(runs, { known });
+  if (!rows.length) {
+    console.log(`\n  هنوز هیچ سناریویی برای «${target}» نه اجرا شده نه نوشته.\n`);
+    return;
+  }
+
+  const sum = summarize(rows);
+  const MARK = { passed: '✓', failed: '✗', findings: '!', never: '—', skipped: '·', unknown: '?' };
+  const WORD = {
+    passed: 'سالم',
+    failed: 'شکست',
+    findings: 'ایراد داشت',
+    never: 'هرگز اجرا نشد',
+    skipped: 'اجرا نشد',
+    unknown: 'نامعلوم',
+  };
+
+  console.log(`\n  سلامتِ «${target}»`);
+  console.log(
+    `  ${sum.passed} سالم · ${sum.failed} شکست · ${sum.findings} ایراد · ${sum.never} هرگز اجرا نشد` +
+      (sum.unknown ? ` · ${sum.unknown} نامعلوم` : '')
+  );
+  console.log('  ' + '─'.repeat(74));
+
+  for (const row of rows) {
+    const when = row.at ? row.at.slice(0, 16).replace('T', ' ') : '—';
+    console.log(`  ${MARK[row.verdict] || '?'} ${row.name.slice(0, 44).padEnd(44)} ${WORD[row.verdict].padEnd(14)} ${when}`);
+
+    if (row.error) console.log(`      ${row.error.slice(0, 90)}`);
+
+    /**
+     * سبزِ کهنه با سبزِ امروز یکی نیست.
+     *
+     * سفری که سه ماه پیش سبز بوده و از آن به بعد اجرا نشده، در فهرست «سالم»
+     * است و این گمراه‌کننده است.
+     */
+    const days = daysSinceGreen(row);
+    if (row.verdict === 'passed' && days !== null && days >= 7) {
+      console.log(`      آخرین سبز ${days} روز پیش بود؛ از آن موقع دوباره اجرا نشده.`);
+    }
+    if (row.verdict !== 'passed' && row.lastGreen) {
+      console.log(`      آخرین بارِ سالم: ${row.lastGreen.at.slice(0, 16).replace('T', ' ')}`);
+    }
+  }
+
+  /**
+   * «نامعلوم» یعنی داده نداریم، نه یعنی سالم.
+   *
+   * اجرایی که با `--reporter=line` رفته گزارشگرِ ما را کنار زده و وضعیتِ
+   * تست‌هایش ثبت نشده. سکوت اینجا یعنی کاربر آن ردیف‌ها را سبز می‌خواند.
+   */
+  if (sum.unknown) {
+    console.log(
+      `\n  ${sum.unknown} ردیف «نامعلوم» است: آن اجرا با گزارشگرِ دیگری رفته و وضعیتِ تست‌ها ثبت نشده.`
+    );
+  }
+  if (flags.json) console.log('\n' + JSON.stringify(rows, null, 2));
+  console.log('');
 }
 
 function cmdList({ flags }) {
@@ -2207,6 +2324,9 @@ try {
       break;
     case 'list':
       cmdList(parsed);
+      break;
+    case 'health':
+      await cmdHealth(parsed);
       break;
     case 'knowledge':
       await cmdKnowledge(parsed);

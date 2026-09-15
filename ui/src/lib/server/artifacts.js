@@ -1,6 +1,7 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { dedupe } from '../../../../src/observe/oracle.js';
+import { healthOf } from '../../../../src/runs/health.js';
 import { RUNS_DIR, TRIAGE_DIR, assertSafeSegment, existingFileInside, resolveInside } from './paths.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -88,6 +89,24 @@ export async function resolveRunId(input) {
   if (matches.length === 1) return matches[0];
   if (!matches.length) throw new Error(`اجرای «${wanted}» پیدا نشد`);
   throw new Error(`«${wanted}» به چند اجرا می‌خورد`);
+}
+
+/**
+ * «کدام سفر سالم است، و از کی؟» — برای یک هدف.
+ *
+ * منطقش در `src/runs/health.js` است، نه اینجا: خط فرمان همان جدول را
+ * می‌دهد و دو تعریف از «سبز» یعنی روزی CI و رابط دو حرفِ متفاوت بزنند.
+ *
+ * @param {string} target
+ * @param {{known?: string[]}} [options] نامِ سناریوهای روی دیسک، تا آن‌هایی
+ *   که هرگز اجرا نشده‌اند هم ردیف بگیرند
+ */
+export async function healthFor(target, { known = [] } = {}) {
+  const entries = await loadRunIndex();
+  const runs = entries
+    .filter((entry) => entry.run?.target === target)
+    .map((entry) => ({ ...entry.run, runId: entry.run.runId || entry.runId }));
+  return healthOf(runs, { known });
 }
 
 export async function listRuns({ target, limit = 250 } = {}) {

@@ -21,12 +21,11 @@
  * `testcase` با `error` نوشته می‌شود.
  */
 import { dedupe } from '../observe/oracle.js';
+import { isFailed, isSkipped, outcomesOf } from './tests.js';
 
 // XML 1.0 این بازه را نمی‌پذیرد؛ لاگ سرور و stack گاهی داخلش دارند و یک
 // کاراکتر کنترلی، کل فایل را برای CI غیرقابل‌تجزیه می‌کند.
 const INVALID_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g;
-
-const FAILED_TEST_STATUSES = new Set(['failed', 'timedOut', 'timedout', 'interrupted']);
 
 /**
  * تستی که اجرا نشده، نه سبز است نه قرمز.
@@ -34,8 +33,11 @@ const FAILED_TEST_STATUSES = new Set(['failed', 'timedOut', 'timedout', 'interru
  * سناریویی که به‌عمد رد می‌شود (مثلاً خودآزمایی که به DOM هدفِ دیگری وابسته
  * است) اگر مثل بقیه رندر شود، در CI «موفق» شمرده می‌شود و شمار پاس را باد
  * می‌کند — یعنی پوشش نداشته را پوشش نشان می‌دهد.
+ *
+ * تعریفِ «افتاد» و «رد شد» از `report/tests.js` می‌آید: همان تعریفی که
+ * `run.json` و تاریخچهٔ سلامت هم با آن سبز/قرمز را حساب می‌کنند. دو نسخه
+ * یعنی روزی CI قرمز باشد و صفحهٔ سلامت سبز.
  */
-const SKIPPED_TEST_STATUSES = new Set(['skipped']);
 
 /**
  * وضعیت‌هایی که یعنی «اجرا به نتیجه رسید» — فهرستِ خوب‌ها، نه فهرستِ بدها.
@@ -98,40 +100,27 @@ function properties(run) {
  * @param {object} input.run محتوای `run.json` پس از نهایی‌سازی
  * @param {object[]} input.steps رخدادهای `kind: 'step'`
  * @param {object[]} input.findings یافته‌های واقعی (بدون `synthetic`)
- * @param {object[]} [input.traces] سطرهای `traces.ndjson` برای وضعیت واقعی تست‌ها
+ * @param {object[]} [input.tests] سطرهای `tests.ndjson` — وضعیت واقعی تست‌ها
+ * @param {object[]} [input.traces] جانشینِ اجراهای قدیمی، پیش از `tests.ndjson`
  */
-export function renderJUnit({ run, steps, findings, traces = [] }) {
+export function renderJUnit({ run, steps, findings, tests = [], traces = [] }) {
   const real = findings.filter((finding) => !finding.synthetic);
 
   /**
-   * وضعیت واقعی تست‌ها — در دو مرحله، چون «آخرین سطر برنده است» غلط بود.
+   * وضعیت واقعی تست‌ها — منطقش در `report/tests.js` است، نه اینجا.
    *
-   * ۱) هر `testId` یک تست است و `retry` بالاتر نتیجهٔ نهایی همان تست. این
-   *    ترتیب را از خودِ داده می‌گیریم نه از ترتیب سطرها، چون `persistTraces`
-   *    موازی append می‌کند و ترتیب نوشتن قطعی نیست.
-   *
-   * ۲) `--repeat-each` همان عنوان را چند بار می‌برد و هر تکرار `testId` خودش
-   *    را دارد. پس یک سناریو وقتی سالم است که **هیچ** تکراری نیفتد — وگرنه
-   *    تکرارِ افتاده زیر تکرارِ سالم دفن می‌شد، یعنی همان بی‌ثباتی که
-   *    `--repeat` برای شکارش هست.
+   * `tests.ndjson` منبعِ اصلی است؛ `traces.ndjson` فقط برای اجراهایی مانده
+   * که پیش از افزوده‌شدنِ آن فایل ضبط شده‌اند.
    */
-  const attempts = new Map();
-  for (const trace of traces) {
-    if (!trace?.scenario) continue;
-    const key = trace.testId || `${trace.scenario}#legacy`;
-    const retry = Number(trace.retry || 0);
-    const previous = attempts.get(key);
-    if (!previous || retry >= previous.retry) {
-      attempts.set(key, { scenario: trace.scenario, retry, status: trace.status });
-    }
-  }
-
-  const testStatus = new Map();
-  for (const attempt of attempts.values()) {
-    const current = testStatus.get(attempt.scenario);
-    if (current && FAILED_TEST_STATUSES.has(String(current))) continue;
-    testStatus.set(attempt.scenario, attempt.status);
-  }
+  const outcomes = outcomesOf(tests.length ? tests : traces);
+  /**
+   * اینجا کلید **عنوان** است نه نامِ پایدار.
+   *
+   * قدم‌ها با عنوان ثبت می‌شوند و این فایل گزارشِ CI است: کسی که در جنکینز
+   * ردیف را می‌بیند باید همان چیزی را ببیند که در ترمینال دیده، با
+   * `[پیش‌نویس]` و همه. نامِ پایدار جای دیگری کار دارد — تاریخچهٔ سلامت.
+   */
+  const testStatus = new Map([...outcomes].map(([name, one]) => [one.title || name, one.status]));
 
   /**
    * سناریوها از دو جا می‌آیند، نه یکی.
@@ -154,7 +143,7 @@ export function renderJUnit({ run, steps, findings, traces = [] }) {
     const own = steps.filter((step) => step.scenario === name);
     const unique = dedupe(grouped.get(name) || []);
     const status = testStatus.get(name);
-    const brokenTest = FAILED_TEST_STATUSES.has(String(status));
+    const brokenTest = isFailed(status);
     const reasons = [];
     if (unique.length) reasons.push(`${unique.length} یافتهٔ یکتا`);
     if (brokenTest) reasons.push(`تست با وضعیت ${status} تمام شد`);
@@ -164,7 +153,7 @@ export function renderJUnit({ run, steps, findings, traces = [] }) {
       time: own.reduce((sum, step) => sum + (step.ms || 0), 0),
       steps: own.length,
       // یافته بر skip می‌چربد: اگر چیزی ثبت شده، تست واقعاً اجرا شده است.
-      skipped: !unique.length && !brokenTest && SKIPPED_TEST_STATUSES.has(String(status)),
+      skipped: !unique.length && !brokenTest && isSkipped(status),
       failure: reasons.length
         ? {
             message: reasons.join(' · '),

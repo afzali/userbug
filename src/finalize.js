@@ -21,6 +21,7 @@ import { RunStore, getCurrentRun, runDir } from './store/run-store.js';
 import { renderReport } from './report/html.js';
 import { renderJUnit } from './report/junit.js';
 import { dedupe } from './observe/oracle.js';
+import { outcomesOf, verdictOf } from './report/tests.js';
 
 /**
  * جمعِ آمار مدل در کل اجرا.
@@ -78,6 +79,14 @@ export async function finalizeRun(runId = getCurrentRun(), { status, junitPath }
   const events = await store.readNdjson('events.ndjson');
   const findings = await store.readNdjson('findings.ndjson');
   const traces = await store.readNdjson('traces.ndjson');
+  /**
+   * وضعیتِ واقعیِ تست‌ها. `traces` جانشینِ اجراهای قدیمی است.
+   *
+   * پیش از این فایل وجود نداشت و وضعیت فقط کنارِ trace نوشته می‌شد — نگاه
+   * به `src/report/tests.js` برای اینکه چرا آن اشتباه بود.
+   */
+  const testRows = await store.readNdjson('tests.ndjson');
+  const outcomes = outcomesOf(testRows.length ? testRows : traces);
   const real = findings.filter((f) => !f.synthetic);
   const synthetic = findings.filter((f) => f.synthetic);
   const steps = events.filter((e) => e.kind === 'step');
@@ -91,12 +100,58 @@ export async function finalizeRun(runId = getCurrentRun(), { status, junitPath }
    * بدون این، `replay` نمی‌داند چه چیزی را دوباره اجرا کند و مجبور است کل
    * مجموعه را ببرد — که با پنج سناریو هنوز قابل تحمل است و با پنجاه تا نه.
    */
-  const scenarios = [...new Set(steps.map((s) => s.scenario).filter(Boolean))].map((name) => ({
-    name,
-    steps: steps.filter((s) => s.scenario === name).length,
-    findings: real.filter((f) => f.scenario === name || steps.some((s) => s.scenario === name && s.step === f.step))
-      .length,
-  }));
+  /**
+   * نامِ سناریوها از **دو** جا می‌آید، نه یکی.
+   *
+   * تستی که پیش از نخستین `ub.step` بشکند هیچ قدمی ثبت نمی‌کند؛ اگر فهرست
+   * فقط از قدم‌ها ساخته شود، همان تستِ افتاده از `run.json` حذف می‌شود و
+   * تاریخچهٔ سلامت آن را «هرگز اجرا نشد» می‌بیند — نه «شکست». همان درسی که
+   * `junit.js` قبلاً گرفته بود و اینجا تکرار نشده بود.
+   */
+  /**
+   * قدم‌ها با **عنوان** ثبت شده‌اند، وضعیت‌ها با **نامِ پایدار**.
+   *
+   * بی این نگاشت، یک پیش‌نویس دو ردیف می‌شود: «ورود» با وضعیت و صفر قدم، و
+   * «ورود [پیش‌نویس]» با قدم‌ها و بی وضعیت. هر دو هم ناقص.
+   */
+  const nameOfTitle = new Map([...outcomes].map(([name, one]) => [one.title || name, name]));
+  const canonical = (title) => nameOfTitle.get(title) || title;
+
+  const scenarios = [
+    ...new Set([...steps.map((s) => canonical(s.scenario)), ...outcomes.keys()].filter(Boolean)),
+  ].map(
+    (name) => {
+      const own = real.filter(
+        (f) =>
+          canonical(f.scenario) === name ||
+          steps.some((s) => canonical(s.scenario) === name && s.step === f.step)
+      );
+      const outcome = outcomes.get(name) || {};
+      const findings = dedupe(own).length;
+      return {
+        name,
+        steps: steps.filter((s) => canonical(s.scenario) === name).length,
+        findings,
+        /** وضعیتِ خودِ تست: passed/failed/timedOut/skipped — یا خالی اگر گزارشگر نبود */
+        status: outcome.status || '',
+        /** عنوانی که در گزارش دیده می‌شود — با `[پیش‌نویس]`، اگر باشد */
+        title: outcome.title || name,
+        draft: Boolean(outcome.draft),
+        /** فایلِ منبع — تا خودآزماهای خودِ ابزار از سلامتِ پروژه جدا بمانند */
+        file: outcome.file || '',
+        /**
+         * حکمِ نهایی: شکستِ تست **و** یافته، هر دو قرمزش می‌کنند.
+         *
+         * سناریویی که هیچ `expect`ی ندارد همیشه `passed` تمام می‌شود، حتی
+         * وقتی سرور وسطش ۵۰۰ داده. بی این ترکیب، همان اپِ خرابی که این ابزار
+         * برای پیدا کردنش هست، سبز گزارش می‌شد.
+         */
+        verdict: verdictOf({ status: outcome.status, findings }),
+        ms: outcome.ms || 0,
+        error: outcome.error || '',
+      };
+    }
+  );
 
   await store.finish({
     // بدون وضعیتِ داده‌شده، وضعیت قبلی می‌ماند — مگر اینکه هنوز «running» باشد
@@ -108,6 +163,9 @@ export async function finalizeRun(runId = getCurrentRun(), { status, junitPath }
     serverLines: events.filter((e) => e.source === 'server').length,
     serverCollectors: [...new Set(events.filter((e) => e.source === 'server').map((e) => e.collector))],
     scenarios,
+    /** شمارشِ سرِ دستی، تا تاریخچه و رابط مجبور نباشند هر بار جمع بزنند */
+    green: scenarios.filter((one) => one.verdict === 'passed').length,
+    red: scenarios.filter((one) => one.verdict === 'failed' || one.verdict === 'findings').length,
     ai: summarizeAi(events),
   });
 
@@ -138,7 +196,7 @@ export async function finalizeRun(runId = getCurrentRun(), { status, junitPath }
    * باشد؛ و اگر یک روز لازم شد، همان فایل از قبل کنار بقیهٔ artifactها هست.
    */
   const junit = path.join(store.dir, 'junit.xml');
-  const junitXml = renderJUnit({ run, steps, findings: real, traces });
+  const junitXml = renderJUnit({ run, steps, findings: real, tests: testRows, traces });
   await fs.writeFile(junit, junitXml, 'utf8');
 
   // کپیِ مسیر دلخواه، برای CI که فایل را جای ثابتی می‌خواهد.

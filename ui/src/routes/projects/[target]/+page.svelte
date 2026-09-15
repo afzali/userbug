@@ -8,6 +8,7 @@
   import PageHeader from '$lib/components/PageHeader.svelte';
   import CommandBar from '$lib/components/CommandBar.svelte';
   import Onboarding from '$lib/components/Onboarding.svelte';
+  import HealthTable from '$lib/components/HealthTable.svelte';
   import RunCard from '$lib/components/RunCard.svelte';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import { formatNumber, sourceLabel } from '$lib/format.js';
@@ -743,6 +744,17 @@
         <Card.Content class="grid min-h-52 place-items-center text-center"><div><span class="text-4xl">◎</span><h2 class="mt-3 font-bold">آمادهٔ مشاهدهٔ زنده</h2><p class="mt-2 text-sm text-muted-foreground">یک اجرا را از فرم کناری شروع کنید.</p></div></Card.Content>
       </Card.Root>
     {/if}
+
+    <!--
+      سلامتِ سفرها، پیش از تاریخچهٔ اجراها.
+
+      ── چرا بالاتر ──
+
+      فهرستِ اجراها تاریخِ **کارِ ابزار** است: کی چه چیزی را بردیم. ولی
+      پرسشی که آدم صبح با آن می‌آید این نیست؛ این است که «اپم سالم است؟».
+      تا امروز هیچ‌جای این رابط آن را جواب نمی‌داد.
+    -->
+    <HealthTable rows={data.health || []} base={`/projects/${encodeURIComponent(target)}`} />
 
     <div>
       <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
