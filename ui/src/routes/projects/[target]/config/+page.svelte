@@ -17,8 +17,6 @@
   let { data } = $props();
 
   // svelte-ignore state_referenced_locally
-  let checksConfig = $state(data.checksConfig || { checks: {} });
-  // svelte-ignore state_referenced_locally
   let fixtures = $state(data.fixtures || []);
   // svelte-ignore state_referenced_locally
   let accounts = $state(data.accounts || []);
@@ -57,7 +55,6 @@
   /** هر پاسخِ موفق، کلِ وضعیت را تازه می‌کند تا صفحه با دیسک واگرا نشود. */
   function absorb(payload) {
     if (!payload || payload.dry) return;
-    checksConfig = payload.checks || { checks: {} };
     fixtures = payload.fixtures || [];
     accounts = payload.accounts || [];
   }
@@ -143,30 +140,12 @@
 
   const kb = (bytes) => (bytes < 1024 ? `${bytes} B` : `${Math.round(bytes / 1024)} KB`);
 
-  const statOf = (id) => checksConfig.checks?.[id] || {};
-  const modeOf = (id) => statOf(id).mode || 'watch';
-
-  /**
-   * خاموش کردنِ چک دلیل می‌خواهد.
-   *
-   * همان قاعدهٔ `allowlist` که README نوشته «فهرست بلند یعنی داریم مشکل را
-   * زیر فرش می‌کنیم». چکی که بی‌دلیل خاموش شود، شش ماه بعد هیچ‌کس نمی‌داند
-   * چرا ساکت است.
-   */
-  async function setMode(id, mode) {
-    let why = '';
-    if (mode === 'off') {
-      why = prompt('چرا این چک خاموش می‌شود؟') || '';
-      if (!why.trim()) return;
-    }
-    absorb(await send({ action: 'check-mode', id, mode, why }));
-  }
 </script>
 
 <PageHeader
-  eyebrow="تنظیماتِ اجرا، نه شناخت"
-  title="پیکربندی {data.project.name}"
-  description="چیزی که خودتان تنظیم می‌کنید: حساب‌ها، فایل‌های آپلود، و چک‌هایی که روی هر اجرا اجرا می‌شوند."
+  eyebrow="آنچه سناریوها مصرف می‌کنند"
+  title="دادهٔ آزمون"
+  description="حساب‌هایی که سناریو با آن‌ها وارد می‌شود، و فایل‌هایی که آپلود می‌کند. جنسشان داده است، نه شناخت و نه تنظیماتِ کلی."
 >
   {#snippet actions()}
     <!--
@@ -182,7 +161,7 @@
       گرفتنِ بستهٔ پروژه
     </Button>
     <Button href={`${base}/files?kind=target`} variant="outline">فایل کانفیگ</Button>
-    <Button href={`${base}/knowledge`} variant="ghost">شناخت</Button>
+    <Button href={`${base}/app`} variant="ghost">اپ</Button>
   {/snippet}
 </PageHeader>
 
@@ -301,43 +280,17 @@
   </p>
 </section>
 
-<section class="mb-6 rounded-xl border p-4">
-  <h2 class="mb-1 text-sm font-bold">چکِ همگانی</h2>
-  <p class="mb-3 text-xs leading-6 text-muted-foreground">
-    این‌ها به شناخت نیاز ندارند و روی هر پروژه‌ای اجرا می‌شوند.
-    <strong>watch</strong> یافته ثبت می‌کند · <strong>expect</strong> سخت می‌شکند · <strong>off</strong> اصلاً اجرا نمی‌شود.
-  </p>
-  <div class="scroll-thin overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead class="text-xs text-muted-foreground">
-        <tr class="border-b"><th class="p-2 text-right">چک</th><th class="p-2 text-right">برخورد</th><th class="p-2 text-right">قلابی</th><th class="p-2 text-right">حالت</th></tr>
-      </thead>
-      <tbody>
-        {#each data.checkDefinitions as check (check.id)}
-          <tr class="border-b last:border-0">
-            <td class="p-2">
-              {check.title}
-              <span class="block font-mono text-xs text-muted-foreground">{check.id}</span>
-              {#if statOf(check.id).why}<span class="block text-xs text-muted-foreground">«{statOf(check.id).why}»</span>{/if}
-            </td>
-            <td class="p-2 text-xs">{statOf(check.id).hits ?? 0}</td>
-            <td class="p-2 text-xs">{statOf(check.id).noise ?? 0}</td>
-            <td class="p-2">
-              <div class="flex gap-1">
-                {#each ['off', 'watch', 'expect'] as mode (mode)}
-                  <Button
-                    size="sm"
-                    variant={modeOf(check.id) === mode ? 'default' : 'outline'}
-                    disabled={Boolean(busy)}
-                    onclick={() => setMode(check.id, mode)}>{mode}</Button
-                  >
-                {/each}
-              </div>
-              {#if check.risky}<span class="mt-1 block text-xs text-muted-foreground">پرخطر — احتمال قلابی بیشتر</span>{/if}
-            </td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
-  </div>
-</section>
+<!--
+  چکِ همگانی از این صفحه رفت.
+
+  ── چرا ──
+
+  کاربر پرسید «چرا اینجاست و اصلاً بدرد می‌خورد؟». بدرد می‌خورد — تنها
+  سنجشِ خودکاری است که بی سناریو هم کار می‌کند — ولی لحظهٔ سراغ رفتنش وقتی
+  است که یک چک قلابی داده، یعنی وسطِ صفحهٔ یافته‌ها.
+-->
+<p class="text-xs leading-6 text-muted-foreground">
+  «چه چیزی ایراد حساب می‌شود» (چک‌های همگانی) به
+  <a class="underline underline-offset-4" href={`${base}/triage`}>صفحهٔ یافته‌ها</a>
+  رفت — همان‌جا که وقتی چکی قلابی می‌دهد، سراغش می‌روید.
+</p>

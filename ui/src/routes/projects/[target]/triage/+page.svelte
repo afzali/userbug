@@ -3,6 +3,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import FindingCard from '$lib/components/FindingCard.svelte';
+  import ChecksPanel from '$lib/components/ChecksPanel.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import { formatDate, formatNumber } from '$lib/format.js';
 
@@ -229,7 +230,7 @@
     اشاره کند، نه فقط «بازگشت».
   -->
   {#snippet actions()}
-    <Button href={`/projects/${encodeURIComponent(data.target)}/knowledge`} variant="outline">شناخت</Button>
+    <Button href={`/projects/${encodeURIComponent(data.target)}/app`} variant="outline">اپ</Button>
     <Button href={`/projects/${encodeURIComponent(data.target)}`} variant="ghost">بازگشت به اجرا</Button>
   {/snippet}
 </PageHeader>
@@ -449,3 +450,23 @@
     </FindingCard>
   {:else}<p class="rounded-xl border border-dashed p-12 text-center text-muted-foreground xl:col-span-2">یافته‌ای با این فیلتر نیست.</p>{/each}
 </div>
+
+<!--
+  «چه چیزی ایراد حساب می‌شود» — ته همین صفحه.
+
+  ── چرا اینجا و نه در پیکربندی ──
+
+  این ده چک تنها سنجشِ خودکاری‌اند که بی نوشتنِ سناریو هم کار می‌کنند، و
+  بیشترِ ردیف‌های بالای همین صفحه از آن‌ها آمده. لحظه‌ای که آدم می‌خواهد
+  حالتشان را عوض کند، وقتی است که یکی‌شان قلابی داده — یعنی همین‌جا.
+-->
+<details class="mt-8 rounded-xl border p-4">
+  <summary class="cursor-pointer text-sm font-bold">چه چیزی ایراد حساب می‌شود؟</summary>
+  <div class="pt-4">
+    <ChecksPanel
+      target={data.target}
+      config={data.checksConfig}
+      definitions={data.checkDefinitions}
+    />
+  </div>
+</details>

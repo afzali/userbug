@@ -332,7 +332,7 @@
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-xs text-muted-foreground">قدم بعد:</span>
           <Button href={`/projects/${data.target}/map`} size="sm">نقشهٔ اپ را بکش</Button>
-          <Button href={`/projects/${data.target}/knowledge`} size="sm" variant="outline">شناختِ ساخته‌شده</Button>
+          <Button href={`/projects/${data.target}/app`} size="sm" variant="outline">شناختِ ساخته‌شده</Button>
         </div>
         <p class="mt-2 text-xs leading-6 text-muted-foreground">
           گشت آن‌جایی را می‌شناسد که <strong>شما</strong> بردید. نقشه بقیه را

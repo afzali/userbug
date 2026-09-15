@@ -13,13 +13,15 @@
    * جوابِ کاربر پراعتمادترین چیزی است که این سیستم می‌گیرد، و تنها راهی است
    * که چیزی `by: user` می‌شود. اگر پایینِ صفحه بود، کسی تا آنجا نمی‌رفت.
    */
+  import { invalidateAll } from '$app/navigation';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
+  import * as Card from '$lib/components/ui/card/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import ModelPicker from '$lib/components/ModelPicker.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
-  import { formatDate } from '$lib/format.js';
+  import { formatDate, formatNumber } from '$lib/format.js';
 
   let { data } = $props();
 
@@ -41,6 +43,35 @@
   let briefSaved = $state(data.brief || '');
   let briefBusy = $state(false);
   let briefNote = $state('');
+
+  /**
+   * اسکنِ دوبارهٔ سورس — endpointها و قاعده‌ها.
+   *
+   * از صفحهٔ «سورس» آمد. هیچ مدلی صدا نمی‌زند: هر سه عدد از حقیقتِ نحوی
+   * می‌آیند، پس صفحه‌ای که فقط برای نگاه کردن باز می‌شود پول خرج نمی‌کند.
+   */
+  async function rescan() {
+    busy = 'source';
+    error = '';
+    feedback = '';
+    try {
+      const response = await fetch('/api/source', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({ target: data.target }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'خوانده نشد');
+      feedback =
+        `${payload.files} فایل خوانده شد · ${payload.endpoints} endpoint` +
+        (payload.invariantsAdded ? ` · ${payload.invariantsAdded} ناوردای تازه` : '');
+      await invalidateAll();
+    } catch (cause) {
+      error = cause.message;
+    } finally {
+      busy = '';
+    }
+  }
 
   async function saveBrief() {
     briefBusy = true;
@@ -171,12 +202,12 @@
 
 </script>
 
-<svelte:head><title>شناخت — {data.target}</title></svelte:head>
+<svelte:head><title>اپ — {data.target}</title></svelte:head>
 
 <PageHeader
   eyebrow="پروژهٔ {data.project?.name || data.target}"
-  title="شناخت"
-  description="آنچه این ابزار دربارهٔ سامانه می‌داند. هرچه اینجا دقیق‌تر باشد، سناریوهای ساخته‌شده کمتر حدس می‌زنند و کاوش کمتر بیراهه می‌رود."
+  title="اپ"
+  description="این اپ چه دارد، و چقدرش را لمس کرده‌ایم. صفحه‌ها و مودال‌ها از گشت و خزش، endpointها و قاعده‌ها از سورس — یک‌جا، چون یک پرسش‌اند."
 >
   {#snippet actions()}
     <Button variant="outline" disabled={Boolean(busy)} onclick={() => digest({ dry: true })}>
@@ -191,9 +222,16 @@
       این صفحه می‌گوید چه می‌دانیم؛ آن یکی می‌گوید از آنچه می‌دانیم، چه چیزی
       آزموده نشده. بی این دکمه، صفحه در خودش تمام می‌شد.
     -->
+    <!--
+      خواندنِ دوبارهٔ سورس — بی هیچ فراخوانی مدل.
+
+      از صفحهٔ «سورس» آمد که در همین صفحه ادغام شد. اسکنِ endpointها و
+      قاعده‌ها نحوی است: مسیرِ فایل، رشتهٔ `case 'GET /x'`، و `UNIQUE(...)`.
+    -->
+    <Button variant="outline" disabled={busy === 'source' || !data.hasSource} onclick={rescan}>
+      {busy === 'source' ? 'در حال خواندن…' : 'خواندنِ دوبارهٔ سورس'}
+    </Button>
     <Button href={`/projects/${encodeURIComponent(data.target)}/proposals`} variant="outline">چه باید آزمود</Button>
-    <!-- حساب‌ها، fixtureها و چک‌ها از این صفحه رفتند؛ راهِ رسیدن نباید برود -->
-    <Button href={`/projects/${encodeURIComponent(data.target)}/config`} variant="ghost">حساب و چک</Button>
   {/snippet}
 </PageHeader>
 
@@ -354,33 +392,79 @@
   </section>
 {/if}
 
-{#if dossier?.routes?.length}
-  <section class="mb-6 rounded-xl border p-4">
-    <h2 class="mb-3 text-sm font-bold">روت‌ها</h2>
-    <div class="scroll-thin overflow-x-auto">
+<!--
+  جاهای اپ — از خزش، گشت، و سورس، در یک فهرست.
+
+  ── چرا جدولِ «روت‌ها» جایش را داد ──
+
+  آن جدول فقط `dossier.routes` را می‌خواند، یعنی چیزی که `learn` از سورس
+  درآورده. پس مودالی که خزش پیدا کرده بود و صفحه‌ای که فقط گشت دیده بود،
+  هیچ‌کدام در آن نبودند — و عددِ پوشش همیشه از واقعیت خوش‌بین‌تر بود.
+-->
+<section class="mb-6 rounded-xl border p-4">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 class="text-sm font-bold">جاهای اپ</h2>
+    <span class="text-[11px] text-muted-foreground">
+      {formatNumber(data.placeCoverage.crawled)} خزش ·
+      {formatNumber(data.placeCoverage.toured)} گشت ·
+      {formatNumber(data.placeCoverage.untouched)} فقط در سورس
+    </span>
+  </div>
+
+  {#if !data.places.length}
+    <p class="mt-2 text-xs leading-6 text-muted-foreground">
+      هنوز هیچ‌جایی شناخته نشده. یک
+      <a class="underline underline-offset-2" href={`${base}/tour`}>گشت</a> بروید یا
+      <a class="underline underline-offset-2" href={`${base}/map`}>نقشه</a> بکشید.
+    </p>
+  {:else}
+    <div class="scroll-thin mt-3 max-h-96 overflow-auto">
       <table class="w-full text-sm">
         <thead class="text-xs text-muted-foreground">
-          <tr class="border-b"><th class="p-2 text-right">مسیر</th><th class="p-2 text-right">هدف</th><th class="p-2 text-right">منبع</th><th class="p-2 text-right">نشان</th></tr>
+          <tr class="border-b">
+            <th class="p-2 text-right">جا</th>
+            <th class="p-2 text-right">از کجا می‌دانیم</th>
+            <th class="p-2 text-right">کنش</th>
+            <th class="p-2 text-right">قرارداد</th>
+          </tr>
         </thead>
         <tbody>
-          {#each dossier.routes as route (route.path)}
-            {@const page = pageByPath.get(route.path)}
+          {#each data.places as place (place.key)}
             <tr class="border-b last:border-0">
-              <td class="whitespace-nowrap p-2 font-mono text-xs">{route.path}</td>
-              <td class="p-2">{route.purpose || page?.purpose || '—'}</td>
-              <td class="p-2"><Badge variant={toneOf(route.by)}>{SOURCE_LABEL[route.by]}</Badge></td>
+              <td class="whitespace-nowrap p-2 font-mono text-xs">
+                {place.route}{place.view ? ` ▸ ${place.view}` : ''}
+                {#if place.purpose}<span class="block font-sans text-[11px] text-muted-foreground">{place.purpose.slice(0, 70)}</span>{/if}
+              </td>
+              <td class="p-2">
+                {#each place.by as source (source)}
+                  <Badge variant={source === 'source' ? 'outline' : 'secondary'} class="me-1 text-[10px]">
+                    {data.byLabel[source] || source}
+                  </Badge>
+                {/each}
+              </td>
               <td class="p-2 text-xs text-muted-foreground">
-                {#if route.requiresAuth}<span>نیازمند ورود</span>{/if}
-                {#if page}<span> · گشت‌شده</span>{/if}
-                {#if page?.stale}<span class="text-amber-600"> · کهنه</span>{/if}
+                {#if place.actions}{formatNumber(place.tried)} از {formatNumber(place.actions)}{:else}—{/if}
+              </td>
+              <td class="p-2 text-xs">
+                {#if place.contract}
+                  {formatNumber(place.contract)} بند
+                {:else if place.by.includes('crawl') || place.by.includes('tour')}
+                  <!--
+                    رفته‌ایم آنجا و نمی‌دانیم چه چیزی همیشه هست — یعنی هیچ
+                    انتظاری هم نمی‌شود نوشت.
+                  -->
+                  <span class="text-amber-600 dark:text-amber-400">ندارد</span>
+                {:else}
+                  <span class="text-muted-foreground">نرفته‌ایم</span>
+                {/if}
               </td>
             </tr>
           {/each}
         </tbody>
       </table>
     </div>
-  </section>
-{/if}
+  {/if}
+</section>
 
 {#if dossier?.risks?.length}
   <section class="mb-6 rounded-xl border p-4">
@@ -520,3 +604,155 @@
     </ul>
   {/if}
 </section>
+
+<!--
+  بقیهٔ سورس — بک‌اند و قاعده‌ها.
+
+  ── چرا اینجا و نه در صفحهٔ خودش ──
+
+  کاربر پرسید «چرا شناخت و سورس دوتاست؟ مگر یکی نیستند؟» — بودند. هر دو
+  یک پرسش را جواب می‌دادند: این اپ چه دارد و چقدرش را لمس کرده‌ایم.
+  تفکیکشان تاریخی بود (یکی از مدل و گشت، آن یکی از اسکنِ ایستا) نه مفهومی.
+-->
+{#if data.hasSource}
+  <div class="mb-6 grid gap-6 lg:grid-cols-2">
+
+    <!-- ── ۲. بک‌اند ── -->
+    <Card.Root>
+      <Card.Header class="pb-3">
+        <Card.Title class="text-sm">بک‌اند</Card.Title>
+        <Card.Description>endpointها، در برابر آنچه اجراها واقعاً صدا زده‌اند.</Card.Description>
+      </Card.Header>
+      <Card.Content class="space-y-3 text-sm">
+        {#if !data.endpoints?.scanned}
+          <p class="text-xs leading-6 text-muted-foreground">
+            هنوز خوانده نشده. «خواندنِ دوبارهٔ سورس» را بزنید.
+          </p>
+        {:else}
+          <div class="flex items-baseline justify-between">
+            <span class="text-muted-foreground">در سورس</span>
+            <strong class="text-lg">{formatNumber(data.endpoints.total)}</strong>
+          </div>
+          <div class="flex items-baseline justify-between">
+            <span class="text-muted-foreground">آزموده</span>
+            <strong class={touched ? '' : 'text-destructive'}>{formatNumber(touched)}</strong>
+          </div>
+          <div class="flex items-baseline justify-between">
+            <span class="text-muted-foreground">تماسِ ثبت‌شده</span>
+            <strong>{formatNumber(data.endpoints.calls)}</strong>
+          </div>
+
+          {#if data.endpoints.untouched.length}
+            <div class="rounded-lg border border-destructive/40 bg-destructive/5 p-2.5 text-xs">
+              <p class="font-medium text-destructive">
+                {formatNumber(data.endpoints.untouched.length)} endpoint، هیچ اجرایی صدایشان نزده
+              </p>
+              <ul class="mt-1.5 max-h-52 space-y-0.5 overflow-y-auto">
+                {#each data.endpoints.untouched as row (row.path)}
+                  <li dir="ltr" class="font-mono text-[11px]">
+                    <span class="text-muted-foreground">{row.methods.join(',') || '?'}</span>
+                    {row.path}
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          {/if}
+
+          <!--
+            فعلِ نیازموده، جدا از مسیرِ نیازموده.
+
+            `GET /keys` را هزار بار زده‌ایم و `DELETE` همان مسیر را هرگز — و
+            دومی همان‌جاست که باگ می‌نشیند.
+          -->
+          {#if data.endpoints.partial.length}
+            <div class="rounded-lg border p-2.5 text-xs">
+              <p class="font-medium">مسیر آزموده شده، این فعل‌ها نه:</p>
+              <ul class="mt-1.5 space-y-0.5">
+                {#each data.endpoints.partial as row (row.path)}
+                  <li dir="ltr" class="font-mono text-[11px]">
+                    <span class="text-destructive">{row.untried.join(',')}</span> {row.path}
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          {/if}
+
+          {#if data.endpoints.unknown.length}
+            <details class="text-xs">
+              <summary class="cursor-pointer text-muted-foreground">
+                {formatNumber(data.endpoints.unknown.length)} مسیر صدا خورد و در سورس نبود
+              </summary>
+              <!-- یا آشکارساز کور است، یا سرویسِ بیرونی. هر دو خبرند، نه نویز. -->
+              <ul class="mt-1.5 space-y-0.5">
+                {#each data.endpoints.unknown as row (row)}
+                  <li dir="ltr" class="font-mono text-[11px] text-muted-foreground">{row}</li>
+                {/each}
+              </ul>
+            </details>
+          {/if}
+
+          {#if data.endpoints.at}
+            <p class="text-[11px] text-muted-foreground">
+              آخرین خواندن: {formatDate(data.endpoints.at)} · {formatNumber(data.endpoints.files)} فایل
+            </p>
+          {/if}
+        {/if}
+      </Card.Content>
+    </Card.Root>
+
+    <!-- ── ۳. قاعده‌ها ── -->
+    <Card.Root>
+      <Card.Header class="pb-3">
+        <Card.Title class="text-sm">قاعده‌ها</Card.Title>
+        <Card.Description>آنچه schema اجبار می‌کند — و می‌شود تلاش کرد بشکندش.</Card.Description>
+      </Card.Header>
+      <Card.Content class="space-y-3 text-sm">
+        <div class="flex items-baseline justify-between">
+          <span class="text-muted-foreground">ناوردا</span>
+          <strong class="text-lg">{formatNumber(data.invariants.total)}</strong>
+        </div>
+        <div class="flex items-baseline justify-between">
+          <span class="text-muted-foreground">یکتایی</span>
+          <strong>{formatNumber(data.invariants.unique)}</strong>
+        </div>
+        <div class="flex items-baseline justify-between">
+          <span class="text-muted-foreground">اجباری‌بودن</span>
+          <strong>{formatNumber(data.invariants.notNull)}</strong>
+        </div>
+        {#if data.invariants.silenced}
+          <div class="flex items-baseline justify-between">
+            <span class="text-muted-foreground">خاموش‌شده با دلیل</span>
+            <strong>{formatNumber(data.invariants.silenced)}</strong>
+          </div>
+        {/if}
+
+        {#if data.invariants.sample.length}
+          <ul class="space-y-1.5 border-t pt-2 text-xs leading-6">
+            {#each data.invariants.sample as row (row.id)}
+              <li>
+                {row.statement}
+                {#if row.from}<span dir="ltr" class="block font-mono text-[11px] text-muted-foreground">{row.from}</span>{/if}
+              </li>
+            {/each}
+          </ul>
+          <Button href={`${base}/proposals`} variant="outline" size="sm" class="w-full">
+            پیشنهادهایی که از این‌ها درآمده
+          </Button>
+        {:else}
+          <p class="text-xs leading-6 text-muted-foreground">
+            هیچ ناوردایی ثبت نشده. اگر پروژه SQL دارد، «خواندنِ دوبارهٔ سورس» آن را پیدا می‌کند.
+          </p>
+        {/if}
+      </Card.Content>
+    </Card.Root>
+  </div>
+{:else}
+  <section class="mb-6 rounded-xl border border-dashed p-6 text-sm leading-7">
+    <p class="font-medium">این پروژه سورسی اعلام نکرده.</p>
+    <p class="mt-1 max-w-2xl text-muted-foreground">
+      کلید <code>source.root</code> را در پیکربندی پروژه بگذارید تا معلوم شود چه
+      endpointها و چه قاعده‌هایی وجود دارند که هنوز آزموده نشده‌اند.
+    </p>
+    <Button href={`${base}/files?kind=target`} variant="outline" size="sm" class="mt-3">پیکربندی پروژه</Button>
+  </section>
+{/if}

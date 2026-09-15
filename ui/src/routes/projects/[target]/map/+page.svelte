@@ -1104,8 +1104,8 @@
             schema را نه. لینک همین‌جاست چون کسی که «در سورس هست، نرسیدیم» را
             خوانده، همان لحظه سؤالِ بعدی‌اش را دارد.
           -->
-          <a class="block text-xs underline underline-offset-4" href={`${base}/source`}>
-            بقیهٔ سورس: بک‌اند و schema، که نقشه نمی‌بیندشان
+          <a class="block text-xs underline underline-offset-4" href={`${base}/app`}>
+            صفحهٔ «اپ»: بک‌اند و قاعده‌های schema، که نقشه نمی‌بیندشان
           </a>
         </Card.Content>
       </Card.Root>

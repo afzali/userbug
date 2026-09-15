@@ -206,7 +206,7 @@
       {
         index: '۳',
         label: 'شناخت',
-        href: `${base}/knowledge`,
+        href: `${base}/app`,
         done: percent !== null && percent > 0,
         state:
           percent === null || percent === 0
@@ -489,7 +489,7 @@
           صفحه‌ها، مسیرها و کارهای خطرناک ثبت می‌شوند. هرچه خودتان گفته باشید
           بالاترین اعتماد را دارد — بالاتر از حدسِ مدل.
         </p>
-        <Button href={`/projects/${encodeURIComponent(target)}/knowledge`} variant="ghost" class="mt-3 w-full text-xs">شناخت</Button>
+        <Button href={`/projects/${encodeURIComponent(target)}/app`} variant="ghost" class="mt-3 w-full text-xs">اپ</Button>
       </li>
 
       <li class="rounded-lg border bg-background p-4">
