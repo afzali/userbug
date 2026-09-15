@@ -314,6 +314,11 @@
     return [...groups.entries()].sort(([a], [b]) => (a < b ? -1 : 1));
   });
 
+  /** جاهایی که فقط گشت می‌شناسدشان — خزش هنوز نرفته. */
+  let tourOnly = $derived(
+    (data.unified || []).filter((one) => one.by.includes('tour') && !one.by.includes('crawl'))
+  );
+
   let totals = $derived.by(() => {
     const out = { actions: 0, tried: 0, inert: 0, destructive: 0 };
     for (const state of states) {
@@ -960,8 +965,49 @@
           {/if}
         </Card.Header>
         <Card.Content class="space-y-3">
+          <!--
+            پوشش از **همهٔ** منابع، نه فقط خزش.
+
+            کاربر پرسید «آیا گشت خودش یک نوع نقشه نیست؟» — بود، و این کارت
+            تا امروز فقط گره‌های خزش را می‌شمرد. یعنی جایی که آدم در گشت
+            دیده بود و جایی که فقط در سورس هست، هیچ‌کدام در مخرج نبودند و
+            نمره از واقعیت خوش‌بین‌تر درمی‌آمد.
+          -->
+          {#if data.coverage?.total}
+            <div class="rounded-lg border bg-muted/30 p-2.5 text-[11px] leading-6">
+              <p>
+                <strong>{formatNumber(data.coverage.total)} جای شناخته‌شده</strong> —
+                {formatNumber(data.coverage.crawled)} خزش · {formatNumber(data.coverage.toured)} گشت
+                {#if data.coverage.untouched}
+                  · <span class="text-amber-600 dark:text-amber-400">
+                      {formatNumber(data.coverage.untouched)} فقط در سورس، هیچ‌کس نرفته
+                    </span>
+                {/if}
+              </p>
+              <!--
+                «جا» با «حالت» یکی نیست و باید گفته شود.
+                حالت = روت + نما + شکلِ صفحه، پس یک جا می‌تواند چند حالت
+                داشته باشد (کتابِ باز و کتابِ بسته). بی این توضیح، دو عددِ
+                کنار هم که نمی‌خوانند فقط گیج می‌کنند.
+              -->
+              <p class="text-muted-foreground">
+                «جا» یعنی روت و نما؛ یک جا می‌تواند چند حالتِ خزش داشته باشد.
+              </p>
+              {#if data.coverage.withoutContract}
+                <!--
+                  «رفته‌ایم ولی نمی‌دانیم اینجا چه چیزی همیشه هست» — و آن دقیقاً
+                  جایی است که هیچ انتظاری نمی‌شود نوشت.
+                -->
+                <p class="text-muted-foreground">
+                  {formatNumber(data.coverage.withoutContract)} جا قرارداد ندارد؛
+                  {formatNumber(data.coverage.contracts)} بندِ «همیشه اینجا بوده» ثبت شده.
+                </p>
+              {/if}
+            </div>
+          {/if}
+
           <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-4">
-            {#each [['حالت', states.length], ['کنش', totals.actions], ['امتحان‌شده', totals.tried], ['در صف', map.frontier?.length || 0]] as [label, value] (label)}
+            {#each [['حالتِ خزش', states.length], ['کنش', totals.actions], ['امتحان‌شده', totals.tried], ['در صف', map.frontier?.length || 0]] as [label, value] (label)}
               <div>
                 <span class="block text-[11px] text-muted-foreground">{label}</span>
                 <span class="font-medium">{formatNumber(value)}</span>
@@ -1010,6 +1056,33 @@
               <div class="mt-2 flex flex-wrap gap-1.5">
                 {#each data.unreached as route (route)}
                   <Badge variant="outline" class="font-mono text-[11px]">{route}</Badge>
+                {/each}
+              </div>
+            </details>
+          {/if}
+
+          <!--
+            جاهایی که فقط گشت می‌شناسدشان.
+
+            تا امروز صفحهٔ نقشه این‌ها را اصلاً نشان نمی‌داد، چون فقط
+            `map.json` را می‌خواند — و کاربر حق داشت بپرسد «مگر گشت خودش یک
+            نوع نقشه نیست؟».
+          -->
+          {#if tourOnly.length}
+            <details class="text-xs">
+              <summary class="cursor-pointer">
+                فقط در گشت دیده شده ({formatNumber(tourOnly.length)})
+                <span class="text-[11px] text-muted-foreground">— خزش هنوز نرفته</span>
+              </summary>
+              <div class="mt-2 space-y-1">
+                {#each tourOnly as one (one.key)}
+                  <div class="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border p-2">
+                    <span class="font-mono text-[11px]">{one.route}{one.view ? ` ▸ ${one.view}` : ''}</span>
+                    <span class="text-[11px] text-muted-foreground">
+                      {one.contract ? `${formatNumber(one.contract)} بندِ قرارداد` : 'بی قرارداد'}
+                      {#if one.purpose}· {one.purpose.slice(0, 60)}{/if}
+                    </span>
+                  </div>
                 {/each}
               </div>
             </details>

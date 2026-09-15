@@ -1,4 +1,5 @@
 import { readMap } from '../../../../../../src/map/store.js';
+import { coverage, unifiedStates } from '../../../../../../src/map/merge.js';
 import { extraRoutes, stuckAtLogin, unreachedRoutes } from '../../../../../../src/map/render.js';
 import { mispredictions } from '../../../../../../src/map/classify.js';
 import { knowledgeDir, readDossier } from '../../../../../../src/knowledge/store.js';
@@ -43,8 +44,22 @@ export async function load({ params }) {
     []
   );
 
+  /**
+   * یک نقشه، از هر سه منبع.
+   *
+   * ── چرا این کنارِ `map` نشست و جایش را نگرفت ──
+   *
+   * کاربر پرسید «آیا گشت خودش یک نوع نقشه نیست؟» — بود. ولی `map.json`
+   * چیزی دارد که آن دو ندارند: **مسیرِ بازپخش‌شدنی**. پس فرمِ خزش همچنان
+   * از خودِ نقشه تغذیه می‌شود و این فهرست برای **دیدن** است: اینکه اپ چه
+   * دارد و چقدرش را لمس کرده‌ایم.
+   */
+  const states = safely(() => unifiedStates(target), []);
+
   return {
     map,
+    unified: states,
+    coverage: coverage(states),
     knownRoutes,
     unreached: map ? safely(() => unreachedRoutes(map, knownRoutes), []) : [],
     extra: map ? safely(() => extraRoutes(map, knownRoutes), []) : [],

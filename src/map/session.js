@@ -40,7 +40,7 @@ import { snapshotPage } from '../steps/snapshot.js';
 import { resolveTarget } from '../scenario/resolve.js';
 import { runUniversalChecks } from '../checks/run.js';
 import { readChecksConfig } from '../checks/config.js';
-import { knowledgeDir, readDossier } from '../knowledge/store.js';
+import { knowledgeDir, readDossier, readPage, writePage } from '../knowledge/store.js';
 import { avoidFrom } from '../knowledge/select.js';
 import { freshIdentity } from '../data/persian.js';
 import { accountsFor, listAccounts, readAccounts, saveAccount } from '../knowledge/credentials.js';
@@ -631,8 +631,58 @@ export class MapSession extends EventEmitter {
       });
     }
 
+    /**
+     * قراردادِ همین گره هم تقویت می‌شود — نه فقط در گشت.
+     *
+     * ── چرا این کم بود ──
+     *
+     * لایهٔ «چیزی که بود، هنوز هست» فقط از گشت و اجرای سناریو تغذیه می‌شد.
+     * یعنی خزشی که پنجاه حالت می‌دید، برای هیچ‌کدامشان نمی‌دانست «اینجا چه
+     * چیزی همیشه هست» — و مودال و کشویی که فقط خزش پیدایشان می‌کند (همان
+     * نیمه‌ای که آدرس ندارد و کسی تست ننوشته) هرگز قرارداد نمی‌گرفتند.
+     *
+     * همان الگوریتمِ `reinforce` است، پس دادهٔ کاربر با همان مکانیزم از
+     * چیدمانِ ثابت جدا می‌شود: آنچه در چند بازدید ماند، قاعده است.
+     */
+    await this.learnContract(state, current.snapshot);
+
     this.enqueue(state);
     return state;
+  }
+
+  /**
+   * قراردادِ یک گره را از snapshotِ همین بازدید تقویت کن.
+   *
+   * شکستش خزش را نمی‌کشد: نقشه محصولِ اصلیِ این اجراست و یک فایلِ شناختِ
+   * نوشته‌نشده دلیلی برای از دست دادنش نیست. ولی ساکت هم نمی‌ماند.
+   */
+  async learnContract(state, snapshot) {
+    if (!snapshot) return;
+    try {
+      const { contractFrom, reinforce } = await import('../checks/contract.js');
+      const previous = readPage(this.targetName, state.route, state.view) || {
+        path: state.route,
+        view: state.view,
+        title: state.title || '',
+        /**
+         * `run` است نه `crawl`: تاکسونومیِ `by` از قبل این را دارد —
+         * «مشاهدهٔ خودکار»، پایین‌تر از گشت (آدم آنجا بوده) و بالاتر از مدل.
+         * نامِ تازه یعنی هر جایی که اعتماد را می‌سنجد باید یکی دیگر یاد بگیرد،
+         * و آنچه نشناسد `model` می‌خواندش — یعنی حدس، که این نیست.
+         */
+        by: 'run',
+        contract: { mode: 'watch', must: [], seenIn: 0 },
+      };
+
+      const { contract } = reinforce(previous.contract, contractFrom(snapshot));
+      await writePage(
+        this.targetName,
+        { ...previous, path: state.route, view: state.view, title: state.title || previous.title, contract },
+        { why: `خزش ${this.runId}` }
+      );
+    } catch (cause) {
+      this.emitEvent('warning', { message: `قراردادِ «${state.route}» نوشته نشد: ${cause.message.slice(0, 80)}` });
+    }
   }
 
   /** کنش‌هایی که ارزشِ امتحان دارند. یک تعریف، چون صف و حلقه هر دو لازمش دارند. */
