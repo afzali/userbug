@@ -1,5 +1,14 @@
 /**
- * «مأموریت» — جمله‌ای که به نقشهٔ کار تبدیل می‌شود، پیش از آنکه پولی خرج شود.
+ * «نقشهٔ کار» — جمله‌ای که به برنامهٔ خزش تبدیل می‌شود، پیش از آنکه پولی خرج شود.
+ *
+ * ── چرا اسمش عوض شد ──
+ *
+ * قبلاً «مأموریت» نام داشت، و بعد صفحهٔ «مأموریت‌ها» ساخته شد برای چیزِ
+ * کاملاً دیگری: سفرهای کاربر (ثبت‌نام، ورود، فراموشی رمز…). دو چیز با یک
+ * نام، دقیقاً همان ایرادی است که کاربر دو بار گرفت.
+ *
+ * حالا: **مأموریت** = سفرِ کاربر (یک سناریو با انتظار و تاریخچهٔ سلامت).
+ * **نقشهٔ کار** = این — برنامه‌ای برای اینکه خزنده کجا را بگردد.
  *
  * ── چرا این قطعه گم بود ──
  *
@@ -14,7 +23,7 @@
  * ── چرا نقشهٔ کار یک **فایل** است ــ
  *
  * نه یک prompt که در حافظه بماند. قابلِ دیدن، اصلاح، کامیت، و اجرای دوباره
- * — مثل هر چیزِ دیگری اینجا. و چون فایل است، ده‌ها مأموریتِ متفاوت می‌شود
+ * — مثل هر چیزِ دیگری اینجا. و چون فایل است، ده‌ها نقشهٔ کارِ متفاوت می‌شود
  * داشت که همه در **یک** نقشه می‌نویسند: تفکیک بی از دست دادنِ پوشش.
  */
 import fs from 'node:fs';
@@ -238,6 +247,18 @@ export function missionToJob(mission, { target = '', states = 40, minutes = 12 }
 /* ── انبار ── */
 
 export function missionsDir(target) {
+  return path.join(knowledgeDir(target), 'plans');
+}
+
+/**
+ * پوشهٔ قدیمی، فقط برای **خواندن**.
+ *
+ * وقتی این‌ها «مأموریت» نام داشتند در `missions/` می‌نشستند. آن نام حالا
+ * مالِ سفرهای کاربر است. پروژه‌ای که از قبل نقشهٔ کار داشته نباید با یک
+ * تغییرِ نام، فایل‌هایش را گم کند — و کپیِ خودکارشان هم نمی‌کنیم، چون آن
+ * وقت یک فایل در دو جا می‌ماند و بعداً معلوم نیست کدام تازه‌تر است.
+ */
+function legacyDir(target) {
   return path.join(knowledgeDir(target), 'missions');
 }
 
@@ -261,23 +282,30 @@ export function saveMission(target, mission) {
 }
 
 export function listMissions(target) {
-  const dir = missionsDir(target);
-  if (!fs.existsSync(dir)) return [];
-  return fs
-    .readdirSync(dir)
-    .filter((name) => name.endsWith('.json'))
-    .map((name) => {
+  const seen = new Set();
+  const out = [];
+
+  // پوشهٔ تازه اول: اگر نامی در هر دو بود، نسخهٔ تازه برنده است
+  for (const dir of [missionsDir(target), legacyDir(target)]) {
+    if (!fs.existsSync(dir)) continue;
+    for (const name of fs.readdirSync(dir).filter((one) => one.endsWith('.json'))) {
+      if (seen.has(name)) continue;
+      seen.add(name);
       try {
-        return JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
+        out.push(JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')));
       } catch {
-        return null;
+        // فایلِ خراب حذف نمی‌شود، فقط نشان داده نمی‌شود
       }
-    })
-    .filter(Boolean)
-    .sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+    }
+  }
+
+  return out.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
 }
 
 export function removeMission(target, slug) {
-  const file = path.join(missionsDir(target), `${String(slug).replace(/[^\p{L}\p{N}_-]/gu, '')}.json`);
-  fs.rmSync(file, { force: true });
+  const name = `${String(slug).replace(/[^\p{L}\p{N}_-]/gu, '')}.json`;
+  // هر دو جا: وگرنه «حذف شد» می‌گوییم و دفعهٔ بعد همان‌جاست
+  for (const dir of [missionsDir(target), legacyDir(target)]) {
+    fs.rmSync(path.join(dir, name), { force: true });
+  }
 }

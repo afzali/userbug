@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { listMissions, saveMission } from '../../../../../src/map/mission.js';
+import { listMissions, saveMission } from '../../../../../src/map/plan.js';
 import { getActiveJob, startJob } from '$lib/server/jobs.js';
 import { jsonError } from '$lib/server/http.js';
 import { assertMutationRequest } from '$lib/server/security.js';
@@ -15,13 +15,13 @@ export async function POST(event) {
     const job = await startJob(options);
 
     /**
-     * اگر این اجرا از یک مأموریت آمده، در همان فایل ثبت می‌شود.
+     * اگر این اجرا از یک نقشهٔ کار آمده، در همان فایل ثبت می‌شود.
      *
      * ── چرا اینجا و نه در مسیرِ جدا ──
      *
-     * یک بار یک `action: 'run'` در `/api/mission` بود که خودش job می‌ساخت —
+     * یک بار یک `action: 'run'` در `/api/plan` بود که خودش job می‌ساخت —
      * یعنی دو درِ شروعِ اجرا، و دیر یا زود یکی‌شان چیزی را می‌فرستاد که آن
-     * یکی نمی‌فرستد. حالا شروعِ اجرا یک در دارد و «از کدام مأموریت» فقط یک
+     * یکی نمی‌فرستد. حالا شروعِ اجرا یک در دارد و «از کدام نقشهٔ کار» فقط یک
      * فیلدِ کنارِ آن است.
      *
      * شکستش اجرا را نمی‌کشد: خزش شروع شده و کاربر منتظرِ آن است؛ نشدنِ یک
@@ -32,13 +32,13 @@ export async function POST(event) {
     if (slug) {
       try {
         const mission = listMissions(options.target).find((one) => one.slug === slug);
-        if (!mission) throw new Error(`مأموریتی به نام «${slug}» نیست`);
+        if (!mission) throw new Error(`نقشهٔ کاری به نام «${slug}» نیست`);
         saveMission(options.target, {
           ...mission,
           runs: [{ job: job.id, at: new Date().toISOString(), by: 'ui' }, ...(mission.runs || [])].slice(0, 20),
         });
       } catch (cause) {
-        missionNote = `اجرا شروع شد ولی در مأموریت ثبت نشد: ${cause.message}`;
+        missionNote = `اجرا شروع شد ولی در نقشهٔ کار ثبت نشد: ${cause.message}`;
       }
     }
 

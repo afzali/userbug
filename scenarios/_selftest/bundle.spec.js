@@ -31,9 +31,9 @@ function withProject() {
   );
   fs.writeFileSync(path.join(know, 'fixtures', 'seed.json'), 'دادهٔ نمونه');
   fs.writeFileSync(path.join(know, 'brief.md'), 'این اپ یک کتاب‌خوان است.');
-  fs.mkdirSync(path.join(know, 'missions'), { recursive: true });
+  fs.mkdirSync(path.join(know, 'plans'), { recursive: true });
   fs.writeFileSync(
-    path.join(know, 'missions', 'کتاب.json'),
+    path.join(know, 'plans', 'کتاب.json'),
     JSON.stringify({ version: 1, slug: 'کتاب', goal: 'ابزارهای متن', scope: ['/content/[id]'] })
   );
 
@@ -112,7 +112,7 @@ test('نامِ هدفِ خطرناک وارد نمی‌شود', async () => {
   expect(() => importBundle({ version: 1, target: '../evil' })).toThrow(/نامِ هدف/);
 });
 
-test('توضیحِ پروژه و مأموریت‌ها هم در بسته‌اند', async () => {
+test('توضیحِ پروژه و نقشه‌های کار هم در بسته‌اند', async () => {
   /**
    * ── چرا این دو جداگانه سنجیده می‌شوند ──
    *
@@ -129,11 +129,11 @@ test('توضیحِ پروژه و مأموریت‌ها هم در بسته‌ان
   const bundle = exportBundle('demo');
 
   expect(bundle.brief).toContain('کتاب‌خوان');
-  expect(bundle.knowledge['missions/کتاب.json'].goal).toBe('ابزارهای متن');
+  expect(bundle.knowledge['plans/کتاب.json'].goal).toBe('ابزارهای متن');
   expect(describeBundle(bundle)).toMatchObject({ brief: true, missions: 1 });
 
   importBundle(bundle, { as: 'copy' });
   // markdown باید متن برگردد، نه JSONِ نقل‌قول‌دار
   expect(fs.readFileSync(path.join(root, 'knowledge', 'copy', 'brief.md'), 'utf8')).toBe('این اپ یک کتاب‌خوان است.');
-  expect(fs.existsSync(path.join(root, 'knowledge', 'copy', 'missions', 'کتاب.json'))).toBe(true);
+  expect(fs.existsSync(path.join(root, 'knowledge', 'copy', 'plans', 'کتاب.json'))).toBe(true);
 });

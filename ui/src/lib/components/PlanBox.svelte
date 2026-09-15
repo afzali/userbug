@@ -8,7 +8,7 @@
    * می‌داد، و خودش خزش را شروع می‌کرد. یعنی صفحهٔ نقشه دو فرم داشت که هر دو
    * یک کار می‌کردند. کاربر درست گفت:
    *
-   *   «مأموریت و خزشِ دستی مگر دو راه مجزا نیستند؟ اگر مأموریت را پر کنم،
+   *   «نقشهٔ کار و خزشِ دستی مگر دو راه مجزا نیستند؟ اگر آن را پر کنم،
    *    عملاً داینامیک همان فرمِ دستی را پر کرده‌ام.»
    *
    * حق داشت. نقشهٔ کار یک **راهِ دیگر برای پر کردنِ همان فرم** است، نه مسیری
@@ -29,7 +29,7 @@
   let dropped = $state([]);
 
   async function load() {
-    const response = await fetch(`/api/mission?target=${encodeURIComponent(target)}`);
+    const response = await fetch(`/api/plan?target=${encodeURIComponent(target)}`);
     if (!response.ok) return;
     missions = (await response.json()).missions || [];
   }
@@ -42,7 +42,7 @@
    */
   onMount(load);
 
-  /** صفحه بعد از «ذخیره به‌عنوان مأموریت» صدایش می‌زند تا فهرست تازه شود. */
+  /** صفحه بعد از «ذخیره به‌عنوان نقشهٔ کار» صدایش می‌زند تا فهرست تازه شود. */
   export async function refresh() {
     await load();
   }
@@ -53,7 +53,7 @@
     error = '';
     dropped = [];
     try {
-      const response = await fetch('/api/mission', {
+      const response = await fetch('/api/plan', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
         body: JSON.stringify({ target, action: 'propose', text: sentence, model }),
@@ -121,13 +121,13 @@
 
   {#if missions.length}
     <!--
-      مأموریت‌های ذخیره‌شده = همان جمله‌ها، بی فراخوانیِ دوباره.
+      نقشه‌های کارِ ذخیره‌شده = همان جمله‌ها، بی فراخوانیِ دوباره.
 
       نقشهٔ کار یک فایل است؛ اگر هفتهٔ بعد همان کار لازم شد، دلیلی ندارد
       دوباره پول بدهیم تا مدل همان جواب را بسازد.
     -->
     <div class="space-y-1 border-t pt-2">
-      <p class="text-[11px] text-muted-foreground">یا یکی از مأموریت‌های ذخیره‌شده — رایگان:</p>
+      <p class="text-[11px] text-muted-foreground">یا یکی از نقشه‌های کارِ ذخیره‌شده — رایگان:</p>
       <ul class="flex flex-wrap gap-1.5">
         {#each missions as one (one.slug)}
           <li>

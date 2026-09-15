@@ -5,6 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import YAML from 'yaml';
+import { countExpects } from '../../../../src/scenario/expect.js';
 import {
   ROOT,
   RUNS_DIR,
@@ -140,6 +141,15 @@ async function scenarioMetadata(directory, relative) {
         executable: Boolean(doc?.name) && Array.isArray(doc?.steps) && !relative.includes('/'),
         persona: String(doc?.persona || 'novice'),
         steps: Array.isArray(doc?.steps) ? doc.steps.length : 0,
+        /**
+         * چند بندِ سنجش دارد — و چرا این عدد مهم است.
+         *
+         * سناریوی بی‌انتظار اجرا می‌شود، سبز تمام می‌شود، و **هیچ‌چیز را
+         * نسنجیده**: فقط می‌گوید «چیزی نشکست». تا وقتی این عدد جایی دیده
+         * نشود، فرقِ آن با سناریویی که واقعاً چیزی را تضمین می‌کند از هیچ
+         * فهرستی معلوم نیست.
+         */
+        expects: countExpects(doc?.steps),
       };
     } catch (cause) {
       return {

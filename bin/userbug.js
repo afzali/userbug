@@ -182,13 +182,13 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --hard                      expect به‌جای assert (همان‌جا بشکند)
       --model <اسلاگ>
 
-  userbug mission <هدف> "<جمله>"  جمله → نقشهٔ کار (یک فراخوانی)، ذخیره در
+  userbug plan <هدف> "<جمله>"     جمله → نقشهٔ کار (یک فراخوانی)، ذخیره در
                                   فایل تا اصلاحش کنید — بعد خزشِ محدود
       --name <نام> --model <اسلاگ>
-  userbug mission list <هدف>      مأموریت‌های ذخیره‌شده
-  userbug mission run <هدف> <نام> اجرای همان نقشهٔ کار
+  userbug plan list <هدف>         نقشه‌های کارِ ذخیره‌شده
+  userbug plan run <هدف> <نام>    اجرای همان نقشهٔ کار
       --states <n> --minutes <n> --headed
-  userbug mission remove <هدف> <نام>
+  userbug plan remove <هدف> <نام>
 
   userbug ai                      تنظیمات هوش مصنوعی: کلید، مدلِ هر نقش، بودجه
       --check                     هر مدل را با ارزان‌ترین درخواست بسنج
@@ -200,7 +200,7 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
   userbug models [--free]         فهرست زندهٔ مدل‌های OpenRouter
   userbug repro <runId> [اثرانگشت]
                                   بازتولید یک یافته از اجرای گذشته
-  userbug health <هدف>            کدام سناریو سالم است و از کی — در طولِ همهٔ
+  userbug missions <هدف>          کدام سفر سالم است و از کی — در طولِ همهٔ
                                   اجراها، با آن‌هایی که هرگز اجرا نشده‌اند
       --json                      همان داده، برای ابزارِ دیگر
 
@@ -621,9 +621,9 @@ function cmdRemove({ positional }) {
  * ابزار همهٔ داده‌اش را داشت و این پرسش را جواب نمی‌داد: هر اجرا جداگانه
  * گزارش می‌شد و هیچ‌چیز در **طولِ زمان** نگاه نمی‌کرد.
  */
-async function cmdHealth({ flags, positional }) {
+async function cmdMissions({ flags, positional }) {
   const target = positional[0];
-  if (!target) throw new Error('نام هدف لازم است: userbug health <هدف>');
+  if (!target) throw new Error('نام هدف لازم است: userbug missions <هدف>');
 
   const { healthOf, summarize, daysSinceGreen } = await import('../src/runs/health.js');
   const { loadScenarios } = await import('../src/scenario/load.js');
@@ -669,7 +669,7 @@ async function cmdHealth({ flags, positional }) {
     unknown: 'نامعلوم',
   };
 
-  console.log(`\n  سلامتِ «${target}»`);
+  console.log(`\n  مأموریت‌های «${target}»`);
   console.log(
     `  ${sum.passed} سالم · ${sum.failed} شکست · ${sum.findings} ایراد · ${sum.never} هرگز اجرا نشد` +
       (sum.unknown ? ` · ${sum.unknown} نامعلوم` : '')
@@ -1217,7 +1217,7 @@ async function cmdBundle({ flags, positional }) {
     const size = (fs.statSync(out).size / 1024).toFixed(0);
     console.log(`\n  بسته: ${out}  (${size} کیلوبایت)`);
     console.log(`  ${info.knowledge} فایلِ شناخت · ${info.scenarios} سناریو · ${info.fixtures} فایلِ نمونه`);
-    if (info.missions || info.brief) console.log(`  ${info.missions} مأموریت${info.brief ? ' · توضیحِ پروژه' : ''}`);
+    if (info.missions || info.brief) console.log(`  ${info.missions} نقشهٔ کار${info.brief ? ' · توضیحِ پروژه' : ''}`);
     if (info.states) console.log(`  نقشه: ${info.states} حالت · ${info.pages} صفحهٔ ثبت‌شده`);
     for (const note of info.omitted) console.log(`  ! نیامد: ${note}`);
     console.log(`\n  بازگرداندن: userbug bundle import ${out}\n`);
@@ -1235,7 +1235,7 @@ async function cmdBundle({ flags, positional }) {
     if (flags.show) {
       console.log(`\n  هدف: ${info.target}  ·  ساخته‌شده: ${info.at.slice(0, 16).replace('T', ' ')}`);
       console.log(`  ${info.knowledge} فایلِ شناخت · ${info.scenarios} سناریو · ${info.fixtures} فایلِ نمونه`);
-    if (info.missions || info.brief) console.log(`  ${info.missions} مأموریت${info.brief ? ' · توضیحِ پروژه' : ''}`);
+    if (info.missions || info.brief) console.log(`  ${info.missions} نقشهٔ کار${info.brief ? ' · توضیحِ پروژه' : ''}`);
       if (info.states) console.log(`  نقشه: ${info.states} حالت`);
       for (const note of info.omitted) console.log(`  ! داخلش نیست: ${note}`);
       console.log('');
@@ -1630,7 +1630,10 @@ async function cmdExpect({ flags, positional }) {
 }
 
 /**
- * «مأموریت» — جمله → نقشهٔ کار → اصلاحِ آدم → خزشِ محدود.
+ * «نقشهٔ کار» — جمله → برنامهٔ خزش → اصلاحِ آدم → خزشِ محدود.
+ *
+ * نامش عوض شد: «مأموریت» حالا مالِ سفرهای کاربر است (`userbug missions`).
+ * این یکی برنامه‌ای است برای اینکه خزنده کجا را بگردد.
  *
  * ── چرا این گام میانی ساخته شد ──
  *
@@ -1644,7 +1647,7 @@ async function cmdExpect({ flags, positional }) {
  * چاپ؛ نه پرسشِ تعاملی، نه ویرایشگری که باز شود. همان فایل را رابط هم
  * می‌خواند و می‌نویسد.
  */
-async function cmdMission({ flags, positional }) {
+async function cmdPlan({ flags, positional }) {
   const {
     listMissions,
     missionSlug,
@@ -1652,10 +1655,10 @@ async function cmdMission({ flags, positional }) {
     proposeMission,
     removeMission,
     saveMission,
-  } = await import('../src/map/mission.js');
+  } = await import('../src/map/plan.js');
 
   const USAGE =
-    'userbug mission <هدف> "<جمله>"  |  mission list <هدف>  |  mission run <هدف> <نام>  |  mission remove <هدف> <نام>';
+    'userbug plan <هدف> "<جمله>"  |  plan list <هدف>  |  plan run <هدف> <نام>  |  plan remove <هدف> <نام>';
 
   /**
    * فعل اول، مثل `bundle`.
@@ -1694,7 +1697,7 @@ async function cmdMission({ flags, positional }) {
   if (verb === 'list') {
     const missions = listMissions(target);
     if (!missions.length) {
-      console.log(`\n  هنوز مأموریتی نیست.\n  ساختنش: userbug mission ${target} "برو داخل کتاب و ابزارهای متن را ببین"\n`);
+      console.log(`\n  هنوز نقشهٔ کاری نیست.\n  ساختنش: userbug plan ${target} "برو داخل کتاب و ابزارهای متن را ببین"\n`);
       return;
     }
     console.log('');
@@ -1710,7 +1713,7 @@ async function cmdMission({ flags, positional }) {
 
   if (verb === 'remove') {
     const slug = positional[2];
-    if (!slug) throw new Error('نام مأموریت لازم است: userbug mission remove <هدف> <نام>');
+    if (!slug) throw new Error('نام نقشهٔ کار لازم است: userbug plan remove <هدف> <نام>');
     removeMission(target, slug);
     console.log(`\n  حذف شد: ${slug}\n`);
     return;
@@ -1718,9 +1721,9 @@ async function cmdMission({ flags, positional }) {
 
   if (verb === 'run') {
     const slug = positional[2];
-    if (!slug) throw new Error('نام مأموریت لازم است: userbug mission run <هدف> <نام>');
+    if (!slug) throw new Error('نام نقشهٔ کار لازم است: userbug plan run <هدف> <نام>');
     const mission = listMissions(target).find((one) => one.slug === slug);
-    if (!mission) throw new Error(`مأموریتی به نام «${slug}» نیست. فهرست: userbug mission list ${target}`);
+    if (!mission) throw new Error(`نقشهٔ کاری به نام «${slug}» نیست. فهرست: userbug plan list ${target}`);
 
     show(mission);
     const job = missionToJob(mission, { target });
@@ -1728,7 +1731,7 @@ async function cmdMission({ flags, positional }) {
      * ترجمه یک جاست: `missionToJob`.
      *
      * اگر اینجا و در رابط هر کدام ترجمهٔ خودشان را داشتند، دیر یا زود یکی‌شان
-     * `profile` را می‌فرستاد و آن یکی نه — و کاربر می‌دید که «همان مأموریت»
+     * `profile` را می‌فرستاد و آن یکی نه — و کاربر می‌دید که «همان نقشهٔ کار»
      * در دو جا دو جور اجرا می‌شود.
      */
     const mapFlags = { ...flags };
@@ -1744,10 +1747,10 @@ async function cmdMission({ flags, positional }) {
     const session = await cmdMap({ flags: mapFlags, positional: [target] });
 
     /**
-     * اجرا در خودِ فایلِ مأموریت ثبت می‌شود — مثل رابط.
+     * اجرا در خودِ فایلِ نقشهٔ کار ثبت می‌شود — مثل رابط.
      *
-     * «چه چیزی از این مأموریت درآمد» پرسشی است که هفتهٔ بعد پرسیده می‌شود.
-     * اگر فقط رابط ثبتش می‌کرد، همان مأموریت بسته به اینکه از کجا اجرا شده
+     * «چه چیزی از این نقشهٔ کار درآمد» پرسشی است که هفتهٔ بعد پرسیده می‌شود.
+     * اگر فقط رابط ثبتش می‌کرد، همان نقشه بسته به اینکه از کجا اجرا شده
      * دو تاریخچهٔ متفاوت می‌داشت.
      */
     if (session?.runId) {
@@ -1785,7 +1788,7 @@ async function cmdMission({ flags, positional }) {
   /**
    * روت‌ها از سه جا، نه فقط از نقشه.
    *
-   * نقشه فقط جایی را می‌شناسد که رفته. مأموریتی که می‌خواهد جایی را بگردد
+   * نقشه فقط جایی را می‌شناسد که رفته. نقشهٔ کاری که می‌خواهد جایی را بگردد
    * که هنوز نرفته‌ایم — دقیقاً ارزشمندترین حالت — با فهرستِ نقشه به
    * «دامنه‌ای که نشناختیم» می‌خورد و می‌افتد.
    */
@@ -1827,10 +1830,10 @@ async function cmdMission({ flags, positional }) {
   });
   show(saved);
 
-  const file = path.relative(ROOT, path.join(knowledgeDir(target), 'missions', `${saved.slug}.json`));
+  const file = path.relative(ROOT, path.join(knowledgeDir(target), 'plans', `${saved.slug}.json`));
   console.log(`\n  فایل: ${file.split(path.sep).join('/')}`);
   console.log('  اصلاحش کنید (رایگان)، بعد:');
-  console.log(`    userbug mission run ${target} ${saved.slug}\n`);
+  console.log(`    userbug plan run ${target} ${saved.slug}\n`);
 }
 
 /**
@@ -2088,7 +2091,7 @@ async function cmdMap({ flags, positional }) {
     /**
      * دامنه‌ای که هیچ حالتی را نگرفت، **شکست است** نه نتیجه.
      *
-     * نخستین مأموریتِ واقعی همین‌طور تمام شد: «صف تمام شد» و صفر کنش داخلِ
+     * نخستین نقشهٔ کارِ واقعی همین‌طور تمام شد: «صف تمام شد» و صفر کنش داخلِ
      * دامنه — یعنی گزارشی که شبیهِ موفقیت است و نیست. این همان شکستِ خاموشی
      * است که کلِ این ابزار برای شکارش ساخته شده، پس در خودش هم بلند گفته
      * می‌شود.
@@ -2456,8 +2459,8 @@ try {
     case 'list':
       cmdList(parsed);
       break;
-    case 'health':
-      await cmdHealth(parsed);
+    case 'missions':
+      await cmdMissions(parsed);
       break;
     case 'knowledge':
       await cmdKnowledge(parsed);
@@ -2483,8 +2486,8 @@ try {
     case 'quest':
       await cmdQuest(parsed);
       break;
-    case 'mission':
-      await cmdMission(parsed);
+    case 'plan':
+      await cmdPlan(parsed);
       break;
     case 'expect':
       await cmdExpect(parsed);

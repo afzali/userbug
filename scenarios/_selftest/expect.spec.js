@@ -12,6 +12,7 @@ import {
   applyExpectations,
   assertProposals,
   buildUser,
+  countExpects,
   describeExpectation,
 } from '../../src/scenario/expect.js';
 
@@ -121,4 +122,31 @@ test('جملهٔ فهرست، خواندنی است نه JSON', () => {
   expect(describeExpectation({ after: 3, label: 'دکمه «افزودن کتاب»', kind: 'visible' })).toBe(
     'بعد از قدم 3: دکمه «افزودن کتاب» باید دیده شود'
   );
+});
+
+test('شمارشِ انتظار داخلِ `when` هم می‌شمارد', () => {
+  /**
+   * ── چرا این تست ──
+   *
+   * صفحهٔ مأموریت‌ها با همین عدد می‌گوید «این سفر بی‌انتظار است». شمارشِ کم
+   * یعنی سناریویی که واقعاً انتظار دارد، هشدارِ زرد بگیرد و آدم برود
+   * انتظاری اضافه کند که از قبل هست.
+   *
+   * و خطرش واقعی است: سناریوی ورودی که همین ابزار ساخت، **همهٔ** کارش زیرِ
+   * `when` بود.
+   */
+  expect(countExpects([{ go: '/' }])).toBe(0);
+  expect(countExpects([{ assert: { visible: 'x' } }, { expect: { visible: 'y' } }])).toBe(2);
+
+  // داخلِ `when.then` و `when.else`
+  expect(
+    countExpects([
+      { when: { visible: 'a' }, then: [{ assert: { visible: 'b' } }] },
+      { when: { visible: 'c', then: [{ expect: { visible: 'd' } }] } },
+    ])
+  ).toBe(2);
+
+  // و داخلِ حلقه
+  expect(countExpects([{ forEach: { times: 3, steps: [{ assert: { visible: 'z' } }] } }])).toBe(1);
+  expect(countExpects(null)).toBe(0);
 });

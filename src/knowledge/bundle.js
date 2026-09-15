@@ -92,7 +92,7 @@ export function exportBundle(target, { fixtures = true } = {}) {
   }
 
   /**
-   * مأموریت‌ها هم می‌آیند.
+   * نقشه‌های کار هم می‌آیند.
    *
    * ── چرا ──
    *
@@ -100,9 +100,11 @@ export function exportBundle(target, { fixtures = true } = {}) {
    * همان چیزی است که ساختنش هزینه داشته: یک فراخوانی مدل و یک دور اصلاحِ
    * دستی. نیامدنش یعنی همان کار دوباره.
    */
-  for (const name of walk(path.join(know, 'missions'))) {
-    const data = readJson(path.join(know, 'missions', name));
-    if (data) bundle.knowledge[`missions/${name}`] = data;
+  for (const dir of ['plans', 'missions']) {
+    for (const name of walk(path.join(know, dir))) {
+      const data = readJson(path.join(know, dir, name));
+      if (data) bundle.knowledge[`${dir}/${name}`] = data;
+    }
   }
 
   /**
@@ -218,7 +220,10 @@ export function describeBundle(bundle) {
     scenarios: count(bundle?.scenarios),
     fixtures: count(bundle?.fixtures),
     brief: Boolean(bundle?.brief),
-    missions: Object.keys(bundle?.knowledge || {}).filter((one) => one.startsWith('missions/')).length,
+    // `missions/` نامِ قدیمیِ همین پوشه است؛ بسته‌های قبلی هنوز آن را دارند
+    missions: Object.keys(bundle?.knowledge || {}).filter(
+      (one) => one.startsWith('plans/') || one.startsWith('missions/')
+    ).length,
     states: bundle?.knowledge?.['map.json']?.states?.length || 0,
     pages: Object.keys(bundle?.knowledge || {}).filter((one) => one.startsWith('pages/')).length,
     omitted: bundle?.omitted || [],

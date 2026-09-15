@@ -4,7 +4,7 @@
    *
    * ── چرا دوباره بازطراحی شد ──
    *
-   * کاربر گفت: «مأموریت و خزشِ دستی مگر دو راه مجزا نیستند؟ اگر مأموریت را
+   * کاربر گفت: «نقشهٔ کار و خزشِ دستی مگر دو راه مجزا نیستند؟ اگر آن را
    * پر کنم عملاً داینامیک همان فرمِ دستی را پر کرده‌ام. تازه قدم بعد، و
    * بقیهٔ سورس، و در سورس هست نرسیدیم… کلی چیز دارد. گیج‌کننده است.»
    *
@@ -31,7 +31,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
-  import MissionPlanner from '$lib/components/MissionPlanner.svelte';
+  import PlanBox from '$lib/components/PlanBox.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import { formatNumber } from '$lib/format.js';
   import { pickState } from '../../../../../../src/map/quest.js';
@@ -126,7 +126,7 @@
     ]),
   ]);
 
-  /** از کدام مأموریت آمده — تا اجرا در همان فایل ثبت شود. */
+  /** از کدام نقشهٔ کار آمده — تا اجرا در همان فایل ثبت شود. */
   let missionSlug = $state('');
 
   let busy = $state(false);
@@ -137,7 +137,7 @@
   /**
    * نقشهٔ کار → همین فرم.
    *
-   * ── چرا اینجا و نه در کارتِ مأموریت ──
+   * ── چرا اینجا و نه در کارتِ نقشهٔ کار ──
    *
    * چون آن‌وقت دو جا می‌دانستند «نقشهٔ کار یعنی چه» و دیر یا زود واگرا
    * می‌شدند. حالا سرور یک بار ترجمه می‌کند (`missionToJob`) و رابط یک بار،
@@ -153,14 +153,14 @@
     scope = [...(plan.scope || [])];
     focus = (plan.look || []).join(' ');
     missionSlug = plan.slug || '';
-    saveNote = plan.slug ? `از مأموریتِ «${plan.slug}»` : 'این نقشهٔ کار هنوز ذخیره نشده.';
+    saveNote = plan.slug ? `از نقشهٔ کارِ «${plan.slug}»` : 'این نقشهٔ کار هنوز ذخیره نشده.';
   }
 
-  /** فرم → فایلِ مأموریت. همان شکلی که سرور می‌شناسد. */
+  /** فرم → فایلِ نقشهٔ کار. همان شکلی که سرور می‌شناسد. */
   async function saveMission() {
     saveNote = '';
     try {
-      const response = await fetch('/api/mission', {
+      const response = await fetch('/api/plan', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
         body: JSON.stringify({
@@ -368,7 +368,7 @@
               profile,
               focus,
               scope: mode === 'scoped' ? scope.join(',') : '',
-              // اجرا در فایلِ مأموریت ثبت می‌شود — اگر از مأموریتی آمده باشد
+              // اجرا در فایلِ نقشهٔ کار ثبت می‌شود — اگر از یکی آمده باشد
               mission: mode === 'scoped' ? missionSlug : '',
             };
 
@@ -408,7 +408,7 @@
   );
 </script>
 
-<PageHeader title="نقشهٔ اپ" subtitle="هر حالتی که می‌شود به آن رسید — بی یک فراخوانی مدل" />
+<PageHeader title="نقشهٔ اپ" description="هر حالتی که می‌شود به آن رسید — بی یک فراخوانی مدل" />
 
 {#if !hasMap}
   <!--
@@ -506,7 +506,7 @@
 
           {#if mode === 'scoped'}
             <div class="border-t pt-2">
-              <MissionPlanner
+              <PlanBox
                 bind:this={planner}
                 {target}
                 bind:sentence
@@ -818,7 +818,7 @@
               -->
               <div class="flex flex-wrap items-center gap-2 border-t pt-2">
                 <Button type="button" size="sm" variant="outline" onclick={saveMission} disabled={busy}>
-                  ذخیره به‌عنوان مأموریت
+                  ذخیره به‌عنوان نقشهٔ کار
                 </Button>
                 {#if saveNote}<span class="text-[11px] text-muted-foreground">{saveNote}</span>{/if}
               </div>

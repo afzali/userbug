@@ -7,7 +7,7 @@ import {
   proposeMission,
   removeMission,
   saveMission,
-} from '../../../../../src/map/mission.js';
+} from '../../../../../src/map/plan.js';
 import { readMap } from '../../../../../src/map/store.js';
 import { knowledgeDir, readDossier } from '../../../../../src/knowledge/store.js';
 import { knowledgeFor } from '../../../../../src/knowledge/select.js';
@@ -19,7 +19,7 @@ import { jsonError } from '$lib/server/http.js';
 import { assertMutationRequest } from '$lib/server/security.js';
 
 /**
- * «مأموریت» — جمله، پیش از آنکه پولی خرج شود.
+ * «نقشهٔ کار» — جمله، پیش از آنکه پولی خرج شود.
  *
  * ── چرا سه کار از یک در ──
  *
@@ -32,7 +32,7 @@ import { assertMutationRequest } from '$lib/server/security.js';
  *
  * یک بار بود و اشتباه بود: دو درِ شروعِ اجرا یعنی دیر یا زود یکی‌شان چیزی
  * را می‌فرستد که آن یکی نمی‌فرستد. شروعِ هر اجرا از `POST /api/jobs` است و
- * «از کدام مأموریت» فقط یک فیلدِ کنارِ آن — همان‌جا در فایل ثبت می‌شود.
+ * «از کدام نقشهٔ کار» فقط یک فیلدِ کنارِ آن — همان‌جا در فایل ثبت می‌شود.
  */
 
 /** دنیایی که مدل مجاز است از آن نام ببرد — یک بار، برای هر سه فعل. */
@@ -51,7 +51,7 @@ async function worldOf(target) {
   /**
    * روت‌ها از سه جا: نقشه، پروندهٔ شناخت، و endpointهای سورس.
    *
-   * نقشه فقط جایی را می‌شناسد که رفته. مأموریتی که می‌خواهد جایی را بگردد
+   * نقشه فقط جایی را می‌شناسد که رفته. نقشهٔ کاری که می‌خواهد جایی را بگردد
    * که هنوز نرفته‌ایم — دقیقاً ارزشمندترین حالت — با فهرستِ نقشه به
    * «دامنه‌ای که نشناختیم» می‌خورد و می‌افتد.
    */

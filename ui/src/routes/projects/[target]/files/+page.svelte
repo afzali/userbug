@@ -92,7 +92,7 @@
    * طورِ دیگری بنویس»، این یکی «بگو چه باید دیده شود». یکی کردنشان یعنی
    * کسی که فقط انتظار می‌خواهد، مجبور شود جمله‌ای برای مدل بنویسد.
    */
-  let showExpect = $state(false);
+  let showExpect = $state(Boolean(data.openExpect));
 
   // پروژه از لایهٔ فضای کاری می‌آید، پس کشویی انتخاب پروژه اینجا لازم نیست.
   let project = $derived(data.project);

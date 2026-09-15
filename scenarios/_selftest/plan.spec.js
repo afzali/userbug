@@ -11,7 +11,7 @@
  * پس هرچه مدل گفته و ما نمی‌شناسیم باید بیفتد، و افتادنش باید **دیده شود**.
  */
 import { test, expect } from '@playwright/test';
-import { assertMission, buildUser, missionSlug, missionToJob } from '../../src/map/mission.js';
+import { assertMission, buildUser, missionSlug, missionToJob } from '../../src/map/plan.js';
 
 const WORLD = {
   routes: ['/contents', '/content/[id_book]'],

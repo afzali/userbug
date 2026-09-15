@@ -125,7 +125,7 @@
   }
 </script>
 
-<PageHeader title="تنظیمات" subtitle="کلید و مدلِ هوش مصنوعی — برای همهٔ پروژه‌ها" />
+<PageHeader title="تنظیمات" description="کلید و مدلِ هوش مصنوعی — برای همهٔ پروژه‌ها" />
 
 <div class="grid gap-6 xl:grid-cols-[24rem_minmax(0,1fr)]">
   <div class="space-y-4">

@@ -179,7 +179,7 @@
       {formatNumber(preview.scenarios)} سناریو ·
       {formatNumber(preview.fixtures)} فایلِ نمونه
       {#if preview.states} · نقشه با {formatNumber(preview.states)} حالت{/if}
-      {#if preview.missions} · {formatNumber(preview.missions)} مأموریت{/if}
+      {#if preview.missions} · {formatNumber(preview.missions)} نقشهٔ کار{/if}
       {#if preview.brief} · توضیحِ پروژه{/if}
     </p>
     {#each preview.omitted as note (note)}

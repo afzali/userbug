@@ -186,6 +186,35 @@ export function routesSeen(scenarioName) {
 
 const NEWLINE = String.fromCharCode(10);
 
+/**
+ * چند بندِ سنجش دارد؟
+ *
+ * ── چرا بازگشتی، و چرا این عدد مهم است ──
+ *
+ * سناریوی بی‌انتظار اجرا می‌شود، سبز تمام می‌شود، و **هیچ‌چیز را نسنجیده**:
+ * فقط می‌گوید «چیزی نشکست». صفحهٔ مأموریت‌ها همین عدد را نشان می‌دهد، پس
+ * شمارشِ کم یعنی سناریویی که واقعاً انتظار دارد، «بی‌انتظار» علامت بخورد —
+ * و آدم برود انتظاری اضافه کند که از قبل هست.
+ *
+ * و بازگشتی، چون سناریوی ورودی که همین ابزار ساخت **همهٔ** کارش زیرِ `when`
+ * بود: شمارشِ سطحی روی آن صفر می‌داد حتی بعد از افزودنِ انتظار.
+ */
+export function countExpects(steps) {
+  let total = 0;
+  for (const step of Array.isArray(steps) ? steps : []) {
+    if (!step || typeof step !== 'object') continue;
+    if (step.expect !== undefined || step.assert !== undefined) total++;
+
+    // `then`/`else` هم در سطحِ قدم می‌آیند و هم داخلِ بدنهٔ `when`
+    for (const key of ['then', 'else']) {
+      if (Array.isArray(step[key])) total += countExpects(step[key]);
+      if (Array.isArray(step.when?.[key])) total += countExpects(step.when[key]);
+    }
+    if (Array.isArray(step.forEach?.steps)) total += countExpects(step.forEach.steps);
+  }
+  return total;
+}
+
 export const SYSTEM = `تو یک مهندسِ آزمون هستی که به یک سناریوی موجود **انتظار** اضافه می‌کند.
 
 سناریو امروز فقط کار می‌کند و هیچ‌جا نمی‌گوید «حالا باید چه دیده شود». تو می‌گویی.
