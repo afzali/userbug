@@ -474,6 +474,8 @@ export async function startJob(rawOptions = {}) {
     remember: rawOptions?.remember ? String(rawOptions.remember).slice(0, 60) : '',
     profile: Boolean(rawOptions?.profile),
     focus: rawOptions?.focus ? String(rawOptions.focus).slice(0, 200) : '',
+    // دامنه: مرز است نه اولویت — «فقط اینجا را بگرد»
+    scope: rawOptions?.scope ? String(rawOptions.scope).slice(0, 300) : '',
   };
 
   if (state.activeId) {
@@ -567,6 +569,7 @@ export async function startJob(rawOptions = {}) {
     if (options.remember) args.push('--remember', options.remember);
     if (options.profile) args.push('--profile');
     if (options.focus) args.push('--focus', options.focus);
+    if (options.scope) args.push('--scope', options.scope);
     if (options.headed) args.push('--headed');
   } else if (options.kind === 'quest') {
     // هدف positional است، نه flag — همان‌طور که آدم در خطِ فرمان می‌نویسد

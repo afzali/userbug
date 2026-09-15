@@ -61,6 +61,7 @@ import {
   writeMap,
 } from './store.js';
 import { callRecorder } from '../knowledge/endpoints.js';
+import { makeScope } from './scope.js';
 import { replayPath, unsupportedVerbs } from './replay.js';
 
 /** بیشتر از این از یک یافته ثبت نمی‌شود. خزش همان باگ را صدها بار می‌بیند. */
@@ -154,6 +155,7 @@ export class MapSession extends EventEmitter {
     profile = false,
     freshProfile = false,
     focus = '',
+    scope = '',
   } = {}) {
     super();
     this.targetName = target;
@@ -183,6 +185,14 @@ export class MapSession extends EventEmitter {
     this.profile = profile;
     this.freshProfile = freshProfile;
     this.focus = focusWords(focus);
+    /**
+     * دامنه — «فقط اینجا را بگرد».
+     *
+     * `focus` اولویت است و ترتیب را عوض می‌کند؛ این یکی مرز است. روی نپی
+     * ۹ حالت از ۲۲ در `/ai-chat` افتاد در حالی که خواسته کتاب بود، و
+     * اولویت هیچ کاری از دستش برنمی‌آمد.
+     */
+    this.scope = makeScope(scope);
 
     this.status = 'starting';
     this.events = [];
@@ -607,6 +617,14 @@ export class MapSession extends EventEmitter {
       if (action.kind === 'avoided' || action.kind === 'input' || action.kind === 'noise') return false;
       if (action.kind === 'destructive' && !this.allowDestructive) return false;
       if (this.navOnly && action.kind !== 'nav') return false;
+      /**
+       * دامنه: فقط **گشتن** را محدود می‌کند، نه رسیدن را.
+       *
+       * حالتی که بیرونِ دامنه است هنوز ثبت و بازپخش می‌شود — مسیرِ رسیدن به
+       * کتاب از منو و فهرست می‌گذرد و بستنِ آن یعنی اصلاً نرسیدن. فقط
+       * کنش‌هایش امتحان نمی‌شوند.
+       */
+      if (this.scope && !this.scope.covers(state)) return false;
       if ((this.unclickable.get(action.key) || 0) >= 2) return false;
       return true;
     });

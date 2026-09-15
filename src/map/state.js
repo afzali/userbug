@@ -377,7 +377,7 @@ function normalizeFocus(text) {
 }
 
 /** `/content/[id]` با `/content/42` یکی است. */
-function routeMatchesPattern(candidate, pattern) {
+export function routeMatchesPattern(candidate, pattern) {
   const clean = (value) => String(value || '').split('?')[0].replace(/\/+$/, '') || '/';
   const a = clean(candidate).split('/');
   const b = clean(pattern).split('/');

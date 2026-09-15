@@ -136,6 +136,8 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --profile                   مرورگر را با پروفایلِ خزشِ قبلی باز کن —
                                   نشست و کش می‌مانند، پس ورود یک‌بار است
       --fresh-profile             پروفایل را اول پاک کن
+      --scope <روت یا نما>[,…]    **فقط** اینجا را بگرد. رسیدن آزاد می‌ماند،
+                                  فقط کنش‌های بیرونِ دامنه امتحان نمی‌شوند
       --focus <واژه‌ها>            اول سراغِ اینها برو (فیلتر نیست، اولویت است؛
                                   روت‌های نرسیدهٔ سورس خودکار اولویت دارند)
       --show                      نقشهٔ موجود را نشان بده، بی‌خزش
@@ -1581,6 +1583,8 @@ async function cmdMap({ flags, positional }) {
     allowDestructive: Boolean(flags['allow-destructive']),
     rememberAs: flags.remember && flags.remember !== true ? String(flags.remember) : '',
     focus: flags.focus && flags.focus !== true ? String(flags.focus) : '',
+    // دامنه: مرز است نه اولویت — «فقط اینجا را بگرد»
+    scope: flags.scope && flags.scope !== true ? String(flags.scope) : '',
     profile: Boolean(flags.profile || flags['fresh-profile']),
     freshProfile: Boolean(flags['fresh-profile']),
   });
@@ -1605,6 +1609,20 @@ async function cmdMap({ flags, positional }) {
   await session.stop();
 
   console.log('\n' + renderMap(map, { knownRoutes, loginPath }));
+
+  /**
+   * نقشهٔ محدود با نقشهٔ کامل یکی نیست.
+   *
+   * سکوت اینجا یعنی کسی بعداً «کجا را نیازموده‌ایم» را از روی نقشه‌ای
+   * می‌خواند که **عمداً** ناقص است — همان پوششِ خوش‌بینانه‌ای که در
+   * `endpointCoverage` هم از آن پرهیز شد.
+   */
+  if (session.scope) {
+    const { outsideScope } = await import('../src/map/scope.js');
+    const outside = outsideScope(map, session.scope);
+    console.log(`  دامنه: ${session.scope.patterns.join('، ')}`);
+    if (outside.length) console.log(`  ${outside.length} حالت بیرونِ دامنه ماند و گشته نشد.`);
+  }
   console.log(`\n  یافته‌ها: ${session.findings.length} ثبت‌شده از ${session.seenFindings.size} یکتا`);
   console.log(`  نقشه: knowledge/${target}/map.json  ·  اجرا: runs/${session.runId}/report.html\n`);
 }

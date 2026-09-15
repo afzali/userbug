@@ -65,6 +65,33 @@
   let rememberId = $derived(startMode === 'account' ? remember : '');
   /** واژه‌هایی که اول سراغشان برود. فیلتر نیست، اولویت است. */
   let focus = $state('');
+
+  /**
+   * «همه‌جا» یا «فقط اینجا» — مرز، نه اولویت.
+   *
+   * ── چرا اولویت کافی نبود ──
+   *
+   * روی نپی، از ۲۲ حالتِ نقشه **۹ تا در `/ai-chat`** افتاد، در حالی که
+   * خواستهٔ کاربر کتاب بود. `focus` فقط ترتیب را عوض می‌کند، پس نزدیک به
+   * نیمی از بودجه رفت جایی که هیچ‌کس نخواسته بود. و سقفِ حالت خزش را
+   * می‌بُرد، ولی در نقطهٔ دلخواهِ خودش نه آنجا که آدم گفته.
+   */
+  let scopeMode = $state('all');
+  let scope = $state('');
+
+  /**
+   * روت‌ها و نماهایی که از قبل می‌شناسیم — تا دامنه از حدس نوشته نشود.
+   *
+   * نقشه `route` و `view` هر حالت را دارد؛ همان‌ها دقیقاً همان چیزی‌اند که
+   * دامنه با آن‌ها سنجیده می‌شود. تایپ کردنشان با دست یعنی غلط‌های املایی‌ای
+   * که بی‌صدا هیچ حالتی را نمی‌گیرند.
+   */
+  let scopeChoices = $derived([
+    ...new Set([
+      ...states.map((one) => one.route).filter(Boolean),
+      ...states.map((one) => one.view).filter(Boolean),
+    ]),
+  ]);
   let busy = $state(false);
   let error = $state('');
 
@@ -254,6 +281,7 @@
           remember: rememberId,
           profile,
           focus,
+          scope: scopeMode === 'only' ? scope : '',
         }),
       });
       const payload = await response.json();
@@ -592,6 +620,52 @@
               داده نیاز دارند اصلاً دیده نمی‌شوند.
             </span>
           </label>
+
+          <!--
+            مرزِ خزش — پیش از اولویت، چون پرسشِ بزرگ‌تری است.
+
+            «کجا نرود» تصمیمی است که کلِ بودجه را شکل می‌دهد؛ «اول کجا برود»
+            فقط ترتیب است. نشاندنِ دومی بالای اولی، همان اشتباهی بود که
+            باعث شد نیمی از خزشِ نپی در چتِ هوش مصنوعی خرج شود.
+          -->
+          <div class="space-y-1.5">
+            <label class="flex items-start gap-2 text-xs">
+              <input type="radio" bind:group={scopeMode} value="all" class="mt-0.5" />
+              <span>
+                همه‌جا را بگرد
+                <span class="block text-[11px] leading-5 text-muted-foreground">
+                  نقشهٔ کامل، ولی بودجه میانِ همهٔ بخش‌ها پخش می‌شود.
+                </span>
+              </span>
+            </label>
+
+            <label class="flex items-start gap-2 text-xs">
+              <input type="radio" bind:group={scopeMode} value="only" class="mt-0.5" />
+              <span class="min-w-0 flex-1">
+                فقط اینجا را بگرد
+                <span class="block text-[11px] leading-5 text-muted-foreground">
+                  رسیدن آزاد می‌ماند — فقط کنش‌های بیرونِ دامنه امتحان نمی‌شوند.
+                </span>
+
+                {#if scopeMode === 'only'}
+                  <Input
+                    bind:value={scope}
+                    list="ub-scope"
+                    class="mt-1.5 h-8"
+                    placeholder="مثلاً: /content/[id_book]  یا  ویرایش"
+                  />
+                  <datalist id="ub-scope">
+                    {#each scopeChoices as choice (choice)}<option value={choice}></option>{/each}
+                  </datalist>
+                  <span class="mt-1 block text-[11px] leading-5 text-muted-foreground">
+                    روت (با <code>/</code> شروع می‌شود) یا نامِ نما. چندتا را با
+                    «،» جدا کنید. نقشهٔ حاصل <strong>عمداً ناقص</strong> است و
+                    گزارش می‌گوید چند حالت بیرون ماند.
+                  </span>
+                {/if}
+              </span>
+            </label>
+          </div>
 
           <label class="block space-y-1">
             <span class="text-[11px] text-muted-foreground">اول سراغِ چه برود</span>
