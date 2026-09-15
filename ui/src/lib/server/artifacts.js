@@ -184,7 +184,10 @@ export async function readRunDetails(input) {
   const synthetic = allFindings.filter((finding) => finding.synthetic);
   const unique = dedupe(realFindings);
   const steps = events.filter((event) => event.kind === 'step');
-  const serverLines = events.filter((event) => event.source === 'server').length;
+  // رخدادِ «وضعیتِ جمع‌کننده‌ها» خودش خطِ لاگ نیست؛ شمردنش عدد را باد می‌کند
+  const serverLines = events.filter(
+    (event) => event.kind !== 'collectors' && event.source === 'server'
+  ).length;
   const run = {
     runId,
     ...storedRun,

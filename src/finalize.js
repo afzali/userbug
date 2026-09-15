@@ -160,8 +160,24 @@ export async function finalizeRun(runId = getCurrentRun(), { status, junitPath }
     findings: unique.length,
     findingEvents: real.length,
     syntheticEvents: synthetic.length,
-    serverLines: events.filter((e) => e.source === 'server').length,
-    serverCollectors: [...new Set(events.filter((e) => e.source === 'server').map((e) => e.collector))],
+    serverLines: events.filter((e) => e.kind !== 'collectors' && e.source === 'server').length,
+    /**
+     * چه چیزی **تنظیم** شده بود و کدامشان واقعاً وصل بودند.
+     *
+     * ── چرا فهرستِ «کی حرف زد» غلط بود ──
+     *
+     * پیش‌تر اینجا نامِ جمع‌کننده‌هایی می‌نشست که خطی تولید کرده بودند. یعنی
+     * سروری که ساکت بود با سروری که اصلاً گوش نمی‌دادیم، یک‌شکل گزارش
+     * می‌شد — و «۰ خط لاگ» به‌عنوان خبرِ خوب خوانده می‌شد.
+     */
+    /**
+     * `null` یعنی «این اجرا اصلاً مرورگری باز نکرد».
+     *
+     * آرایهٔ خالی یعنی مرورگر باز شد ولی هیچ لاگی تنظیم نشده بود — و آن یک
+     * هشدارِ واقعی است. یکی کردنِ این دو باعث شد خودآزماهای خالص هم پیامِ
+     * «هیچ لاگ سروری تنظیم نشده» بگیرند، که دروغ بود.
+     */
+    serverCollectors: events.findLast((e) => e.kind === 'collectors')?.collectors ?? null,
     scenarios,
     /** شمارشِ سرِ دستی، تا تاریخچه و رابط مجبور نباشند هر بار جمع بزنند */
     green: scenarios.filter((one) => one.verdict === 'passed').length,
@@ -216,8 +232,26 @@ export function printSummary({ run, steps, unique, file, junitCopy, absorbed }) 
   console.log(`\n  گزارش: ${file}`);
   if (junitCopy) console.log(`  JUnit: ${junitCopy}`);
   console.log(
-    `  قدم: ${steps.length}  ·  یافتهٔ یکتا: ${unique.length}  ·  خط لاگ سرور: ${run.serverLines ?? 0}\n`
+    `  قدم: ${steps.length}  ·  یافتهٔ یکتا: ${unique.length}  ·  خط لاگ سرور: ${run.serverLines ?? 0}`
   );
+
+  /**
+   * «۰ خط لاگ سرور» بی توضیح، خبرِ خوب خوانده می‌شود.
+   *
+   * ولی معنیِ دیگرش این است که اصلاً گوش نمی‌دادیم — و آن‌وقت هر ۵۰۰ که
+   * سرور داده و UI پنهانش کرده، از گزارش بیرون مانده. پس وضعیتِ
+   * جمع‌کننده‌ها همیشه گفته می‌شود، نه فقط وقتی خطی آمده.
+   */
+  const collectors = run.serverCollectors;
+  if (Array.isArray(collectors)) {
+    if (!collectors.length) {
+      console.log('  ! هیچ لاگ سروری تنظیم نشده — خطای سمتِ سرور دیده نمی‌شود (کلید logs در کانفیگ هدف).');
+    }
+    for (const one of collectors.filter((row) => !row.available)) {
+      console.log(`  ! لاگ «${one.name}» نیامد: ${one.why || 'در دسترس نبود'}`);
+    }
+  }
+  console.log('');
 
   if (run.ai) {
     const a = run.ai;

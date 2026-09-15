@@ -24,7 +24,14 @@ import path from 'node:path';
 
 import { loadTarget } from '../target.js';
 import { INIT_SCRIPT, attachClientObservers } from '../observe/client.js';
-import { createServerCollectors, drainAll, startAll } from '../observe/server.js';
+import {
+  collectorWarning,
+  createServerCollectors,
+  describeCollectors,
+  drainAll,
+  startAll,
+  stopAll,
+} from '../observe/server.js';
 import { judge } from '../observe/oracle.js';
 import { dismissBlockers } from '../observe/blockers.js';
 import { routeOf } from '../observe/route.js';
@@ -379,6 +386,24 @@ export class MapSession extends EventEmitter {
     await this.context.addInitScript(INIT_SCRIPT);
 
     this.collectors = await startAll(createServerCollectors(target.logs));
+    /**
+     * «۰ خط لاگ سرور» دو معنی دارد؛ گزارش باید بگوید کدام.
+     *
+     * یا سرور ساکت بود، یا اصلاً گوش نمی‌دادیم. جمع‌کننده‌ای که فایلش نیست
+     * بی‌صدا ساکت می‌ماند، و آن سکوت از «خطایی نبود» قابل تشخیص نیست.
+     */
+    {
+      const row = {
+        kind: 'collectors',
+        source: 'server',
+        severity: 'info',
+        message: collectorWarning(this.collectors) || 'لاگ سرور وصل است',
+        collectors: describeCollectors(this.collectors),
+        at: new Date().toISOString(),
+      };
+      this.events.push(row);
+      await this.store?.appendEvent(row).catch(() => {});
+    }
     this.page = this.context.pages()[0] || (await this.context.newPage());
     attachClientObservers(
       this.page,
@@ -1225,6 +1250,9 @@ export class MapSession extends EventEmitter {
       this.events.push({ ...line, at: new Date().toISOString() });
       await this.store?.appendEvent(line).catch(() => {});
     }
+
+    // جمع‌کنندهٔ فرمانی یک فرآیند است؛ بی این، هر خزش یکی جا می‌گذارد
+    await stopAll(this.collectors || []);
 
     await this.saveTrace();
     await this.context?.close().catch(() => {});

@@ -11,7 +11,14 @@
 import { test as base, expect } from '@playwright/test';
 import { loadTargetOrPlaceholder } from './target.js';
 import { attachClientObservers, INIT_SCRIPT } from './observe/client.js';
-import { createServerCollectors, startAll, drainAll } from './observe/server.js';
+import {
+  collectorWarning,
+  createServerCollectors,
+  describeCollectors,
+  drainAll,
+  startAll,
+  stopAll,
+} from './observe/server.js';
 import { judge, fingerprint, normalizeMessage } from './observe/oracle.js';
 import { routeOf } from './observe/route.js';
 import { dismissBlockers } from './observe/blockers.js';
@@ -140,6 +147,26 @@ export const test = base.extend({
     });
 
     const collectors = await startAll(createServerCollectors(target.logs));
+
+    /**
+     * «۰ خط لاگ سرور» دو معنی دارد؛ گزارش باید بگوید کدام.
+     *
+     * ── چه شد ──
+     *
+     * یا سرور ساکت بود (خبرِ خوب)، یا اصلاً گوش نمی‌دادیم (خبرِ بد). روی
+     * پروژهٔ واقعی دومی بود و هیچ‌جا گفته نمی‌شد: جمع‌کننده‌ای که فایلش نبود
+     * بی‌صدا ساکت می‌ماند.
+     *
+     * پس وضعیتشان یک رخدادِ ثبت‌شده است — هم در گزارش دیده می‌شود، هم
+     * `run.json` از همین می‌سازدش.
+     */
+    sink({
+      kind: 'collectors',
+      source: 'server',
+      severity: 'info',
+      message: collectorWarning(collectors) || 'لاگ سرور وصل است',
+      collectors: describeCollectors(collectors),
+    });
 
     const ub = {
       target,
@@ -375,6 +402,14 @@ export const test = base.extend({
     };
 
     await use(ub);
+
+    /**
+     * جمع‌کنندهٔ فرمانی یک **فرآیند** است و باید کشته شود.
+     *
+     * بی این، هر اجرا یک `docker logs -f` جا می‌گذارد که تا بسته شدنِ
+     * ترمینال زنده می‌ماند.
+     */
+    await stopAll(collectors);
 
     // شمارندهٔ سروصدا. حلقهٔ یادگیری بدون این نمی‌تواند چکِ پرسروصدا را پیدا
     // کند، و شمارنده‌ای که بعداً اضافه شود از صفر شروع می‌کند.

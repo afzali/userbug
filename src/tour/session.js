@@ -38,7 +38,14 @@ import { callRecorder } from '../knowledge/endpoints.js';
 import { knowledgeDir } from '../knowledge/store.js';
 import { loadTarget } from '../target.js';
 import { INIT_SCRIPT, attachClientObservers } from '../observe/client.js';
-import { createServerCollectors, drainAll, startAll } from '../observe/server.js';
+import {
+  collectorWarning,
+  createServerCollectors,
+  describeCollectors,
+  drainAll,
+  startAll,
+  stopAll,
+} from '../observe/server.js';
 import { fingerprint, judge, normalizeMessage } from '../observe/oracle.js';
 import { RunStore, newRunId, runDir, setCurrentRun } from '../store/run-store.js';
 import { snapshotPage } from '../steps/snapshot.js';
@@ -202,6 +209,19 @@ export class TourSession extends EventEmitter {
     await this.context.exposeBinding(BINDING, (source, payload) => this.onRecord(payload));
 
     this.collectors = await startAll(createServerCollectors(target.logs));
+    /**
+     * «۰ خط لاگ سرور» دو معنی دارد؛ گزارش باید بگوید کدام.
+     *
+     * یا سرور ساکت بود، یا اصلاً گوش نمی‌دادیم. جمع‌کننده‌ای که فایلش نیست
+     * بی‌صدا ساکت می‌ماند، و آن سکوت از «خطایی نبود» قابل تشخیص نیست.
+     */
+    await this.onObserved({
+      kind: 'collectors',
+      source: 'server',
+      severity: 'info',
+      message: collectorWarning(this.collectors) || 'لاگ سرور وصل است',
+      collectors: describeCollectors(this.collectors),
+    });
     this.checksConfig = readChecksConfig(this.targetName);
 
     this.page = this.context.pages()[0] || (await this.context.newPage());
@@ -602,6 +622,9 @@ export class TourSession extends EventEmitter {
     // آخرین خطوطِ لاگ سرور، پیش از بستن. کاری که کاربر در ثانیهٔ آخر کرد هم
     // ردِ سروری دارد و بی این، فقط آن یکی گم می‌شد.
     for (const line of await drainAll(this.collectors || []).catch(() => [])) await this.onObserved(line);
+
+    // جمع‌کنندهٔ فرمانی یک فرآیند است؛ بی این، هر گشت یکی جا می‌گذارد
+    await stopAll(this.collectors || []);
 
     // trace پیش از بستنِ context ذخیره می‌شود، وگرنه چیزی برای ذخیره نمانده
     await this.saveTrace();

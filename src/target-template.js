@@ -154,15 +154,46 @@ function normalizeLogs(input) {
   const list = Array.isArray(input) ? input : [input];
 
   return list
-    .map((entry) => ({
-      name: String(entry?.name ?? '').trim(),
-      // مسیر با اسلش رو به جلو نوشته می‌شود تا در سورس جاوااسکریپت نیازی به
-      // فرار دادنِ بک‌اسلشِ ویندوز نباشد.
-      path: String(entry?.path ?? '')
-        .trim()
-        .replace(/\\/g, '/'),
-    }))
-    .filter((entry) => entry.path)
+    .map((entry) => {
+      const name = String(entry?.name ?? '').trim();
+
+      /**
+       * دو جنسِ لاگ، یک فهرست.
+       *
+       * `file` سروری است که روی دیسک می‌نویسد؛ `command` سروری که روی
+       * stdout می‌نویسد (`npm run dev`، `docker logs -f`، `journalctl -f`).
+       * دومی لازم شد چون اپِ امروزی معمولاً فایلِ لاگ ندارد، و نتیجه‌اش این
+       * بود که نیمی از رصدِ این ابزار عملاً خاموش بماند.
+       */
+      const command = String(entry?.command ?? '').trim();
+      if (command) {
+        return {
+          type: 'command',
+          name,
+          command,
+          /**
+           * آرگومان‌ها آرایه می‌مانند، نه یک رشته.
+           *
+           * همان درسی که `schedule.js` نوشت: رشتهٔ فرمان یعنی هر مقداری که
+           * از کانفیگ بیاید می‌تواند فرمانِ دیگری اجرا کند. هیچ shellی وسط
+           * نیست و نباید باشد.
+           */
+          args: (Array.isArray(entry?.args) ? entry.args : []).map((one) => String(one)),
+          cwd: String(entry?.cwd ?? '').trim().replace(/\\/g, '/'),
+        };
+      }
+
+      return {
+        type: 'file',
+        name,
+        // مسیر با اسلش رو به جلو نوشته می‌شود تا در سورس جاوااسکریپت نیازی به
+        // فرار دادنِ بک‌اسلشِ ویندوز نباشد.
+        path: String(entry?.path ?? '')
+          .trim()
+          .replace(/\\/g, '/'),
+      };
+    })
+    .filter((entry) => entry.path || entry.command)
     .map((entry, index) => {
       if (!entry.name) entry.name = `log${index + 1}`;
       if (!/^[\w.-]+$/.test(entry.name)) {
@@ -177,7 +208,7 @@ function normalizeLogs(input) {
  *
  * @returns {{key: string, name: string, baseURL: string, apiURL: string,
  *   environment: string, device: string, locale: string, dir: string,
- *   logs: {name: string, path: string}[], sourceRoot: string}}
+ *   logs: {type: string, name: string, path?: string, command?: string, args?: string[]}[], sourceRoot: string}}
  */
 export function assertProjectFields(input = {}) {
   const key = assertProjectKey(input.key);
@@ -295,19 +326,27 @@ export function renderTargetConfig(input) {
   lines.push('   * لاگ سرور.');
   lines.push('   *');
   lines.push('   * خطاهای کنسول مرورگر خودکار گرفته می‌شوند و مسیر نمی‌خواهند؛ این فهرست');
-  lines.push('   * برای لاگ‌هایی است که سرور روی دیسک می‌نویسد. فقط `type: \'file\'`');
-  lines.push('   * پشتیبانی می‌شود.');
+  lines.push('   * برای لاگِ خودِ سرور است — چه روی دیسک بنویسد، چه روی stdout.');
+  lines.push('   *');
+  lines.push('   * بی این، خطایی که سرور می‌دهد و UI فقط یک پیام عمومی از آن نشان');
+  lines.push('   * می‌دهد، هرگز دیده نمی‌شود.');
   lines.push('   */');
   if (fields.logs.length) {
     lines.push('  logs: [');
     for (const log of fields.logs) {
-      lines.push(`    { type: 'file', name: ${quote(log.name)}, path: ${quote(log.path)} },`);
+      if (log.type === 'command') {
+        const args = log.args.map((one) => quote(one)).join(', ');
+        lines.push(`    { type: 'command', name: ${quote(log.name)}, command: ${quote(log.command)}, args: [${args}] },`);
+      } else {
+        lines.push(`    { type: 'file', name: ${quote(log.name)}, path: ${quote(log.path)} },`);
+      }
     }
     lines.push('  ],');
   } else {
-    lines.push('  logs: [');
+    lines.push("  logs: [");
     lines.push("    // { type: 'file', name: 'php', path: 'D:/path/to/error.log' },");
-    lines.push('  ],');
+    lines.push("    // { type: 'command', name: 'docker', command: 'docker', args: ['logs', '-f', 'app'] },");
+    lines.push("  ],");
   }
   lines.push('');
 

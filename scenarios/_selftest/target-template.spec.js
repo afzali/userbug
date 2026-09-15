@@ -93,5 +93,41 @@ test('لاگِ بی‌مسیر حذف می‌شود، نه اینکه ردیف �
     ...BASE,
     logs: [{ name: 'front', path: '' }, { name: 'back', path: 'D:/x.log' }],
   });
-  expect(fields.logs).toEqual([{ name: 'back', path: 'D:/x.log' }]);
+  expect(fields.logs).toEqual([{ type: 'file', name: 'back', path: 'D:/x.log' }]);
+});
+
+test('لاگِ فرمانی هم پذیرفته می‌شود — سرورهایی که فایل ندارند', () => {
+  /**
+   * ── چرا این لازم شد ──
+   *
+   * تا امروز فقط `type: 'file'` بود، یعنی سرور باید روی دیسک می‌نوشت. ولی
+   * `npm run dev` روی stdout می‌نویسد و داکر در `docker logs` نگه می‌دارد.
+   * نتیجه‌اش روی پروژهٔ واقعی این بود: یک خط لاگ در کلِ اجرا.
+   */
+  const fields = assertProjectFields({
+    ...BASE,
+    logs: [{ name: 'docker', command: 'docker', args: ['logs', '-f', 'app'] }],
+  });
+  expect(fields.logs).toEqual([
+    { type: 'command', name: 'docker', command: 'docker', args: ['logs', '-f', 'app'], cwd: '' },
+  ]);
+});
+
+test('آرگومان‌ها آرایه می‌مانند؛ رشتهٔ فرمان پذیرفته نمی‌شود', () => {
+  /**
+   * همان درسی که `schedule.js` نوشت و این مخزن یک بار با `shell: true` خورد:
+   * رشتهٔ فرمان یعنی مقدارِ کانفیگ می‌تواند فرمانِ دیگری اجرا کند.
+   */
+  const fields = assertProjectFields({
+    ...BASE,
+    logs: [{ name: 'x', command: 'sh', args: 'rm -rf /' }],
+  });
+  expect(fields.logs[0].args).toEqual([]);
+});
+
+test('فرمان در کانفیگِ ساخته‌شده هم درست رندر می‌شود', () => {
+  const text = renderTargetConfig(
+    assertProjectFields({ ...BASE, logs: [{ name: 'docker', command: 'docker', args: ['logs', '-f', 'app'] }] })
+  );
+  expect(text).toContain("{ type: 'command', name: 'docker', command: 'docker', args: ['logs', '-f', 'app'] }");
 });

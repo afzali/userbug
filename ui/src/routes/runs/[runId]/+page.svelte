@@ -57,7 +57,31 @@
   <Card.Root class="gap-1 p-4 py-4"><span class="text-xs text-muted-foreground">قدم</span><strong class="text-2xl">{formatNumber(data.run.steps)}</strong></Card.Root>
   <Card.Root class="gap-1 p-4 py-4"><span class="text-xs text-muted-foreground">یافتهٔ یکتا</span><strong class="text-2xl text-destructive">{formatNumber(data.run.findings)}</strong></Card.Root>
   <Card.Root class="gap-1 p-4 py-4"><span class="text-xs text-muted-foreground">رخداد یافته</span><strong class="text-2xl">{formatNumber(data.run.findingEvents)}</strong></Card.Root>
-  <Card.Root class="gap-1 p-4 py-4"><span class="text-xs text-muted-foreground">خط لاگ سرور</span><strong class="text-2xl">{formatNumber(data.run.serverLines)}</strong></Card.Root>
+  <!--
+    «۰ خط لاگ سرور» دو معنی دارد و این کارت باید بگوید کدام: یا سرور ساکت
+    بود، یا اصلاً گوش نمی‌دادیم. دومی یعنی هر ۵۰۰ که UI پنهانش کرده، از
+    گزارش بیرون مانده.
+  -->
+  <Card.Root class="gap-1 p-4 py-4">
+    <span class="text-xs text-muted-foreground">خط لاگ سرور</span>
+    <strong class="text-2xl">{formatNumber(data.run.serverLines)}</strong>
+    {#if Array.isArray(data.run.serverCollectors)}
+      {@const dead = data.run.serverCollectors.filter((one) => !one.available)}
+      {#if !data.run.serverCollectors.length}
+        <span class="text-[11px] leading-5 text-amber-600 dark:text-amber-400">
+          هیچ لاگ سروری تنظیم نشده
+        </span>
+      {:else if dead.length}
+        <span class="text-[11px] leading-5 text-amber-600 dark:text-amber-400">
+          {dead.map((one) => one.name).join('، ')} نیامد
+        </span>
+      {:else}
+        <span class="text-[11px] leading-5 text-muted-foreground">
+          {data.run.serverCollectors.map((one) => one.name).join('، ')} وصل بود
+        </span>
+      {/if}
+    {/if}
+  </Card.Root>
   <Card.Root class="gap-1 p-4 py-4"><span class="text-xs text-muted-foreground">دستگاه</span><strong class="truncate text-lg">{data.run.device || '—'}</strong></Card.Root>
 </div>
 
