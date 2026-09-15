@@ -1,6 +1,6 @@
 <script>
   /**
-   * پنلِ گشتِ زنده.
+   * گشتِ زنده — یکی از سه راهِ «کشف».
    *
    * ── چرا اینجا و نه داخلِ خودِ اپ ──
    *
@@ -18,21 +18,29 @@
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
-  import PageHeader from '$lib/components/PageHeader.svelte';
   import { formatDate } from '$lib/format.js';
 
-  let { data } = $props();
+  /**
+   * `data` همان بستهٔ صفحهٔ کشف است؛ این پنل فقط سهمِ خودش را می‌خواند.
+   *
+   * ── چرا `data.tour.live` و نه `data.tour` ──
+   *
+   * وقتی سه پنل در یک صفحه‌اند، هر کدام باید بداند کدام تکه مالِ اوست.
+   * تخت کردنِ همه در یک شیء یعنی روزی دو پنل یک کلید را بخواهند و یکی‌شان
+   * چیزی ببیند که مالِ آن یکی است.
+   */
+  let { data, target } = $props();
 
   // svelte-ignore state_referenced_locally
-  let running = $state(Boolean(data.tour?.running));
+  let running = $state(Boolean(data.tour.live?.running));
   // svelte-ignore state_referenced_locally
-  let steps = $state(data.tour?.steps || []);
+  let steps = $state(data.tour.live?.steps || []);
   // svelte-ignore state_referenced_locally
-  let pages = $state(data.tour?.pages || []);
+  let pages = $state(data.tour.live?.pages || []);
   // svelte-ignore state_referenced_locally
-  let findings = $state(data.tour?.findings || []);
+  let findings = $state(data.tour.live?.findings || []);
   // svelte-ignore state_referenced_locally
-  let url = $state(data.tour?.url || '');
+  let url = $state(data.tour.live?.url || '');
 
   /**
    * مسیرِ نسبی، نه آدرس کامل.
@@ -50,7 +58,7 @@
     }
   });
   // svelte-ignore state_referenced_locally
-  let recording = $state(data.tour?.recording ?? true);
+  let recording = $state(data.tour.live?.recording ?? true);
 
   let purpose = $state('');
   let noteText = $state('');
@@ -97,7 +105,7 @@
   function listen() {
     close();
     disconnected = false;
-    source = new EventSource(`/api/tour/events?target=${encodeURIComponent(data.target)}`);
+    source = new EventSource(`/api/tour/events?target=${encodeURIComponent(target)}`);
 
     source.onopen = () => {
       attempts = 0;
@@ -166,7 +174,7 @@
       const response = await fetch('/api/tour', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ target: data.target, ...body }),
+        body: JSON.stringify({ target: target, ...body }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'انجام نشد');
@@ -212,7 +220,7 @@
       const response = await fetch('/api/tour', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ target: data.target, action: 'detect-view' }),
+        body: JSON.stringify({ target: target, action: 'detect-view' }),
       });
       const payload = await response.json();
       if (response.ok) {
@@ -254,39 +262,38 @@
   }
 </script>
 
-<svelte:head><title>گشت زنده — {data.target}</title></svelte:head>
+<div class="space-y-4">
+  <!--
+    دکمه‌ها بالای پنل، نه در سرصفحهٔ صفحه.
 
-<PageHeader
-  eyebrow="پروژهٔ {data.project?.name || data.target}"
-  title="گشت زنده"
-  description="مرورگر باز می‌شود و شما مثل یک کاربر واقعی کار می‌کنید: وارد شوید، منوها را بگردید، صفحه‌ها را ببینید. هرچه می‌کنید ضبط می‌شود و هر جا خواستید بگویید این صفحه برای چیست."
->
-  {#snippet actions()}
-    {#if running}
-      <Button variant="outline" disabled={Boolean(busy)} onclick={() => send({ action: 'recording', on: !recording })}>
-        {recording ? 'توقف ضبط' : 'ادامهٔ ضبط'}
-      </Button>
-      <Button disabled={Boolean(busy)} onclick={() => stop(false)}>پایان و ذخیره</Button>
-      <Button variant="outline" disabled={Boolean(busy)} onclick={() => stop(true)}>پایان بدون ذخیره</Button>
-    {:else}
-      <!--
-        نگه داشتنِ نشست.
+    وقتی سه راهِ کشف کنارِ هم‌اند، «شروع گشت» باید کنارِ توضیحِ گشت باشد —
+    نه در سرصفحه‌ای که مالِ هر سه است.
+  -->
+  <div class="flex flex-wrap items-center gap-2">
+{#if running}
+  <Button variant="outline" disabled={Boolean(busy)} onclick={() => send({ action: 'recording', on: !recording })}>
+    {recording ? 'توقف ضبط' : 'ادامهٔ ضبط'}
+  </Button>
+  <Button disabled={Boolean(busy)} onclick={() => stop(false)}>پایان و ذخیره</Button>
+  <Button variant="outline" disabled={Boolean(busy)} onclick={() => stop(true)}>پایان بدون ذخیره</Button>
+{:else}
+  <!--
+    نگه داشتنِ نشست.
 
-        ── چرا این گزینه آمد ──
+    ── چرا این گزینه آمد ──
 
-        کارِ طبیعیِ آدم این است: در همین گشت حساب بسازد و تنظیماتِ خودِ اپ را
-        انجام بدهد، و بعد بگوید «از همان نشست استفاده کن» — چون داده در
-        `localStorage` همان مرورگر است. تا امروز نمی‌شد: پوشهٔ پروفایلِ گشت
-        موقت بود و در پایان پاک می‌شد.
-      -->
-      <label class="flex items-center gap-2 text-xs text-muted-foreground" title="پوشهٔ مرورگر در knowledge/<هدف>/profile می‌ماند — همان که خزش با «همان مرورگرِ خزشِ قبلی» باز می‌کند.">
-        <input type="checkbox" bind:checked={keepProfile} disabled={Boolean(busy)} />
-        نشست بماند
-      </label>
-      <Button disabled={Boolean(busy)} onclick={start}>{busy === 'start' ? 'در حال باز کردن…' : 'شروع گشت'}</Button>
-    {/if}
-  {/snippet}
-</PageHeader>
+    کارِ طبیعیِ آدم این است: در همین گشت حساب بسازد و تنظیماتِ خودِ اپ را
+    انجام بدهد، و بعد بگوید «از همان نشست استفاده کن» — چون داده در
+    `localStorage` همان مرورگر است. تا امروز نمی‌شد: پوشهٔ پروفایلِ گشت
+    موقت بود و در پایان پاک می‌شد.
+  -->
+  <label class="flex items-center gap-2 text-xs text-muted-foreground" title="پوشهٔ مرورگر در knowledge/<هدف>/profile می‌ماند — همان که خزش با «همان مرورگرِ خزشِ قبلی» باز می‌کند.">
+    <input type="checkbox" bind:checked={keepProfile} disabled={Boolean(busy)} />
+    نشست بماند
+  </label>
+  <Button disabled={Boolean(busy)} onclick={start}>{busy === 'start' ? 'در حال باز کردن…' : 'شروع گشت'}</Button>
+{/if}
+  </div>
 
 {#if error}
   <div class="mb-4 whitespace-pre-line rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</div>
@@ -307,7 +314,7 @@
         {#if result.written.scenario}
           <li>
             پیش‌نویس: <code>{result.written.scenario}</code>
-            <a class="text-primary underline" href={`/projects/${data.target}/files?kind=scenario&relative=${encodeURIComponent(result.written.scenario)}`}>بازش کن</a>
+            <a class="text-primary underline" href={`/projects/${target}/files?kind=scenario&relative=${encodeURIComponent(result.written.scenario)}`}>بازش کن</a>
           </li>
         {/if}
         <li>پرونده: {result.written.dossier.replaced} تازه · {result.written.dossier.conflicts} تعارض</li>
@@ -330,9 +337,14 @@
       -->
       <div class="mt-4 border-t pt-3">
         <div class="flex flex-wrap items-center gap-2">
-          <span class="text-xs text-muted-foreground">قدم بعد:</span>
-          <Button href={`/projects/${data.target}/map`} size="sm">نقشهٔ اپ را بکش</Button>
-          <Button href={`/projects/${data.target}/app`} size="sm" variant="outline">شناختِ ساخته‌شده</Button>
+          <!--
+            «نقشه» و «شناخت» حالا بالا و پایینِ همین صفحه‌اند، پس پیوند
+            لازم نیست — فقط باید گفت کجای صفحه.
+          -->
+          <span class="text-xs text-muted-foreground">
+            قدم بعد: بالای همین صفحه <strong>«خودت بگرد»</strong> را بزنید تا
+            خزش بقیه را پیدا کند؛ و پایین‌تر ببینید چه پیدا شد.
+          </span>
         </div>
         <p class="mt-2 text-xs leading-6 text-muted-foreground">
           گشت آن‌جایی را می‌شناسد که <strong>شما</strong> بردید. نقشه بقیه را
@@ -347,7 +359,7 @@
 {#if !running && !result}
   <section class="rounded-xl border border-dashed p-6 text-sm leading-7 text-muted-foreground">
     <p class="mb-3 font-semibold text-foreground">
-      {data.history.length ? 'گشتی در جریان نیست.' : 'گشت هنوز شروع نشده.'}
+      {data.tour.history.length ? 'گشتی در جریان نیست.' : 'گشت هنوز شروع نشده.'}
     </p>
     <p>
       «شروع گشت» یک پنجرهٔ مرورگر باز می‌کند. آن پنجره را کنارِ همین صفحه بگذارید: در آن کار کنید و
@@ -371,49 +383,29 @@
   و **صفحه‌ها** (چه چیزی از آن‌ها ماند). دومی مهم‌تر است، چون خروجیِ ماندگارِ
   گشت همان است.
 -->
-{#if !running && (data.history.length || data.pages.length)}
-  <section class="mt-6 grid gap-4 lg:grid-cols-2">
-    {#if data.history.length}
-      <div class="rounded-xl border p-4">
-        <h2 class="mb-3 text-sm font-bold">گشت‌های پیشین</h2>
-        <ul class="space-y-2 text-xs">
-          {#each data.history as run (run.runId)}
-            <li class="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2">
-              <span class="text-muted-foreground">{formatDate(run.startedAt)}</span>
-              <span class="flex-1">{run.steps} قدم · {run.findings} یافته</span>
-              <a class="text-primary underline underline-offset-2" href={`/runs/${encodeURIComponent(run.runId)}`}>
-                روایتش
-              </a>
-            </li>
-          {/each}
-        </ul>
-      </div>
-    {/if}
+{#if !running && data.tour.history.length}
+  <!--
+    فهرستِ صفحه‌های ثبت‌شده از اینجا رفت.
 
-    {#if data.pages.length}
-      <div class="rounded-xl border p-4">
-        <h2 class="mb-1 text-sm font-bold">صفحه‌هایی که ثبت شده‌اند</h2>
-        <p class="mb-3 text-xs text-muted-foreground">
-          خروجیِ ماندگارِ گشت. گشتِ تازه اینها را پاک نمی‌کند؛ رویشان می‌سازد.
-        </p>
-        <ul class="space-y-1.5 text-xs">
-          {#each data.pages.slice(0, 10) as page (page.path + page.view)}
-            <li class="rounded-lg border px-3 py-1.5">
-              <code>{page.path}</code>
-              {#if page.view}<span class="text-muted-foreground"> ▸ {page.view}</span>{/if}
-              {#if page.purpose}
-                <span class="block text-muted-foreground">{page.purpose}</span>
-              {:else}
-                <span class="block text-muted-foreground">— هنوز کسی نگفته برای چیست</span>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-        {#if data.pages.length > 10}
-          <p class="mt-2 text-xs text-muted-foreground">و {data.pages.length - 10} صفحهٔ دیگر.</p>
-        {/if}
-      </div>
-    {/if}
+    ── چرا ──
+
+    «چه چیزی از گشت ماند» حالا در «چه پیدا شد» است، کنارِ آنچه خزش و سورس
+    پیدا کرده‌اند — یک فهرست به‌جای سه تا. اینجا فقط تاریخِ خودِ گشت‌ها
+    می‌ماند، که جای دیگری ندارد.
+  -->
+  <section class="mt-6 rounded-xl border p-4">
+    <h2 class="mb-3 text-sm font-bold">گشت‌های پیشین</h2>
+    <ul class="space-y-2 text-xs">
+      {#each data.tour.history as run (run.runId)}
+        <li class="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2">
+          <span class="text-muted-foreground">{formatDate(run.startedAt)}</span>
+          <span class="flex-1">{run.steps} قدم · {run.findings} یافته</span>
+          <a class="text-primary underline underline-offset-2" href={`/runs/${encodeURIComponent(run.runId)}`}>
+            روایتش
+          </a>
+        </li>
+      {/each}
+    </ul>
   </section>
 {/if}
 
@@ -583,3 +575,4 @@
     </ul>
   </section>
 {/if}
+</div>

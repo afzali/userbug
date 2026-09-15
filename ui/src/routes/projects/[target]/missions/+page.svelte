@@ -116,8 +116,8 @@
       می‌گویند بعدش چه باید دیده شود. سه راه برای آوردنشان هست:
     </p>
     <div class="mt-4 flex flex-wrap gap-2">
-      <Button href={`${base}/tour`} size="sm">گشتِ زنده — خودت نشان بده</Button>
-      <Button href={`${base}/map`} variant="outline" size="sm">نقشهٔ اپ — خودش بگردد</Button>
+      <Button href={`${base}/discover`} size="sm">کشف — گشت یا خزش</Button>
+      
       <Button href={`${base}/files`} variant="outline" size="sm">خودم می‌نویسم</Button>
     </div>
   </section>
@@ -259,7 +259,7 @@
       <Button href={`${base}/proposals`} variant="outline" size="sm">
         {data.fromMap ? `${formatNumber(data.fromMap)} پیشنهاد از نقشه و شناخت` : 'ببین چه باید آزمود'}
       </Button>
-      <Button href={`${base}/tour`} variant="outline" size="sm">گشتِ زنده</Button>
+      <Button href={`${base}/discover`} variant="outline" size="sm">کشف</Button>
       <Button href={`${base}/files`} variant="outline" size="sm">
         فایل‌های پروژه{data.others ? ` (${formatNumber(data.others)} پیش‌نویس و اسکریپت)` : ''}
       </Button>

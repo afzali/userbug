@@ -19,11 +19,12 @@
   import * as Card from '$lib/components/ui/card/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import ModelPicker from '$lib/components/ModelPicker.svelte';
-  import PageHeader from '$lib/components/PageHeader.svelte';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
   import { formatDate, formatNumber } from '$lib/format.js';
 
-  let { data } = $props();
+  let { data, target } = $props();
+
+  let base = $derived(`/projects/${encodeURIComponent(target)}`);
 
   /**
    * «این پروژه چیست» — متنی که خودت می‌نویسی.
@@ -38,9 +39,9 @@
    * بازنویسی، و «چرا این شد؟».
    */
   // svelte-ignore state_referenced_locally
-  let brief = $state(data.brief || '');
+  let brief = $state(data.found.brief || '');
   // svelte-ignore state_referenced_locally
-  let briefSaved = $state(data.brief || '');
+  let briefSaved = $state(data.found.brief || '');
   let briefBusy = $state(false);
   let briefNote = $state('');
 
@@ -58,7 +59,7 @@
       const response = await fetch('/api/source', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ target: data.target }),
+        body: JSON.stringify({ target: target }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'خوانده نشد');
@@ -80,7 +81,7 @@
       const response = await fetch('/api/brief', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ target: data.target, text: brief }),
+        body: JSON.stringify({ target: target, text: brief }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'ذخیره نشد');
@@ -94,16 +95,16 @@
   }
 
   // svelte-ignore state_referenced_locally
-  let dossier = $state(data.dossier);
+  let dossier = $state(data.found.dossier);
   // svelte-ignore state_referenced_locally
-  let pages = $state(data.pages || []);
+  let pages = $state(data.found.pages || []);
   // svelte-ignore state_referenced_locally
-  let coverage = $state(data.coverage);
+  let coverage = $state(data.found.coverage);
   // svelte-ignore state_referenced_locally
-  let history = $state(data.history || []);
+  let history = $state(data.found.history || []);
 
   // svelte-ignore state_referenced_locally
-  let docs = $state(data.docs || []);
+  let docs = $state(data.found.docs || []);
 
   let newDoc = $state({ url: '', note: '' });
 
@@ -136,7 +137,7 @@
       const response = await fetch('/api/knowledge', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ target: data.target, ...body }),
+        body: JSON.stringify({ target: target, ...body }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'انجام نشد');
@@ -200,16 +201,77 @@
       : 'ثبت شد؛ این بند حالا by: user است و حدسِ مدل عوضش نمی‌کند.';
   }
 
+  /**
+   * برچسبِ دسته‌ها به فارسی، یک جا.
+   *
+   * همان فهرستِ `src/map/render.js`. تکرارش عمدی است و کوچک: آن یکی برای
+   * ترمینال است و این یکی برای رابط.
+   */
+  const KIND = {
+    nav: 'ناوبری',
+    mutate: 'جهش',
+    inert: 'بی‌اثر',
+    unknown: 'نامعلوم',
+    input: 'ورودی',
+    noise: 'نمایشی',
+    destructive: 'برگشت‌ناپذیر',
+    avoided: 'ممنوع',
+  };
+
+  let map = $derived(data.crawl.map);
+
+  /**
+   * جاهایی که فقط گشت می‌شناسدشان — خزش هنوز نرفته.
+   *
+   * تعریفش با استفاده‌اش در یک فایل می‌ماند: وقتی ستونِ گزارش از صفحهٔ نقشه
+   * به اینجا آمد، این یکی جا ماند و صفحه با `ReferenceError` افتاد — بی
+   * اینکه `svelte-check` چیزی بگوید.
+   */
+  let tourOnly = $derived(
+    (data.found.places || []).filter((one) => one.by.includes('tour') && !one.by.includes('crawl'))
+  );
+  let states = $derived(map?.states || []);
+  let hasMap = $derived(states.length > 0);
+
+  /** خانوادهٔ روت → حالت‌ها. همان دسته‌بندیِ نقشه، بی تاکسونومیِ تازه. */
+  let families = $derived.by(() => {
+    const groups = new Map();
+    for (const state of states) {
+      const list = groups.get(state.route) || [];
+      list.push(state);
+      groups.set(state.route, list);
+    }
+    return [...groups.entries()].sort(([a], [b]) => (a < b ? -1 : 1));
+  });
+
+  let totals = $derived.by(() => {
+    const out = { actions: 0, tried: 0, inert: 0, destructive: 0 };
+    for (const state of states) {
+      for (const action of state.actions || []) {
+        out.actions++;
+        if (action.tried) out.tried++;
+        if (action.inert) out.inert++;
+        if (action.kind === 'destructive') out.destructive++;
+      }
+    }
+    return out;
+  });
+
+  function kindsOf(state) {
+    const counts = {};
+    for (const action of state.actions || []) counts[action.kind] = (counts[action.kind] || 0) + 1;
+    return Object.entries(counts).sort(([, a], [, b]) => b - a);
+  }
 </script>
 
-<svelte:head><title>اپ — {data.target}</title></svelte:head>
+<div class="space-y-6">
+  <!--
+    دکمه‌های «چه پیدا شد»: خواندنِ سورس و ساختِ شناخت.
 
-<PageHeader
-  eyebrow="پروژهٔ {data.project?.name || data.target}"
-  title="اپ"
-  description="این اپ چه دارد، و چقدرش را لمس کرده‌ایم. صفحه‌ها و مودال‌ها از گشت و خزش، endpointها و قاعده‌ها از سورس — یک‌جا، چون یک پرسش‌اند."
->
-  {#snippet actions()}
+    این‌ها هم یک راهِ کشف‌اند، ولی راهی که مرورگر لازم ندارد — پس کنارِ
+    نتیجه می‌نشینند نه کنارِ گشت و خزش.
+  -->
+  <div class="flex flex-wrap items-center gap-2">
     <Button variant="outline" disabled={Boolean(busy)} onclick={() => digest({ dry: true })}>
       {busy === 'digest' ? '…' : 'فقط ساختار (رایگان)'}
     </Button>
@@ -228,12 +290,11 @@
       از صفحهٔ «سورس» آمد که در همین صفحه ادغام شد. اسکنِ endpointها و
       قاعده‌ها نحوی است: مسیرِ فایل، رشتهٔ `case 'GET /x'`، و `UNIQUE(...)`.
     -->
-    <Button variant="outline" disabled={busy === 'source' || !data.hasSource} onclick={rescan}>
+    <Button variant="outline" disabled={busy === 'source' || !data.found.hasSource} onclick={rescan}>
       {busy === 'source' ? 'در حال خواندن…' : 'خواندنِ دوبارهٔ سورس'}
     </Button>
-    <Button href={`/projects/${encodeURIComponent(data.target)}/proposals`} variant="outline">چه باید آزمود</Button>
-  {/snippet}
-</PageHeader>
+    <Button href={`/projects/${encodeURIComponent(target)}/proposals`} variant="outline">چه باید آزمود</Button>
+  </div>
 
 {#if error}
   <div class="mb-4 whitespace-pre-line rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</div>
@@ -405,17 +466,17 @@
   <div class="flex flex-wrap items-baseline justify-between gap-2">
     <h2 class="text-sm font-bold">جاهای اپ</h2>
     <span class="text-[11px] text-muted-foreground">
-      {formatNumber(data.placeCoverage.crawled)} خزش ·
-      {formatNumber(data.placeCoverage.toured)} گشت ·
-      {formatNumber(data.placeCoverage.untouched)} فقط در سورس
+      {formatNumber(data.found.placeCoverage.crawled)} خزش ·
+      {formatNumber(data.found.placeCoverage.toured)} گشت ·
+      {formatNumber(data.found.placeCoverage.untouched)} فقط در سورس
     </span>
   </div>
 
-  {#if !data.places.length}
+  {#if !data.found.places.length}
     <p class="mt-2 text-xs leading-6 text-muted-foreground">
       هنوز هیچ‌جایی شناخته نشده. یک
-      <a class="underline underline-offset-2" href={`${base}/tour`}>گشت</a> بروید یا
-      <a class="underline underline-offset-2" href={`${base}/map`}>نقشه</a> بکشید.
+      <a class="underline underline-offset-2" href={`${base}/discover`}>گشت</a> بروید یا
+      <a class="underline underline-offset-2" href={`${base}/discover`}>خزش</a> کنید.
     </p>
   {:else}
     <div class="scroll-thin mt-3 max-h-96 overflow-auto">
@@ -429,7 +490,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each data.places as place (place.key)}
+          {#each data.found.places as place (place.key)}
             <tr class="border-b last:border-0">
               <td class="whitespace-nowrap p-2 font-mono text-xs">
                 {place.route}{place.view ? ` ▸ ${place.view}` : ''}
@@ -438,7 +499,7 @@
               <td class="p-2">
                 {#each place.by as source (source)}
                   <Badge variant={source === 'source' ? 'outline' : 'secondary'} class="me-1 text-[10px]">
-                    {data.byLabel[source] || source}
+                    {data.found.byLabel[source] || source}
                   </Badge>
                 {/each}
               </td>
@@ -614,7 +675,7 @@
   یک پرسش را جواب می‌دادند: این اپ چه دارد و چقدرش را لمس کرده‌ایم.
   تفکیکشان تاریخی بود (یکی از مدل و گشت، آن یکی از اسکنِ ایستا) نه مفهومی.
 -->
-{#if data.hasSource}
+{#if data.found.hasSource}
   <div class="mb-6 grid gap-6 lg:grid-cols-2">
 
     <!-- ── ۲. بک‌اند ── -->
@@ -624,14 +685,14 @@
         <Card.Description>endpointها، در برابر آنچه اجراها واقعاً صدا زده‌اند.</Card.Description>
       </Card.Header>
       <Card.Content class="space-y-3 text-sm">
-        {#if !data.endpoints?.scanned}
+        {#if !data.found.endpoints?.scanned}
           <p class="text-xs leading-6 text-muted-foreground">
             هنوز خوانده نشده. «خواندنِ دوبارهٔ سورس» را بزنید.
           </p>
         {:else}
           <div class="flex items-baseline justify-between">
             <span class="text-muted-foreground">در سورس</span>
-            <strong class="text-lg">{formatNumber(data.endpoints.total)}</strong>
+            <strong class="text-lg">{formatNumber(data.found.endpoints.total)}</strong>
           </div>
           <div class="flex items-baseline justify-between">
             <span class="text-muted-foreground">آزموده</span>
@@ -639,16 +700,16 @@
           </div>
           <div class="flex items-baseline justify-between">
             <span class="text-muted-foreground">تماسِ ثبت‌شده</span>
-            <strong>{formatNumber(data.endpoints.calls)}</strong>
+            <strong>{formatNumber(data.found.endpoints.calls)}</strong>
           </div>
 
-          {#if data.endpoints.untouched.length}
+          {#if data.found.endpoints.untouched.length}
             <div class="rounded-lg border border-destructive/40 bg-destructive/5 p-2.5 text-xs">
               <p class="font-medium text-destructive">
-                {formatNumber(data.endpoints.untouched.length)} endpoint، هیچ اجرایی صدایشان نزده
+                {formatNumber(data.found.endpoints.untouched.length)} endpoint، هیچ اجرایی صدایشان نزده
               </p>
               <ul class="mt-1.5 max-h-52 space-y-0.5 overflow-y-auto">
-                {#each data.endpoints.untouched as row (row.path)}
+                {#each data.found.endpoints.untouched as row (row.path)}
                   <li dir="ltr" class="font-mono text-[11px]">
                     <span class="text-muted-foreground">{row.methods.join(',') || '?'}</span>
                     {row.path}
@@ -664,11 +725,11 @@
             `GET /keys` را هزار بار زده‌ایم و `DELETE` همان مسیر را هرگز — و
             دومی همان‌جاست که باگ می‌نشیند.
           -->
-          {#if data.endpoints.partial.length}
+          {#if data.found.endpoints.partial.length}
             <div class="rounded-lg border p-2.5 text-xs">
               <p class="font-medium">مسیر آزموده شده، این فعل‌ها نه:</p>
               <ul class="mt-1.5 space-y-0.5">
-                {#each data.endpoints.partial as row (row.path)}
+                {#each data.found.endpoints.partial as row (row.path)}
                   <li dir="ltr" class="font-mono text-[11px]">
                     <span class="text-destructive">{row.untried.join(',')}</span> {row.path}
                   </li>
@@ -677,23 +738,23 @@
             </div>
           {/if}
 
-          {#if data.endpoints.unknown.length}
+          {#if data.found.endpoints.unknown.length}
             <details class="text-xs">
               <summary class="cursor-pointer text-muted-foreground">
-                {formatNumber(data.endpoints.unknown.length)} مسیر صدا خورد و در سورس نبود
+                {formatNumber(data.found.endpoints.unknown.length)} مسیر صدا خورد و در سورس نبود
               </summary>
               <!-- یا آشکارساز کور است، یا سرویسِ بیرونی. هر دو خبرند، نه نویز. -->
               <ul class="mt-1.5 space-y-0.5">
-                {#each data.endpoints.unknown as row (row)}
+                {#each data.found.endpoints.unknown as row (row)}
                   <li dir="ltr" class="font-mono text-[11px] text-muted-foreground">{row}</li>
                 {/each}
               </ul>
             </details>
           {/if}
 
-          {#if data.endpoints.at}
+          {#if data.found.endpoints.at}
             <p class="text-[11px] text-muted-foreground">
-              آخرین خواندن: {formatDate(data.endpoints.at)} · {formatNumber(data.endpoints.files)} فایل
+              آخرین خواندن: {formatDate(data.found.endpoints.at)} · {formatNumber(data.found.endpoints.files)} فایل
             </p>
           {/if}
         {/if}
@@ -709,26 +770,26 @@
       <Card.Content class="space-y-3 text-sm">
         <div class="flex items-baseline justify-between">
           <span class="text-muted-foreground">ناوردا</span>
-          <strong class="text-lg">{formatNumber(data.invariants.total)}</strong>
+          <strong class="text-lg">{formatNumber(data.found.invariants.total)}</strong>
         </div>
         <div class="flex items-baseline justify-between">
           <span class="text-muted-foreground">یکتایی</span>
-          <strong>{formatNumber(data.invariants.unique)}</strong>
+          <strong>{formatNumber(data.found.invariants.unique)}</strong>
         </div>
         <div class="flex items-baseline justify-between">
           <span class="text-muted-foreground">اجباری‌بودن</span>
-          <strong>{formatNumber(data.invariants.notNull)}</strong>
+          <strong>{formatNumber(data.found.invariants.notNull)}</strong>
         </div>
-        {#if data.invariants.silenced}
+        {#if data.found.invariants.silenced}
           <div class="flex items-baseline justify-between">
             <span class="text-muted-foreground">خاموش‌شده با دلیل</span>
-            <strong>{formatNumber(data.invariants.silenced)}</strong>
+            <strong>{formatNumber(data.found.invariants.silenced)}</strong>
           </div>
         {/if}
 
-        {#if data.invariants.sample.length}
+        {#if data.found.invariants.sample.length}
           <ul class="space-y-1.5 border-t pt-2 text-xs leading-6">
-            {#each data.invariants.sample as row (row.id)}
+            {#each data.found.invariants.sample as row (row.id)}
               <li>
                 {row.statement}
                 {#if row.from}<span dir="ltr" class="block font-mono text-[11px] text-muted-foreground">{row.from}</span>{/if}
@@ -756,3 +817,207 @@
     <Button href={`${base}/files?kind=target`} variant="outline" size="sm" class="mt-3">پیکربندی پروژه</Button>
   </section>
 {/if}
+
+<div class="space-y-4">
+  {#if !hasMap}
+    <p class="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+      هنوز نقشه‌ای نیست.
+    </p>
+  {:else}
+    <!--
+      گزارشِ نقشه — یک کارت، نه پنج تا.
+
+      «عددها»، «در سورس هست نرسیدیم»، «دیدیم در سورس نبود» و «پیش‌بینی
+      نخواند» همه یک پرسش را جواب می‌دهند: این نقشه چه می‌گوید. پنج کارتِ
+      هم‌وزن در ستونِ کنترل، هم آن ستون را یک کیلومتر می‌کرد هم هیچ‌کدام را
+      مهم نشان نمی‌داد. حالا عددها همیشه پیدایند و تفصیل‌ها تا خواسته
+      نشوند بسته‌اند.
+    -->
+    <Card.Root>
+      <Card.Header class="pb-3">
+        <Card.Title class="text-sm">این نقشه چه می‌گوید</Card.Title>
+        {#if map.entry?.scenario}
+          <Card.Description class="text-[11px]">مسیرِ ورود: {map.entry.scenario}</Card.Description>
+        {/if}
+      </Card.Header>
+      <Card.Content class="space-y-3">
+        <!--
+          پوشش از **همهٔ** منابع، نه فقط خزش.
+
+          کاربر پرسید «آیا گشت خودش یک نوع نقشه نیست؟» — بود، و این کارت
+          تا امروز فقط گره‌های خزش را می‌شمرد. یعنی جایی که آدم در گشت
+          دیده بود و جایی که فقط در سورس هست، هیچ‌کدام در مخرج نبودند و
+          نمره از واقعیت خوش‌بین‌تر درمی‌آمد.
+        -->
+        {#if data.found.placeCoverage?.total}
+          <div class="rounded-lg border bg-muted/30 p-2.5 text-[11px] leading-6">
+            <p>
+              <strong>{formatNumber(data.found.placeCoverage.total)} جای شناخته‌شده</strong> —
+              {formatNumber(data.found.placeCoverage.crawled)} خزش · {formatNumber(data.found.placeCoverage.toured)} گشت
+              {#if data.found.placeCoverage.untouched}
+                · <span class="text-amber-600 dark:text-amber-400">
+                    {formatNumber(data.found.placeCoverage.untouched)} فقط در سورس، هیچ‌کس نرفته
+                  </span>
+              {/if}
+            </p>
+            <!--
+              «جا» با «حالت» یکی نیست و باید گفته شود.
+              حالت = روت + نما + شکلِ صفحه، پس یک جا می‌تواند چند حالت
+              داشته باشد (کتابِ باز و کتابِ بسته). بی این توضیح، دو عددِ
+              کنار هم که نمی‌خوانند فقط گیج می‌کنند.
+            -->
+            <p class="text-muted-foreground">
+              «جا» یعنی روت و نما؛ یک جا می‌تواند چند حالتِ خزش داشته باشد.
+            </p>
+            {#if data.found.placeCoverage.withoutContract}
+              <!--
+                «رفته‌ایم ولی نمی‌دانیم اینجا چه چیزی همیشه هست» — و آن دقیقاً
+                جایی است که هیچ انتظاری نمی‌شود نوشت.
+              -->
+              <p class="text-muted-foreground">
+                {formatNumber(data.found.placeCoverage.withoutContract)} جا قرارداد ندارد؛
+                {formatNumber(data.found.placeCoverage.contracts)} بندِ «همیشه اینجا بوده» ثبت شده.
+              </p>
+            {/if}
+          </div>
+        {/if}
+
+        <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-4">
+          {#each [['حالتِ خزش', states.length], ['کنش', totals.actions], ['امتحان‌شده', totals.tried], ['در صف', map.frontier?.length || 0]] as [label, value] (label)}
+            <div>
+              <span class="block text-[11px] text-muted-foreground">{label}</span>
+              <span class="font-medium">{formatNumber(value)}</span>
+            </div>
+          {/each}
+        </div>
+
+        <details class="text-xs">
+          <summary class="cursor-pointer text-muted-foreground">عددهای ریزتر</summary>
+          <div class="mt-2 space-y-1.5">
+            <div class="flex justify-between"><span class="text-muted-foreground">یال</span><span>{map.edges?.length || 0}</span></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">بی‌اثر</span><span>{totals.inert}</span></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">برگشت‌ناپذیر (نزده)</span><span>{totals.destructive}</span></div>
+            {#if map.stats?.stoppedBecause}
+              <div class="flex justify-between"><span class="text-muted-foreground">توقف</span><span>{map.stats.stoppedBecause}</span></div>
+            {/if}
+          </div>
+        </details>
+
+        <!--
+          پیش‌بینیِ سورس در برابرِ آنچه واقعاً شد — اول، چون «جایی رفتیم که
+          نباید» احتمالِ باگ بودنش از «کجا نرفتیم» بیشتر است.
+        -->
+        {#if data.crawl.mispredicted?.length}
+          <details class="text-xs">
+            <summary class="cursor-pointer">
+              پیش‌بینی نخواند ({formatNumber(data.crawl.mispredicted.length)})
+              <span class="text-[11px] text-muted-foreground">— سورس یک چیز گفت، کلیک چیز دیگری</span>
+            </summary>
+            <div class="mt-2 space-y-1.5">
+              {#each data.crawl.mispredicted.slice(0, 8) as row (row.label + row.predicted)}
+                <div class="rounded-lg border p-2">
+                  <span class="block font-medium">{row.label}</span>
+                  <span dir="ltr" class="mt-1 block font-mono text-[11px] text-muted-foreground">
+                    {row.predicted} → {row.actual}
+                  </span>
+                </div>
+              {/each}
+            </div>
+          </details>
+        {/if}
+
+        {#if data.crawl.unreached.length}
+          <details class="text-xs">
+            <summary class="cursor-pointer">در سورس هست، نرسیدیم ({formatNumber(data.crawl.unreached.length)})</summary>
+            <div class="mt-2 flex flex-wrap gap-1.5">
+              {#each data.crawl.unreached as route (route)}
+                <Badge variant="outline" class="font-mono text-[11px]">{route}</Badge>
+              {/each}
+            </div>
+          </details>
+        {/if}
+
+        <!--
+          جاهایی که فقط گشت می‌شناسدشان.
+
+          تا امروز صفحهٔ نقشه این‌ها را اصلاً نشان نمی‌داد، چون فقط
+          `map.json` را می‌خواند — و کاربر حق داشت بپرسد «مگر گشت خودش یک
+          نوع نقشه نیست؟».
+        -->
+        {#if tourOnly.length}
+          <details class="text-xs">
+            <summary class="cursor-pointer">
+              فقط در گشت دیده شده ({formatNumber(tourOnly.length)})
+              <span class="text-[11px] text-muted-foreground">— خزش هنوز نرفته</span>
+            </summary>
+            <div class="mt-2 space-y-1">
+              {#each tourOnly as one (one.key)}
+                <div class="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border p-2">
+                  <span class="font-mono text-[11px]">{one.route}{one.view ? ` ▸ ${one.view}` : ''}</span>
+                  <span class="text-[11px] text-muted-foreground">
+                    {one.contract ? `${formatNumber(one.contract)} بندِ قرارداد` : 'بی قرارداد'}
+                    {#if one.purpose}· {one.purpose.slice(0, 60)}{/if}
+                  </span>
+                </div>
+              {/each}
+            </div>
+          </details>
+        {/if}
+
+        {#if data.crawl.extra.length && data.crawl.knownRoutes.length}
+          <details class="text-xs">
+            <summary class="cursor-pointer">دیدیم، در سورس نبود ({formatNumber(data.crawl.extra.length)})</summary>
+            <div class="mt-2 flex flex-wrap gap-1.5">
+              {#each data.crawl.extra as route (route)}
+                <Badge variant="outline" class="font-mono text-[11px]">{route}</Badge>
+              {/each}
+            </div>
+          </details>
+        {/if}
+
+        <!--
+          پیوند به «بقیهٔ سورس» حذف شد: بک‌اند و قاعده‌ها حالا در همین صفحه
+          و چند بخش پایین‌ترند. پیوندی که به خودِ صفحه برگردد، فقط سردرگمی
+          اضافه می‌کند.
+        -->
+      </Card.Content>
+    </Card.Root>
+
+    {#each families as [route, group] (route)}
+      <Card.Root>
+        <Card.Header class="pb-3">
+          <Card.Title class="font-mono text-sm">{route}</Card.Title>
+          <Card.Description>{group.length} حالت</Card.Description>
+        </Card.Header>
+        <Card.Content class="space-y-2">
+          {#each group as state (state.id)}
+            {@const tried = (state.actions || []).filter((action) => action.tried).length}
+            <div class="rounded-lg border p-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-sm font-medium">
+                  {state.view ? `▸ ${state.view}` : state.title || 'نمای اصلی'}
+                </span>
+                {#if state.pathBroken}
+                  <Badge variant="destructive" class="text-[10px]">مسیر شکسته</Badge>
+                {/if}
+                <span class="text-[11px] text-muted-foreground">{tried} از {(state.actions || []).length} کنش امتحان شد</span>
+              </div>
+
+              <div class="mt-2 flex flex-wrap gap-1.5">
+                {#each kindsOf(state) as [kind, count] (kind)}
+                  <Badge variant="secondary" class="text-[10px]">{count} {KIND[kind] || kind}</Badge>
+                {/each}
+              </div>
+
+              <p class="mt-2 font-mono text-[11px] text-muted-foreground">
+                {state.sample || route}
+                {#if state.path?.length}· {state.path.length} قدم تا اینجا{/if}
+              </p>
+            </div>
+          {/each}
+        </Card.Content>
+      </Card.Root>
+    {/each}
+  {/if}
+</div>
+</div>

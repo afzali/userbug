@@ -230,7 +230,7 @@
     اشاره کند، نه فقط «بازگشت».
   -->
   {#snippet actions()}
-    <Button href={`/projects/${encodeURIComponent(data.target)}/app`} variant="outline">اپ</Button>
+    <Button href={`/projects/${encodeURIComponent(data.target)}/discover`} variant="outline">کشف</Button>
     <Button href={`/projects/${encodeURIComponent(data.target)}`} variant="ghost">بازگشت به اجرا</Button>
   {/snippet}
 </PageHeader>

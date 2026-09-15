@@ -191,21 +191,21 @@
       {
         index: '۱',
         label: 'گشت',
-        href: `${base}/tour`,
+        href: `${base}/discover`,
         done: p.pages > 0,
         state: p.pages ? `${p.pages} صفحه ثبت شد` : 'با هم در اپ بگردیم',
       },
       {
         index: '۲',
         label: 'نقشه',
-        href: `${base}/map`,
+        href: `${base}/discover`,
         done: p.states > 0,
         state: p.states ? `${p.states} حالت · ${p.frontier} کنش در صف` : 'بقیه را خودش بگردد',
       },
       {
         index: '۳',
         label: 'شناخت',
-        href: `${base}/app`,
+        href: `${base}/discover`,
         done: percent !== null && percent > 0,
         state:
           percent === null || percent === 0
@@ -397,7 +397,7 @@
           مرورگر باز می‌شود و <strong>شما</strong> می‌رانید. روی هر صفحه می‌توانید
           بنویسید کارش چیست، و هر ایرادی که دیدید همان‌جا ثبت کنید.
         </p>
-        <Button href={`/projects/${encodeURIComponent(target)}/tour`} class="mt-3 w-full">شروع گشت</Button>
+        <Button href={`/projects/${encodeURIComponent(target)}/discover`} class="mt-3 w-full">شروع گشت</Button>
       </li>
 
       <!--
@@ -411,7 +411,7 @@
           مرورگر هر دکمهٔ امنی را می‌زند و می‌نویسد از کجا به کجا می‌رسد —
           صفحه‌ها، و مودال‌ها و منوهایی که آدرس ندارند. بی هوش مصنوعی.
         </p>
-        <Button href={`/projects/${encodeURIComponent(target)}/map`} variant="ghost" class="mt-3 w-full text-xs">نقشهٔ اپ</Button>
+        <Button href={`/projects/${encodeURIComponent(target)}/discover`} variant="ghost" class="mt-3 w-full text-xs">خزش</Button>
       </li>
 
       <li class="rounded-lg border bg-background p-4">
@@ -421,7 +421,7 @@
           صفحه‌ها، مسیرها و کارهای خطرناک ثبت می‌شوند. هرچه خودتان گفته باشید
           بالاترین اعتماد را دارد — بالاتر از حدسِ مدل.
         </p>
-        <Button href={`/projects/${encodeURIComponent(target)}/app`} variant="ghost" class="mt-3 w-full text-xs">اپ</Button>
+        <Button href={`/projects/${encodeURIComponent(target)}/discover`} variant="ghost" class="mt-3 w-full text-xs">چه پیدا شد</Button>
       </li>
 
       <li class="rounded-lg border bg-background p-4">

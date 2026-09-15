@@ -161,7 +161,7 @@
       گرفتنِ بستهٔ پروژه
     </Button>
     <Button href={`${base}/files?kind=target`} variant="outline">فایل کانفیگ</Button>
-    <Button href={`${base}/app`} variant="ghost">اپ</Button>
+    <Button href={`${base}/discover`} variant="ghost">کشف</Button>
   {/snippet}
 </PageHeader>
 
