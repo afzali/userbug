@@ -151,6 +151,11 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --rebuild                   از نو بساز (پیش‌فرض: درختِ ذخیره‌شده)
       --all                       آنچه «حذف شده» زده‌اید را هم نشان بده
       --json                      خامِ درخت، برای ابزارهای دیگر
+      --name                      نامِ خوانای فارسی با مدل — **یک** فراخوانی
+                                  برای کلِ درخت، کش‌شونده. تنها قدمِ پولیِ
+                                  این فرمان؛ بقیه‌اش از دیسک درمی‌آید
+      --force                     با --name: نام‌های موجود را هم دوباره بساز
+      --model <اسلاگ>             مدلِ نام‌گذاری؛ بر تنظیمات می‌چربد
       --set <شناسه> --title <نام> [--desc <متن>]
                                   نام و توضیحِ خودت؛ by: user، و هیچ
                                   استخراجی بعداً نمی‌بردش
@@ -1260,6 +1265,42 @@ async function cmdCapabilities({ flags, positional }) {
    * فایل می‌نویسد. کسی که فقط می‌خواهد **ببیند**، نباید بنویسد.
    */
   if (flags.rebuild) caps.rebuild(target);
+
+  /**
+   * نام‌گذاری — تنها قدمِ پولیِ این فرمان، و فقط با پرچمِ صریح.
+   *
+   * همان موضعِ `map --classify`: هر چیزی که پول خرج کند باید خواسته شده
+   * باشد، نه دنبالهٔ کاری که کاربر برای چیزِ دیگری زده.
+   */
+  if (flags.name) {
+    const { nameCapabilities } = await import('../src/knowledge/name-caps.js');
+    const project = await loadTarget(target);
+    /**
+     * دو تلهٔ همین چند خط، که هر دو را نخستین اجرا نشان داد:
+     *
+     *   `model: ''` — زنجیرهٔ `??` در `resolveModel` فقط از `null` و
+     *   `undefined` رد می‌شود. رشتهٔ خالی «مقدار» است و برنده می‌شود، پس
+     *   اسلاگ خالی می‌ماند و سرور `No models provided` می‌دهد.
+     *
+     *   `target: project.models` — تابع خودش `target.models` را می‌خواند،
+     *   پس این یعنی `project.models.models`. بی‌صدا به پیش‌فرض می‌افتاد.
+     */
+    const models = resolveModel({
+      global: await loadGlobalConfig(),
+      target: project,
+      role: 'analyze',
+      model: flags.model && flags.model !== true ? assertModelSlug(flags.model) : undefined,
+    });
+
+    const stats = await nameCapabilities({ target, models, force: Boolean(flags.force) });
+    console.log(
+      `
+  ${stats.named} نام از ${stats.pending} بخش` +
+        (stats.skipped ? `  ·  ${stats.skipped} را مدل نتوانست` : '') +
+        `  ·  ${stats.calls} فراخوانی  ·  ${models.model}
+`
+    );
+  }
 
   const index = touch.refreshTouch(target, path.dirname(runDir('x')));
   const tree = caps.buildTree(target, {

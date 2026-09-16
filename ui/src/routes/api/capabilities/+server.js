@@ -92,6 +92,45 @@ export async function POST(event) {
       return json({ target, id, angles: anglesFor(target, node, { covered: node.counts.scenarios }) });
     }
 
+    /**
+     * نام‌های خوانا — تنها کارِ این مسیر که پول خرج می‌کند.
+     *
+     * ── چرا مثل بقیه بی‌صدا انجام نمی‌شود ──
+     *
+     * همان موضعِ `--classify` و `--author`: چیزی که هزینه دارد با انتخابِ
+     * صریح شروع می‌شود. و چون هزینه دارد، جواب هم برمی‌گرداند که **چند**
+     * فراخوانی شد — کاربر باید بتواند ببیند چه خرید.
+     */
+    if (action === 'name') {
+      const [{ nameCapabilities }, { loadGlobalConfig, resolveModel }, { loadTarget }] = await Promise.all([
+        import('../../../../../src/knowledge/name-caps.js'),
+        import('../../../../../src/models/config.js'),
+        import('../../../../../src/target.js'),
+      ]);
+
+      /**
+       * `target` خودِ پیکربندیِ پروژه است، نه `project.models` — تابع
+       * داخلش `target.models` را می‌خواند. و مدلِ خالی باید `undefined`
+       * باشد نه `''`، وگرنه زنجیرهٔ `??` رویش می‌ایستد و اسلاگ خالی
+       * می‌ماند. هر دو را نخستین اجرا با یک ۴۰۰ نشان داد.
+       */
+      const config = await loadTarget(target).catch(() => ({}));
+      const models = resolveModel({
+        global: await loadGlobalConfig(),
+        target: config,
+        role: 'analyze',
+        model: String(body?.model || '').trim() || undefined,
+      });
+
+      const stats = await nameCapabilities({ target, models, force: Boolean(body?.force) });
+      return json({
+        target,
+        stats,
+        model: models.model,
+        ...(await treeOf(target, await aggregateTriage(target).catch(() => []))),
+      });
+    }
+
     if (action === 'reset') {
       const id = String(body?.id ?? '').trim();
       if (!id) throw new Error('شناسهٔ قابلیت لازم است');

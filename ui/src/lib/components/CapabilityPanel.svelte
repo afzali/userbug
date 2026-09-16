@@ -177,7 +177,18 @@
           {BY[source] || source}
         </Badge>
       {/each}
-      {#if node.edited}<Badge class="text-[10px]">نامش را خودتان گذاشته‌اید</Badge>{/if}
+      <!--
+        نامِ مدل و نامِ آدم یک‌شکل دیده نمی‌شوند.
+
+        بی این، شش ماه بعد کسی نمی‌داند «قفسهٔ کتاب‌ها» را خودش نوشته یا
+        یک مدلِ ارزان حدس زده — و تفاوتشان همان چیزی است که تصمیم می‌گیرد
+        رویش حساب کنی یا نه.
+      -->
+      {#if node.titleBy === 'user'}
+        <Badge class="text-[10px]">نامش را خودتان گذاشته‌اید</Badge>
+      {:else if node.titleBy === 'model'}
+        <Badge variant="outline" class="text-[10px]">نامش را مدل ساخته</Badge>
+      {/if}
       {#if node.missing}
         <Badge variant="outline" class="text-[10px] text-amber-600 dark:text-amber-400">
           در آخرین کشف دیده نشد

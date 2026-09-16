@@ -439,6 +439,28 @@ export function readEdits(target) {
 }
 
 /**
+ * نام‌هایی که مدل ساخته — لایهٔ **میانی**.
+ *
+ * ── چرا سه لایه و نه دو ──
+ *
+ * `مشتق < مدل < کاربر`، و هر مرز دلیلِ خودش را دارد:
+ *
+ *   مدل بر مشتق می‌چربد، چون `contents` درست است ولی چیزی نمی‌گوید.
+ *   کاربر بر مدل می‌چربد، چون تنها منبعی است که قضاوتِ آدم پشتش است.
+ *
+ * و چرا نام‌های مدل در فایلِ **مشتق** می‌نشینند نه در `edits`: چون باید با
+ * تازه‌سازی قابلِ بازنویسی باشند. ریختنشان در `edits` یعنی حدسِ یک مدلِ
+ * ارزان همان وزنی را بگیرد که جملهٔ خودِ آدم — دقیقاً همان چیزی که
+ * `TRUST` در `merge.js` برای جلوگیری‌اش نوشته شده.
+ */
+export function writeNames(target, names) {
+  const stored = readJson(derivedFile(target), { version: CAPABILITIES_VERSION, target, nodes: [] });
+  stored.names = { ...(stored.names || {}), ...names };
+  writeJson(derivedFile(target), stored);
+  return stored.names;
+}
+
+/**
  * ثبتِ یک ویرایش. `patch: null` یعنی برگرداندن به حالتِ مشتق‌شده.
  *
  * فیلدهای مجاز محدودند، چون این فایل دستِ کاربر است و نباید بتواند
@@ -524,7 +546,27 @@ export function rebuild(target) {
     nodes.push({ ...old, missing: true });
   }
 
-  const payload = { version: CAPABILITIES_VERSION, target, updatedAt: now, nodes };
+  /**
+   * نام‌های ساخته‌شده از تازه‌سازی جان سالم می‌برند.
+   *
+   * ── چرا این خط لازم است ──
+   *
+   * `rebuild` کلِ فایلِ مشتق را بازنویسی می‌کند، و نام‌ها هم در همان فایل
+   * زندگی می‌کنند. بی این، هر بار که کسی «تازه‌سازی درخت» بزند، کارِ
+   * مدل دور ریخته می‌شود و دفعهٔ بعد دوباره پول می‌گیرد — بی آنکه چیزی
+   * خطا بدهد. نام‌ها فقط کم‌رنگ‌تر برمی‌گردند به `contents` و کسی نمی‌فهمد
+   * چرا.
+   *
+   * شناسه از **معنا** ساخته می‌شود (مسیر و نما)، پس گرهی که هنوز هست،
+   * همان شناسه را دارد و نامش سرِ جایش می‌ماند.
+   */
+  const payload = {
+    version: CAPABILITIES_VERSION,
+    target,
+    updatedAt: now,
+    names: previous.names || {},
+    nodes,
+  };
   writeJson(derivedFile(target), payload);
   return payload;
 }
@@ -542,18 +584,22 @@ export function readCapabilities(target) {
  */
 export function buildTree(target, { counts = {}, includeGone = false } = {}) {
   const edits = readEdits(target);
+  const stored = readCapabilities(target);
+  const names = stored.names || {};
   const NONE = { scenarios: [], runs: 0, findings: 0, openFindings: 0, firstAt: '', lastAt: '' };
 
-  const rows = readCapabilities(target).nodes.map((node) => {
+  const rows = stored.nodes.map((node) => {
     const edit = edits[node.id] || null;
+    const named = names[node.id] || null;
     return {
       ...node,
-      title: edit?.title || node.title,
-      desc: edit?.desc || '',
+      /** مشتق < مدل < کاربر — و هر ردیف می‌گوید کدامش را می‌بینید. */
+      title: edit?.title || named?.title || node.title,
+      desc: edit?.desc || named?.desc || '',
       parent: edit && 'parent' in edit ? edit.parent : node.parent,
       status: edit?.status || 'active',
       /** هر بند می‌گوید از کجا آمده — همان قاعدهٔ پروندهٔ شناخت. */
-      titleBy: edit?.title ? 'user' : 'derived',
+      titleBy: edit?.title ? 'user' : named?.title ? 'model' : 'derived',
       edited: Boolean(edit),
       /**
        * نما عددِ صفحهٔ میزبانش را **نمی‌گیرد**.

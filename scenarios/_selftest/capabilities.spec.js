@@ -258,3 +258,62 @@ test('شمارش از مسیرِ جمع‌شده می‌آید، نه از نم�
   const { flat } = buildTree('demo', { counts });
   expect(flat[0].counts.runs).toBe(4);
 });
+
+test('سه لایهٔ نام: مشتق < مدل < کاربر', async () => {
+  withProject({
+    states: [{ id: 'a', route: '/contents', view: '', title: 'مدیریت فایل‌ها', actions: [] }],
+  });
+  const { rebuild, buildTree, writeNames, setEdit, capabilityId } = await load();
+  rebuild('demo');
+  const id = capabilityId('/contents', '');
+
+  // لایهٔ ۱ — مشتق
+  expect(buildTree('demo').flat[0].titleBy).toBe('derived');
+
+  // لایهٔ ۲ — مدل بر مشتق می‌چربد: «contents» درست است ولی چیزی نمی‌گوید
+  writeNames('demo', { [id]: { title: 'فهرست کتاب‌ها', desc: 'قفسه', by: 'model' } });
+  expect(buildTree('demo').flat[0].title).toBe('فهرست کتاب‌ها');
+  expect(buildTree('demo').flat[0].titleBy).toBe('model');
+
+  // لایهٔ ۳ — کاربر بر مدل می‌چربد، چون تنها منبعی است که قضاوتِ آدم پشتش است
+  setEdit('demo', id, { title: 'کتاب‌های من' });
+  expect(buildTree('demo').flat[0].title).toBe('کتاب‌های من');
+  expect(buildTree('demo').flat[0].titleBy).toBe('user');
+});
+
+test('نامِ مدل از تازه‌سازی جان سالم می‌برد', async () => {
+  withProject({
+    states: [{ id: 'a', route: '/contents', view: '', actions: [] }],
+  });
+  const { rebuild, buildTree, writeNames, capabilityId } = await load();
+  rebuild('demo');
+  writeNames('demo', { [capabilityId('/contents', '')]: { title: 'فهرست کتاب‌ها', by: 'model' } });
+
+  /**
+   * `rebuild` کلِ فایلِ مشتق را بازنویسی می‌کند و نام‌ها هم در همان فایل‌اند.
+   * بی نگه‌داشتنشان، هر «تازه‌سازی درخت» کارِ مدل را دور می‌ریزد و دفعهٔ
+   * بعد دوباره پول می‌گیرد — بی آنکه چیزی خطا بدهد.
+   */
+  rebuild('demo');
+  expect(buildTree('demo').flat[0].title).toBe('فهرست کتاب‌ها');
+});
+
+test('نامی که کاربر گذاشته به مدل داده نمی‌شود', async () => {
+  withProject({
+    states: [
+      { id: 'a', route: '/contents', view: '', actions: [] },
+      { id: 'b', route: '/login', view: '', actions: [] },
+    ],
+  });
+  const { rebuild, setEdit, capabilityId } = await load();
+  rebuild('demo');
+  setEdit('demo', capabilityId('/contents', ''), { title: 'کتاب‌های من' });
+
+  const { pendingNames } = await import(`../../src/knowledge/name-caps.js?t=${Date.now()}${Math.random()}`);
+  /**
+   * نه برای صرفه‌جویی: اگر داده شود، مدل ممکن است «بهترش» کند — و آن
+   * دقیقاً همان بازنویسیِ حرفِ آدم است که کلِ `TRUST` برای جلوگیری‌اش
+   * نوشته شده.
+   */
+  expect(pendingNames('demo').map((one) => one.route)).toEqual(['/login']);
+});

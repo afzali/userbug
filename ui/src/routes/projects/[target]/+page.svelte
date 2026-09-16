@@ -154,6 +154,43 @@
     return payload;
   }
 
+  /**
+   * چند بخش هنوز نامِ خوانا ندارد.
+   *
+   * فقط صفحه‌ها، نه نماها: نمای خزش نامش را از خودِ اپ دارد («افزودن کتاب
+   * جدید») که بهتر از هرچیزی است که مدل بسازد — و رایگان.
+   */
+  let unnamed = $derived(
+    tree.flat.filter((one) => !one.view && !one.shelf && one.titleBy === 'derived').length
+  );
+  let nameNote = $state('');
+
+  /**
+   * نام‌گذاری — و چرا نتیجه‌اش با عدد گزارش می‌شود.
+   *
+   * این تنها دکمهٔ این صفحه است که پول خرج می‌کند. کاربری که بزندش باید
+   * ببیند چه خرید: چند نام ساخته شد، چند تا را مدل نتوانست، و با کدام
+   * مدل. «انجام شد» برای کارِ پولی جوابِ کافی نیست.
+   */
+  async function nameThem(force) {
+    busy = 'name';
+    error = '';
+    nameNote = '';
+    try {
+      const payload = await send({ action: 'name', force });
+      const stats = payload.stats || {};
+      nameNote = stats.pending
+        ? `${formatNumber(stats.named)} نام ساخته شد از ${formatNumber(stats.pending)} بخش` +
+          (stats.skipped ? ` · ${formatNumber(stats.skipped)} را مدل نتوانست` : '') +
+          ` · ${formatNumber(stats.calls)} فراخوانی · ${payload.model || ''}`
+        : 'همه از قبل نام داشتند — هیچ فراخوانی‌ای نشد.';
+    } catch (cause) {
+      error = cause.message;
+    } finally {
+      busy = '';
+    }
+  }
+
   async function refresh() {
     busy = 'rebuild';
     error = '';
@@ -320,7 +357,7 @@
 {#snippet actions()}
   <Button variant="outline" size="sm" href={`${base}/discover`}>کشف</Button>
   <Button variant="outline" size="sm" disabled={!!busy} onclick={refresh}>
-    {busy === 'rebuild' ? 'در حال ساختن…' : 'تازه‌سازی درخت'}
+    {busy === 'rebuild' ? 'در حال ساختن…' : 'تازه‌سازی'}
   </Button>
   <Button size="sm" href={`${base}/run`}>اجرای تازه</Button>
 {/snippet}
@@ -562,9 +599,58 @@
     </div>
   </div>
 
-  <p class="mt-6 text-[11px] leading-6 text-muted-foreground">
-    این درخت از گشت و خزش و سورس ساخته می‌شود، بی یک فراخوانی مدل — پس
-    نام‌ها گاهی خامند. هر نامی که خودتان بگذارید <Badge variant="secondary" class="text-[10px]">by: user</Badge>
-    می‌شود و هیچ تازه‌سازی‌ای عوضش نمی‌کند.
-  </p>
+  <!--
+    نام‌های خوانا — تنها جای این صفحه که پول خرج می‌کند.
+
+    ── چرا این نوار پایین است و نه بالا ──
+
+    درخت بی آن کار می‌کند: ساختار، شمارش، و زاویه‌های آزمون همه رایگان‌اند.
+    گذاشتنش بالای صفحه یعنی اولین چیزی که کاربر می‌بیند یک دکمهٔ پولی
+    باشد — در حالی که شاید اصلاً لازمش نداشته باشد.
+
+    ── و چرا وقتی همه نام دارند ناپدید نمی‌شود ──
+
+    `--force` راهِ اصلاحِ نام‌های بدِ مدل است. دکمه‌ای که بعد از نخستین
+    استفاده ناپدید شود، آن راه را هم می‌بندد.
+  -->
+  <div class="mt-6 rounded-xl border bg-muted/20 p-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="min-w-0 flex-1">
+        <p class="text-xs font-medium">
+          نام‌ها خام‌اند؟
+          {#if unnamed}
+            <span class="text-muted-foreground">
+              ({formatNumber(unnamed)} بخش هنوز نامِ خوانا ندارد)
+            </span>
+          {/if}
+        </p>
+        <p class="text-[11px] leading-5 text-muted-foreground">
+          کلِ درخت — ساختار، شمارش، و زاویه‌های آزمون — بی هیچ فراخوانی مدل
+          ساخته شده. فقط <strong>نام</strong> است که رایگان درنمی‌آید:
+          <code class="font-mono">contents</code> درست است ولی چیزی نمی‌گوید.
+          این دکمه <strong>یک</strong> فراخوانی می‌زند و نتیجه کش می‌شود.
+        </p>
+      </div>
+      <!--
+        ── چرا وقتی همه نام دارند `force` می‌رود ──
+
+        دکمه در آن حالت «دوباره نام‌گذاری کن» می‌گوید، و بی `force` هیچ
+        گرهی نامزد نیست: صفر فراخوانی، و پیامِ «همه از قبل نام داشتند».
+        یعنی دکمه‌ای که دقیقاً وقتی خوانده می‌شود که کاربر از نام‌ها راضی
+        نیست، هیچ کاری نمی‌کند — و او فکر می‌کند خراب است.
+      -->
+      <Button size="sm" variant="outline" disabled={!!busy} onclick={() => nameThem(!unnamed)}>
+        {busy === 'name' ? 'در حال نام‌گذاری…' : unnamed ? 'نام‌های خوانا بساز' : 'دوباره نام‌گذاری کن'}
+      </Button>
+    </div>
+
+    {#if nameNote}<p class="mt-2 text-[11px] text-muted-foreground">{nameNote}</p>{/if}
+
+    <p class="mt-2 border-t pt-2 text-[11px] leading-5 text-muted-foreground">
+      نامی که مدل می‌سازد <Badge variant="outline" class="text-[10px]">by: model</Badge>
+      است و با نام‌گذاریِ دوباره عوض می‌شود. نامی که <strong>خودتان</strong> بگذارید
+      <Badge variant="secondary" class="text-[10px]">by: user</Badge>
+      است و هیچ‌چیز — نه تازه‌سازی، نه مدل — عوضش نمی‌کند.
+    </p>
+  </div>
 {/if}
