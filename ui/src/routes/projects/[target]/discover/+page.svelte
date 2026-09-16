@@ -39,7 +39,19 @@
    * کسی که کارش را بلد است هر بار یک کلیکِ اضافه می‌دهد.
    */
   let how = $state(
-    data.tour.live?.running ? 'tour' : data.found.pages.length ? 'crawl' : 'tour'
+    /**
+     * انتخابِ صریحِ آدرس بر هر پیش‌فرضی می‌چربد.
+     *
+     * کسی که از قدمِ دومِ ساختِ پروژه با «گشت» آمده، نباید همان پرسش را
+     * دوباره ببیند.
+     */
+    ['tour', 'crawl', 'source'].includes(data.how)
+      ? data.how
+      : data.tour.live?.running
+        ? 'tour'
+        : data.found.pages.length
+          ? 'crawl'
+          : 'tour'
   );
 
   const WAYS = [

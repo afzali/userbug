@@ -44,8 +44,17 @@ import { looksRecorded } from '../../../../../../src/scenario/entry.js';
  * چون یک صفحه است. تقسیمش یعنی سه بار خواندنِ همان `readMap` و `listPages`،
  * و سه جا که می‌توانند از هم عقب بیفتند.
  */
-export async function load({ params }) {
-  return build(params.target);
+export async function load({ params, url }) {
+  /**
+   * «کدام راه» از آدرس هم می‌آید.
+   *
+   * ── چرا لازم شد ──
+   *
+   * قدمِ دومِ ساختِ پروژه می‌گوید «حالا سایت را معرفی کن» و کاربر گشت را
+   * انتخاب می‌کند. بی این پارامتر، دکمه او را به همین صفحه می‌آورد و
+   * صفحه دوباره از او می‌پرسد «چطور کشفش کنم؟» — یعنی همان پرسش، دو بار.
+   */
+  return { ...(await build(params.target)), how: String(url.searchParams.get('how') || '') };
 }
 
 async function build(target) {

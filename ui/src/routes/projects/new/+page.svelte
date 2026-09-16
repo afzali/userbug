@@ -3,6 +3,7 @@
   import * as Card from '$lib/components/ui/card/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import { run, startJob } from '$lib/run-store.svelte.js';
   import { latinFromPersianLayout } from '../../../../../src/target-template.js';
 
   /**
@@ -163,21 +164,198 @@
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'پروژه ساخته نشد');
-      location.href = `/projects/${encodeURIComponent(payload.key)}`;
+      /**
+       * ── چرا دیگر مستقیم به پروژه نمی‌رود ──
+       *
+       * تا امروز پروژه ساخته می‌شد و کاربر روی صفحه‌ای رها می‌شد که یک
+       * فرمِ اجرا داشت و یک کارتِ چهارقدمی. یعنی درست در لحظه‌ای که آدم
+       * تازه گفته «این اپِ من است»، ابزار می‌پرسید «کدام سناریو را اجرا
+       * کنم؟» — سناریویی که هنوز وجود ندارد.
+       *
+       * پرسشِ درستِ همان لحظه یکی است: «حالا این سایت را چطور به من
+       * نشان می‌دهی؟» و هر سه جوابش از قبل ساخته شده بود؛ فقط هیچ‌کس در
+       * این لحظه نشانشان نمی‌داد.
+       */
+      created = payload.key;
+      saving = false;
     } catch (cause) {
       error = cause.message;
       saving = false;
     }
   }
+
+  /* ─────────────── قدم ۲: «حالا سایت را معرفی کن» ─────────────── */
+
+  /** کلیدِ پروژهٔ ساخته‌شده؛ رشتهٔ خالی یعنی هنوز در قدمِ یکیم. */
+  let created = $state('');
+  let how = $state('tour');
+  let scope = $state('');
+  /**
+   * خواندنِ سورس پیش‌فرض تیک‌خورده است، چون رایگان است.
+   *
+   * نه مرورگر می‌خواهد نه مدل: مسیرِ فایل، رشتهٔ `case 'GET /x'` و
+   * `UNIQUE(...)` در schema. تنها کاری در این صفحه که هیچ هزینه‌ای ندارد و
+   * هر سه راهِ دیگر را بهتر می‌کند.
+   */
+  let alsoSource = $state(true);
+  let starting = $state('');
+
+  const WAYS = [
+    {
+      key: 'tour',
+      title: 'خودم نشانت می‌دهم',
+      hint: 'مرورگر باز می‌شود و شما مثل یک کاربر کار می‌کنید. هرچه کردید ضبط می‌شود — دقیق‌ترین راه، و کندترین.',
+    },
+    {
+      key: 'crawl',
+      title: 'خودت برو بگرد',
+      hint: 'هر دکمهٔ امنی را می‌زند و می‌نویسد از کجا به کجا می‌رسد. بی هوش مصنوعی.',
+    },
+    {
+      key: 'scoped',
+      title: 'فقط فلان‌جا را بگرد',
+      hint: 'می‌گویید کجا، و همان‌جا را عمیق بررسی می‌کند.',
+    },
+    {
+      key: 'later',
+      title: 'فعلاً هیچ‌کدام',
+      hint: 'مستقیم به پروژه بروید؛ هر سه راه از صفحهٔ «کشف» هم هست.',
+    },
+  ];
+
+  async function introduce() {
+    starting = how;
+    error = '';
+    const base = `/projects/${encodeURIComponent(created)}`;
+
+    try {
+      /**
+       * سورس اول خوانده می‌شود، نه آخر.
+       *
+       * روت‌ها و endpointهایی که از کد درمی‌آیند، به خزش می‌گویند کجاها
+       * هست که هنوز نرسیده — پس همان خزشی که چند ثانیه بعد شروع می‌شود،
+       * با نقشهٔ بهتری شروع می‌کند. بعدش خواندنش همان کار را نمی‌کند.
+       */
+      if (alsoSource && form.sourceRoot.trim()) {
+        await fetch('/api/source', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+          body: JSON.stringify({ target: created }),
+        }).catch(() => null);
+      }
+
+      if (how === 'tour') return void (location.href = `${base}/discover?how=tour`);
+      if (how === 'later') return void (location.href = base);
+
+      /**
+       * خزش و کاوش از همان درِ همیشگی می‌روند.
+       *
+       * `startJob` حالتِ مشترک را هم می‌چیند، پس وقتی صفحهٔ پروژه بالا
+       * می‌آید پلیر از قبل وصل است و کاربر همان لحظه می‌بیند چه می‌شود —
+       * به‌جای صفحه‌ای که انگار هیچ اتفاقی نیفتاده.
+       */
+      const job = await startJob(
+        created,
+        how === 'scoped'
+          ? { kind: 'quest', goal: scope.trim() || 'همه‌جای اپ را بررسی کن' }
+          : { kind: 'map' }
+      );
+      if (!job) throw new Error(run.error || 'شروع نشد');
+      location.href = base;
+    } catch (cause) {
+      error = cause.message;
+      starting = '';
+    }
+  }
 </script>
 
+<!--
+  دو قدم، و عنوان هر دو را می‌گوید.
+
+  ── چرا شمارهٔ قدم دیده می‌شود ──
+
+  کاربری که «ساخت پروژه» می‌زند انتظار دارد کار تمام شده باشد. صفحه‌ای که
+  بی مقدمه پرسشِ تازه‌ای بپرسد، شبیهِ خطاست. «قدم ۲ از ۲» می‌گوید این
+  ادامهٔ همان کار است و آخرش هم همین‌جاست.
+-->
 <PageHeader
-  eyebrow="پروژهٔ تازه"
-  title="یک پروژه تعریف کنید"
-  description="خروجی یک فایل در targets/ است که پیش از ذخیره در زیرپروسه اعتبارسنجی می‌شود. موارد پیشرفته کامنتِ همان فایل‌اند و بعداً از ویرایشگر اضافه می‌شوند."
+  eyebrow={created ? 'قدم ۲ از ۲' : 'قدم ۱ از ۲ · پروژهٔ تازه'}
+  title={created ? 'حالا سایت را معرفی کنیم' : 'یک پروژه تعریف کنید'}
+  description={created
+    ? `پروژهٔ «${created}» ساخته شد. برای اینکه ابزار بداند این اپ چه دارد، یک بار باید دیده شودش — سه راه دارد و هر سه بعداً هم در دسترس‌اند.`
+    : 'خروجی یک فایل در targets/ است که پیش از ذخیره در زیرپروسه اعتبارسنجی می‌شود. موارد پیشرفته کامنتِ همان فایل‌اند و بعداً از ویرایشگر اضافه می‌شوند.'}
 >
   {#snippet actions()}<Button href="/" variant="outline">فهرست پروژه‌ها</Button>{/snippet}
 </PageHeader>
+
+{#if created}
+  <!--
+    ── چرا این صفحه لازم بود ──
+
+    هر سه راهِ زیر از قبل ساخته شده بودند و هیچ‌کدام در **این لحظه** نشان
+    داده نمی‌شدند. کاربر پروژه می‌ساخت و روی صفحه‌ای رها می‌شد که می‌پرسید
+    «کدام سناریو را اجرا کنم؟» — سناریویی که هنوز وجود نداشت.
+
+    قابلیتی که در لحظهٔ درستش دیده نشود، عملاً وجود ندارد.
+  -->
+  <Card.Root class="mx-auto max-w-3xl">
+    <Card.Content class="space-y-4 pt-6">
+      {#each WAYS as way (way.key)}
+        <label
+          class="flex items-start gap-2.5 rounded-lg border p-3 text-sm {how === way.key
+            ? 'border-primary bg-accent/40'
+            : ''}"
+        >
+          <input type="radio" bind:group={how} value={way.key} class="mt-1" disabled={Boolean(starting)} />
+          <span class="min-w-0">
+            <strong>{way.title}</strong>
+            <span class="block text-xs leading-6 text-muted-foreground">{way.hint}</span>
+            {#if way.key === 'scoped' && how === 'scoped'}
+              <Input
+                bind:value={scope}
+                class="mt-2 h-9"
+                placeholder="مثلاً: برو در تنظیمات و همهٔ گزینه‌هایش را امتحان کن"
+                disabled={Boolean(starting)}
+              />
+            {/if}
+          </span>
+        </label>
+      {/each}
+
+      {#if form.sourceRoot.trim()}
+        <!--
+          سورس گزینهٔ چهارم نیست، **همراهِ** هر سه‌تاست.
+
+          چون با آن‌ها رقابت نمی‌کند: نه مرورگر می‌خواهد نه مدل، و روت‌هایی
+          که از کد درمی‌آورد به خزشی که چند ثانیه بعد شروع می‌شود می‌گویند
+          کجاها هست که هنوز نرسیده.
+        -->
+        <label class="flex items-start gap-2.5 rounded-lg border border-dashed p-3 text-sm">
+          <input type="checkbox" bind:checked={alsoSource} class="mt-1" disabled={Boolean(starting)} />
+          <span>
+            <strong>سورس را هم بخوان</strong>
+            <span class="block text-xs leading-6 text-muted-foreground">
+              رایگان — نه مرورگر می‌خواهد نه مدل. روت، endpoint و قاعده‌های
+              schema از <code dir="ltr" class="font-mono">{form.sourceRoot}</code> خوانده می‌شوند و
+              به کشفِ بالا کمک می‌کنند.
+            </span>
+          </span>
+        </label>
+      {/if}
+
+      {#if error}<p class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>{/if}
+
+      <div class="flex justify-end gap-2 border-t pt-4">
+        <Button href={`/projects/${encodeURIComponent(created)}`} variant="ghost" disabled={Boolean(starting)}>
+          بعداً
+        </Button>
+        <Button onclick={introduce} disabled={Boolean(starting)}>
+          {starting ? 'در حال شروع…' : how === 'later' ? 'برویم سراغ پروژه' : 'شروع'}
+        </Button>
+      </div>
+    </Card.Content>
+  </Card.Root>
+{:else}
 
 <Card.Root class="mx-auto max-w-3xl">
   <Card.Content class="space-y-5 pt-6">
@@ -307,3 +485,4 @@
     </div>
   </Card.Content>
 </Card.Root>
+{/if}

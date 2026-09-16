@@ -23,7 +23,7 @@
   import CapabilityTree from '$lib/components/CapabilityTree.svelte';
   import CapabilityPanel from '$lib/components/CapabilityPanel.svelte';
   import { formatNumber } from '$lib/format.js';
-  import { run, startJob } from '$lib/run-store.svelte.js';
+  import { onFinished, run, startJob } from '$lib/run-store.svelte.js';
 
   let { data } = $props();
 
@@ -210,17 +210,109 @@
   /**
    * سناریوهای همهٔ گره‌های انتخاب‌شده، بی تکرار.
    *
-   * این جنینِ «دورِ بررسی» است: امروز فقط سناریوهای موجود را می‌گیرد،
-   * و در گامِ بعد یک موجودیتِ نام‌دار می‌شود که خزش و کاوش را هم زیرِ
-   * یک اسم می‌برد.
+   * ── چرا از درخت و نه از فهرستِ فایل‌ها ──
+   *
+   * تا امروز انتخابِ سناریو بر اساسِ **فایل** بود: تیکِ چند نام از یک
+   * فهرستِ الفبایی. ولی چیزی که آدم در ذهن دارد بخشی از اپ است، نه
+   * فایل — «کتاب‌ها را بررسی کن». این خط همان ترجمه است.
    */
   let pickedScenarios = $derived([
     ...new Set(
-      tree.flat
-        .filter((one) => picked.has(one.id))
-        .flatMap((one) => one.counts.scenarios || [])
+      picked.size
+        ? tree.flat.filter((one) => picked.has(one.id)).flatMap((one) => one.counts.scenarios || [])
+        : /** دامنهٔ خالی یعنی کلِ اپ — پس همهٔ سناریوهای شناخته‌شده. */
+          tree.flat.flatMap((one) => one.counts.scenarios || [])
     ),
   ]);
+
+  /* ─────────────────── دورِ بررسی — دکمهٔ مادر ─────────────────── */
+
+  let roundOpen = $state(false);
+  let roundName = $state('');
+  let roundNote = $state('');
+  let roundScenarios = $state(true);
+  let roundCrawl = $state(false);
+
+  /**
+   * یک دور: نامش ثبت می‌شود، بعد کارهایش پشتِ سرِ هم می‌روند.
+   *
+   * ── چرا اول ثبت و بعد اجرا ──
+   *
+   * دامنه و توضیح در `run.json` نیستند و هیچ‌جای دیگری هم نمی‌روند. اگر
+   * بعد از اجرا ثبت شوند، اجرایی که وسطِ راه بشکند دوری بی‌دامنه به‌جا
+   * می‌گذارد — و همان دور است که بعداً باید بگوید «قرار بود کجا را ببینم».
+   *
+   * ── چرا پشتِ سرِ هم و نه با هم ──
+   *
+   * لایهٔ کار عمداً فقط یک اجرای هم‌زمان می‌پذیرد: هر دو مرورگر باز
+   * می‌کنند. پس دومی به پایانِ اولی گره می‌خورد، نه به یک `Promise.all` که
+   * بی‌صدا `JOB_ACTIVE` می‌گیرد.
+   */
+  async function startRound() {
+    const name = roundName.trim();
+    busy = 'round';
+    error = '';
+
+    try {
+      const response = await fetch('/api/rounds', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({ target, name, note: roundNote, scope: [...picked] }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'دور ثبت نشد');
+
+      /** ترتیب عمدی: سناریوها سریع‌ترند، پس نتیجه‌شان زودتر دیده می‌شود. */
+      const queue = [];
+      if (roundScenarios && pickedScenarios.length) {
+        queue.push({ kind: 'run', only: pickedScenarios, bench: name });
+      }
+      if (roundCrawl) {
+        queue.push({
+          kind: 'map',
+          bench: name,
+          /**
+           * دامنهٔ خزش از خودِ انتخاب می‌آید.
+           *
+           * `--scope` مسیر می‌خواهد نه شناسه، و مسیرهای تکراری (ده نما روی
+           * یک صفحه) باید یکی شوند — وگرنه یک رشتهٔ بلندِ تکراری ساخته
+           * می‌شود که خودِ خزنده باید دوباره تمیزش کند.
+           */
+          scope: picked.size
+            ? [...new Set(tree.flat.filter((one) => picked.has(one.id)).map((one) => one.route))].join(',')
+            : '',
+        });
+      }
+
+      if (!queue.length) throw new Error('هیچ کاری برای این دور انتخاب نشده');
+
+      const first = await startJob(target, queue[0]);
+      if (!first) throw new Error(run.error || 'شروع نشد');
+
+      /**
+       * کارِ دوم منتظرِ پایانِ اولی می‌ماند.
+       *
+       * `onFinished` همان‌جایی است که پلیر هم از آن می‌خواند، پس اگر کاربر
+       * وسطِ کار لغو کند، این هم صدا زده می‌شود — و لغو یعنی لغو، پس دومی
+       * شروع نمی‌شود.
+       */
+      if (queue[1]) {
+        const stop = onFinished((job) => {
+          stop();
+          if (job?.status === 'cancelled') return;
+          startJob(target, queue[1]);
+        });
+      }
+
+      roundOpen = false;
+      roundName = '';
+      roundNote = '';
+    } catch (cause) {
+      error = cause.message;
+    } finally {
+      busy = '';
+    }
+  }
 </script>
 
 <svelte:head><title>اپِ من — {data.project?.name || target}</title></svelte:head>
@@ -348,24 +440,102 @@
         هیچ صفحه‌ای نمی‌کرد: فهرستِ اجرا بر اساسِ **فایلِ سناریو** بود، نه
         بر اساسِ بخشی از اپ که می‌خواهی بررسی کنی.
       -->
-      {#if picked.size}
-        <div class="sticky bottom-4 mt-3 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 shadow-lg">
-          <span class="text-sm font-medium">{formatNumber(picked.size)} قابلیت انتخاب شده</span>
-          <span class="text-[11px] text-muted-foreground">
-            {pickedScenarios.length
-              ? `${formatNumber(pickedScenarios.length)} سناریو رویشان`
-              : 'هیچ سناریویی رویشان نیست'}
-          </span>
-          <div class="ms-auto flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              disabled={!!busy || !pickedScenarios.length}
-              onclick={() => runScenarios(pickedScenarios)}
-            >
-              {busy === 'run' ? 'شروع…' : 'همین‌ها را بگیر'}
-            </Button>
-            <Button size="sm" variant="ghost" onclick={() => { picked = new Set(); }}>برداشتنِ تیک‌ها</Button>
+      {#if picked.size || roundOpen}
+        <div class="sticky bottom-4 mt-3 rounded-xl border bg-card p-3 shadow-lg">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-sm font-medium">
+              {picked.size ? `${formatNumber(picked.size)} قابلیت انتخاب شده` : 'کلِ اپ'}
+            </span>
+            <span class="text-[11px] text-muted-foreground">
+              {pickedScenarios.length
+                ? `${formatNumber(pickedScenarios.length)} سناریو رویشان`
+                : picked.size
+                  ? 'هیچ سناریویی رویشان نیست'
+                  : ''}
+            </span>
+            <div class="ms-auto flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant={roundOpen ? 'secondary' : 'default'}
+                disabled={!!busy}
+                onclick={() => { roundOpen = !roundOpen; }}
+              >
+                دورِ تازه
+              </Button>
+              {#if pickedScenarios.length}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!!busy}
+                  onclick={() => runScenarios(pickedScenarios)}
+                >
+                  {busy === 'run' ? 'شروع…' : 'فقط سناریوها را بگیر'}
+                </Button>
+              {/if}
+              {#if picked.size}
+                <Button size="sm" variant="ghost" onclick={() => { picked = new Set(); }}>برداشتنِ تیک‌ها</Button>
+              {/if}
+            </div>
           </div>
+
+          <!--
+            دکمهٔ مادر.
+
+            ── چرا اسم و روش می‌پرسد، و نه فقط «بزن» ──
+
+            دوری که اسم نداشته باشد، همان `bench`ِ خالیِ دیروز است: یک اجرای
+            دیگر در فهرست که هفتهٔ بعد از بقیه جدا نمی‌شود. و انتخابِ روش،
+            چون کاری که آدم می‌خواهد معمولاً ترکیبی است — «سناریوها را بگیر
+            **و** دوباره بگرد ببین چیزی تازه هست».
+          -->
+          {#if roundOpen}
+            <div class="mt-3 space-y-2 border-t pt-3">
+              <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <Input bind:value={roundName} class="h-9" maxlength="60" placeholder="اسمِ این دور — مثلاً: پیش از انتشار ۴.۲" />
+                <Input bind:value={roundNote} class="h-9" maxlength="300" placeholder="چرا این دور؟ (اختیاری)" />
+              </div>
+
+              <div class="flex flex-wrap gap-3 text-xs">
+                <label class="flex items-center gap-1.5">
+                  <input type="checkbox" bind:checked={roundScenarios} disabled={!pickedScenarios.length && picked.size > 0} />
+                  سناریوها را بگیر
+                  {#if picked.size}({formatNumber(pickedScenarios.length)}){/if}
+                </label>
+                <label class="flex items-center gap-1.5">
+                  <input type="checkbox" bind:checked={roundCrawl} />
+                  دوباره بگرد، ببین چیزی تازه هست
+                </label>
+              </div>
+
+              <!--
+                ── چرا این جمله اینجاست ──
+
+                کارها **پشتِ سر هم** اجرا می‌شوند، نه با هم: هر دو مرورگر باز
+                می‌کنند و لایهٔ کار عمداً فقط یک اجرای هم‌زمان می‌پذیرد. کاربری
+                که هر دو را تیک بزند و ببیند فقط یکی شروع شد، فکر می‌کند خراب
+                است.
+              -->
+              <p class="text-[11px] leading-5 text-muted-foreground">
+                {#if roundScenarios && roundCrawl}
+                  اول سناریوها، بعد خزش — پشتِ سرِ هم، چون هر دو مرورگر باز می‌کنند.
+                  دومی وقتی اولی تمام شد خودش شروع می‌شود.
+                {:else}
+                  هر دو زیرِ همین اسم ثبت می‌شوند و در «دورها» و در تریاژ کنارِ هر یافته دیده می‌شوند.
+                {/if}
+              </p>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  disabled={!!busy || !roundName.trim() || (!roundScenarios && !roundCrawl)}
+                  onclick={startRound}
+                >
+                  {busy === 'round' ? 'در حال شروع…' : 'شروعِ دور'}
+                </Button>
+                <Button size="sm" variant="ghost" href={`${base}/rounds`}>دورهای قبلی</Button>
+              </div>
+            </div>
+          {/if}
         </div>
       {/if}
     </section>

@@ -138,6 +138,8 @@ export class TourSession extends EventEmitter {
       device: this.deviceName || target.device,
       isolation: 'tour',
       kind: 'tour',
+      /** گشت هم می‌تواند بخشی از یک دور باشد — همان دلیلِ `map/session.js`. */
+      bench: process.env.UB_BENCH || '',
     });
 
     /**

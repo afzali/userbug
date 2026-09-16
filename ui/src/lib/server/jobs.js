@@ -560,6 +560,17 @@ export async function startJob(rawOptions = {}) {
   }
 
   const args = [path.join(ROOT, 'bin', 'userbug.js'), options.kind, target];
+  /**
+   * نامِ دور به **هر سه** نوعِ کار می‌چسبد، نه فقط به اجرای سناریو.
+   *
+   * ── چرا این تغییر لازمهٔ «دورِ بررسی» بود ──
+   *
+   * دوری که آدم واقعاً می‌خواهد معمولاً ترکیبی است: «سناریوها را بگیر و
+   * دوباره بخز ببین چیزی تازه هست». تا امروز `--bench` فقط زیرِ شاخهٔ
+   * `run` ساخته می‌شد، پس نیمِ هر دور بی‌نام ثبت می‌شد و بعداً هیچ‌کس
+   * نمی‌توانست بپرسد «در دورِ پیش از انتشار چه پیدا شد».
+   */
+  if (options.bench) args.push('--bench', options.bench);
   if (options.kind === 'map') {
     if (options.from) args.push('--from', options.from);
     if (options.seed) args.push('--seed', options.seed);
@@ -582,7 +593,6 @@ export async function startJob(rawOptions = {}) {
     // `--only` بر `--grep` مقدم است: تیکِ صریحِ کاربر از الگو روشن‌تر است
     const selection = benchGrep(options.only) || options.grep;
     if (selection) args.push('--grep', selection);
-    if (options.bench) args.push('--bench', options.bench);
     if (options.device) args.push('--device', options.device);
     if (options.persona) args.push('--persona', options.persona);
     if (options.depth) args.push('--depth', String(options.depth));

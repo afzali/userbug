@@ -158,6 +158,12 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
                                   «این دیگر نیست» — تصمیمِ آدم، نه حدسِ ابزار
       --reset <شناسه>             برگشت به آنچه استخراج می‌گوید
 
+  userbug rounds <هدف>            دورهای بررسی: هر بار زیر یک اسم، با تفاوتش
+      --add <نام> [--note <چرا>] [--scope <شناسه>,…]
+                                  ثبتِ قصدِ یک دور، پیش از اجرا
+      --remove <نام>              حذفِ توضیح و دامنه (اجراها می‌مانند)
+      --json                      خام، برای ابزارهای دیگر
+
   userbug checks <هدف>            چکِ همگانی: حالت، برخورد، و سروصدا
       --off <شناسه> --why <متن>   خاموش کردن؛ دلیل اجباری است
       --watch <شناسه>             یافته ثبت کن، ولی نشکن (پیش‌فرض)
@@ -1319,6 +1325,96 @@ async function cmdCapabilities({ flags, positional }) {
 }
 
 /**
+ * دورهای بررسی.
+ *
+ * ── چرا خط فرمان هم لازمش دارد ──
+ *
+ * قاعدهٔ مخزن یکی است: هیچ کاری فقط-رابطی نیست. ولی اینجا یک دلیلِ عملی هم
+ * هست — زمان‌بندیِ شبانه از خط فرمان می‌رود و `--bench` می‌دهد. بی این
+ * فرمان، دوری که هر شب ساخته می‌شود هیچ‌وقت دامنه و توضیح نمی‌گیرد.
+ */
+async function cmdRounds({ flags, positional }) {
+  const target = positional[0];
+  if (!target) throw new Error('نام هدف لازم است: userbug rounds <هدف>');
+
+  const [rounds, artifacts] = await Promise.all([
+    import('../src/runs/rounds.js'),
+    import('../src/knowledge/store.js'),
+  ]);
+  artifacts.assertKnowledgeKey(target);
+
+  if (flags.remove) {
+    rounds.removeRound(target, flags.remove === true ? '' : flags.remove);
+    console.log(`\n  توضیح و دامنهٔ «${flags.remove}» حذف شد. اجراهایش سرِ جایشان‌اند.\n`);
+    return;
+  }
+
+  if (flags.add) {
+    const saved = rounds.saveRound(target, flags.add === true ? '' : flags.add, {
+      note: flags.note === true ? '' : flags.note || '',
+      scope: String(flags.scope === true ? '' : flags.scope || '')
+        .split(',')
+        .map((one) => one.trim())
+        .filter(Boolean),
+    });
+    console.log(`\n  دورِ «${saved.name}» ثبت شد.`);
+    console.log(`  حالا اجراهایش را با --bench "${saved.name}" بگیرید.\n`);
+    return;
+  }
+
+  /**
+   * خواندنِ اجراها بی لایهٔ رابط.
+   *
+   * `listRuns` در `ui/` است و خط فرمان نباید به رابط وابسته شود. پس همان
+   * کارِ کوچک اینجا تکرار می‌شود: خواندنِ `run.json`ها. تکرارِ پنج خط بهتر
+   * از وابستگیِ وارونه است.
+   */
+  const { runDir } = await import('../src/store/run-store.js');
+  const runsRoot = path.dirname(runDir('x'));
+  const list = [];
+  if (fs.existsSync(runsRoot)) {
+    for (const entry of fs.readdirSync(runsRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      try {
+        const meta = JSON.parse(fs.readFileSync(path.join(runsRoot, entry.name, 'run.json'), 'utf8'));
+        if (meta?.target === target) list.push({ ...meta, runId: entry.name });
+      } catch {
+        // اجرایی که وسطِ نوشتن است یا خراب شده
+      }
+    }
+  }
+  list.sort((a, b) => String(b.startedAt || '').localeCompare(String(a.startedAt || '')));
+
+  const grouped = rounds.groupRounds(list, rounds.readRounds(target));
+
+  if (flags.json) {
+    console.log(JSON.stringify(grouped, null, 2));
+    return;
+  }
+
+  if (!grouped.length) {
+    console.log(`\n  هنوز هیچ اجرایی برای «${target}» نبوده.\n`);
+    return;
+  }
+
+  console.log(`\n  دورهای ${target}\n  ` + '-'.repeat(52));
+  for (const round of grouped) {
+    const kinds = Object.entries(round.kinds)
+      .map(([kind, count]) => (count > 1 ? `${kind}×${count}` : kind))
+      .join(' + ');
+    console.log(`\n  ${round.name || '(بی‌نام)'}`);
+    if (round.note) console.log(`    ${round.note}`);
+    console.log(
+      `    ${String(round.finishedAt || '').slice(0, 16).replace('T', ' ')}  ·  ` +
+        `${round.runs.length} اجرا${kinds ? ` (${kinds})` : ''}  ·  ${round.findings} یافته`
+    );
+    if (round.scope?.length) console.log(`    دامنه: ${round.scope.length} قابلیت`);
+    else if (round.name) console.log('    دامنه: کلِ اپ');
+  }
+  console.log('');
+}
+
+/**
  * بسته‌بندی و بازگرداندنِ یک پروژه.
  *
  * ── چرا این فرمان لازم شد ──
@@ -1612,6 +1708,15 @@ async function cmdQuest({ flags, positional }) {
 
   const runId = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '_' + target + '_quest';
   const env = { ...process.env, UB_TARGET: target, UB_RUN_ID: runId, UB_AUTHOR: '1', UB_RUN_KIND: 'quest' };
+  /**
+   * کاوش هم می‌تواند بخشی از یک «دور» باشد.
+   *
+   * تا امروز `--bench` فقط به `run` می‌چسبید، پس دوری که هم سناریو می‌گرفت
+   * هم جایی را می‌کاوید، نیمه‌اش بی‌نام می‌ماند و در فهرست از کاوشِ هفتهٔ
+   * پیش جدا نمی‌شد.
+   */
+  const questBench = normalizeBench(flags.bench === true ? '' : flags.bench);
+  if (questBench) env.UB_BENCH = questBench;
   if (depth) env.UB_DEPTH = String(depth);
   if (flags.model && flags.model !== true) env.UB_MODEL = assertModelSlug(flags.model);
 
@@ -2158,6 +2263,16 @@ async function cmdMap({ flags, positional }) {
     seedLabel = path.relative(ROOT, file).split(path.sep).join('/');
   }
 
+  /**
+   * نامِ دور، از راهِ محیط — همان مسیری که `global-setup.js` هم می‌رود.
+   *
+   * `MapSession` در همین پروسه اجرا می‌شود، پس گذاشتنش روی `process.env`
+   * کافی است. دو راهِ متفاوت برای یک چیز (پرچمِ سازنده و متغیرِ محیط) یعنی
+   * روزی یکی‌شان از قلم بیفتد و خزشی بی‌نام ثبت شود.
+   */
+  const mapBench = normalizeBench(flags.bench === true ? '' : flags.bench);
+  if (mapBench) process.env.UB_BENCH = mapBench;
+
   const { MapSession } = await import('../src/map/session.js');
   const session = new MapSession({
     target,
@@ -2624,6 +2739,9 @@ try {
       break;
     case 'capabilities':
       await cmdCapabilities(parsed);
+      break;
+    case 'rounds':
+      await cmdRounds(parsed);
       break;
     case 'bundle':
       await cmdBundle(parsed);
