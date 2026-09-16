@@ -7,7 +7,6 @@
   import { Input } from '$lib/components/ui/input/index.js';
   import ModelPicker from '$lib/components/ModelPicker.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
-  import CommandBar from '$lib/components/CommandBar.svelte';
   import Onboarding from '$lib/components/Onboarding.svelte';
   import RunCard from '$lib/components/RunCard.svelte';
   import { formatNumber } from '$lib/format.js';
@@ -337,7 +336,6 @@
   نوارِ پیشرفتِ زیرش وضعیت را می‌گوید («۲۷٪ · ۱۱ پیشنهاد») و آن تابلوی
   وضعیت است نه قدمِ بعد. این یکی قدمِ بعد را می‌گیرد و می‌زند.
 -->
-<CommandBar {target} busy={busy || run.submitting} onRun={startJob} />
 
 <!--
   نوارِ پنج‌قدمی از اینجا رفت — به منو.

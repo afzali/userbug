@@ -269,6 +269,29 @@ export async function aggregateTriage(target) {
     return list;
   };
 
+  /**
+   * «کجا دیده شد» — مکان، در کنارِ زمان و تکرار.
+   *
+   * ── چرا تا امروز گم می‌شد ──
+   *
+   * هر یافته از لحظهٔ ثبت `route` دارد (`fixtures.js`، `checks/contract.js`،
+   * `checks/run.js`)، ولی این حلقهٔ ادغام کپی‌اش نمی‌کرد. پس تریاژ می‌دانست
+   * یک نقص **چند بار** و **در کدام بنچ** دیده شده، و نمی‌دانست **کجا** —
+   * و «چه ایرادهایی در بخشِ کتاب هست» بی‌جواب می‌ماند.
+   *
+   * ── چرا فهرست و نه یک رشته ──
+   *
+   * `route` جزئی از خودِ fingerprint است، پس معمولاً یکی بیشتر نیست. ولی
+   * `checks/invariant.js` عمداً `route: ''` می‌گذارد (ناوردا به صفحه گره
+   * نخورده) و هیچ قاعده‌ای تضمین نمی‌کند این برای همیشه بماند. همان الگوی
+   * `devices` و `benches`: جمع کن، تا روزی که واگرا شد، دروغ نگوید.
+   */
+  const addRoute = (list, finding) => {
+    const route = String(finding.route || '').trim();
+    if (route && !list.includes(route)) list.push(route);
+    return list;
+  };
+
   for (const run of [...runs].reverse()) {
     const detail = await readRunDetails(run.runId);
     for (const finding of detail.findings) {
@@ -279,6 +302,7 @@ export async function aggregateTriage(target) {
         seen.lastSeen = run.startedAt;
         seen.latest = finding;
         addBench(seen.benches, run);
+        addRoute(seen.routes, finding);
         for (const device of devicesOf(finding, run)) {
           if (!seen.devices.includes(device)) seen.devices.push(device);
         }
@@ -294,6 +318,7 @@ export async function aggregateTriage(target) {
           count: finding.count || 1,
           runs: [run.runId],
           benches: addBench([], run),
+          routes: addRoute([], finding),
           firstSeen: run.startedAt,
           lastSeen: run.startedAt,
           latest: finding,

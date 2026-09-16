@@ -5,7 +5,8 @@
   import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button/index.js';
   import RunPlayer from '$lib/components/RunPlayer.svelte';
-  import { attach, close } from '$lib/run-store.svelte.js';
+  import CommandBar from '$lib/components/CommandBar.svelte';
+  import { attach, close, run, startJob, ACTIVE } from '$lib/run-store.svelte.js';
 
   let { children } = $props();
   let dark = $state(false);
@@ -363,8 +364,32 @@
   </aside>
 
   <div class="min-w-0">
-    <header class="sticky top-0 z-10 hidden h-14 items-center justify-end border-b bg-background/85 px-6 backdrop-blur lg:flex">
-      <span class="flex items-center gap-2 text-xs text-muted-foreground"><span class="size-2 rounded-full bg-emerald-500"></span> آمادهٔ اجرای محلی</span>
+    <!--
+      هدر، حالا نوارِ فرمان است.
+
+      ── چرا ──
+
+      پیش‌تر یک خطِ «آمادهٔ اجرای محلی» بود: درست، ولی بی‌کار. و نوارِ فرمان
+      — تنها جایی که می‌شود به زبانِ خود گفت چه می‌خواهی — فقط روی صفحهٔ خانه
+      بود. یعنی وسطِ تریاژ، دقیقاً همان‌جا که می‌فهمی باید دوباره چیزی را
+      بیازمایی، باید برمی‌گشتی خانه.
+
+      همان استدلالی که پلیر و عددهای منو را جابه‌جا کرد: چیزی که همیشه لازم
+      است، مالِ یک صفحه نیست.
+
+      بیرون از پروژه نوار معنا ندارد (فرمان به **کدام** هدف؟)، پس همان
+      نشانگرِ قبلی سرِ جایش برمی‌گردد.
+    -->
+    <header class="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/85 px-4 backdrop-blur lg:px-6">
+      {#if inProject}
+        <CommandBar
+          {target}
+          busy={run.submitting || ACTIVE.has(run.job?.status)}
+          onRun={(job) => startJob(target, job)}
+        />
+      {:else}
+        <span class="ms-auto flex items-center gap-2 text-xs text-muted-foreground"><span class="size-2 rounded-full bg-emerald-500"></span> آمادهٔ اجرای محلی</span>
+      {/if}
     </header>
     <main class="surface-grid min-h-[calc(100vh-3.5rem)] p-4 sm:p-6 lg:p-8">
       <!--

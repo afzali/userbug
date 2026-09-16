@@ -146,6 +146,18 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --force                     طبقه‌بندیِ دوباره، حتی اگر مهرها بخورند
       --model <اسلاگ>             مدلِ طبقه‌بندی؛ بر تنظیمات می‌چربد
 
+  userbug capabilities <هدف>      این اپ چه بخش‌ها و قابلیت‌هایی دارد — درختی
+                                  از گشت و خزش و سورس، بی یک فراخوانی مدل
+      --rebuild                   از نو بساز (پیش‌فرض: درختِ ذخیره‌شده)
+      --all                       آنچه «حذف شده» زده‌اید را هم نشان بده
+      --json                      خامِ درخت، برای ابزارهای دیگر
+      --set <شناسه> --title <نام> [--desc <متن>]
+                                  نام و توضیحِ خودت؛ by: user، و هیچ
+                                  استخراجی بعداً نمی‌بردش
+      --set <شناسه> --status <active|gone|ignored>
+                                  «این دیگر نیست» — تصمیمِ آدم، نه حدسِ ابزار
+      --reset <شناسه>             برگشت به آنچه استخراج می‌گوید
+
   userbug checks <هدف>            چکِ همگانی: حالت، برخورد، و سروصدا
       --off <شناسه> --why <متن>   خاموش کردن؛ دلیل اجباری است
       --watch <شناسه>             یافته ثبت کن، ولی نشکن (پیش‌فرض)
@@ -1192,6 +1204,118 @@ async function cmdCoverage({ flags, positional }) {
   }
 
   if (flags.verbose) console.log('  آشکارسازها: ' + JSON.stringify(byDetector) + '\n');
+}
+
+/**
+ * «این اپ چه بخش‌ها و قابلیت‌هایی دارد؟»
+ *
+ * ── چرا این فرمان، وقتی صفحهٔ رابط هم هست ──
+ *
+ * قاعدهٔ این مخزن: هر کاری که رابط می‌کند باید از خط فرمان هم بشود. ولی
+ * اینجا یک دلیلِ دوم هم هست — درخت **مشتق** است، و چیزی که مشتق است باید
+ * بشود بی باز کردنِ مرورگر از نو ساختش و دید چه درآمد. اولین بارِ اجرای
+ * همین فرمان روی نپی، چهار ایراد را نشان داد که هیچ‌کدام خطا نمی‌دادند.
+ */
+async function cmdCapabilities({ flags, positional }) {
+  const target = positional[0];
+  if (!target) throw new Error('نام هدف لازم است: userbug capabilities <هدف>');
+
+  const [caps, touch, { runDir }, artifacts] = await Promise.all([
+    import('../src/knowledge/capabilities.js'),
+    import('../src/runs/touch.js'),
+    import('../src/store/run-store.js'),
+    import('../src/knowledge/store.js'),
+  ]);
+  artifacts.assertKnowledgeKey(target);
+
+  /* ── ویرایش‌ها: نام، توضیح، وضعیت ── */
+  if (flags.reset) {
+    caps.setEdit(target, flags.reset, null);
+    console.log(`\n  «${flags.reset}» به آنچه استخراج می‌گوید برگشت.\n`);
+    return;
+  }
+
+  if (flags.set) {
+    const patch = {};
+    if (flags.title !== undefined) patch.title = flags.title;
+    if (flags.desc !== undefined) patch.desc = flags.desc;
+    if (flags.status !== undefined) patch.status = flags.status;
+    if (!Object.keys(patch).length) throw new Error('یکی از --title، --desc یا --status لازم است');
+    caps.setEdit(target, flags.set, patch);
+    console.log(`\n  ثبت شد — by: user. هیچ استخراجی بعداً عوضش نمی‌کند.\n`);
+    return;
+  }
+
+  /**
+   * خطِ فرمان پیش‌فرضْ از نو نمی‌سازد.
+   *
+   * برعکسِ `coverage` — و عمدی: آنجا اسکنِ سورس ارزان است و جواب باید تازه
+   * باشد. اینجا ساختنِ دوباره، `map.json` و همهٔ صفحه‌ها را می‌خواند و
+   * فایل می‌نویسد. کسی که فقط می‌خواهد **ببیند**، نباید بنویسد.
+   */
+  if (flags.rebuild) caps.rebuild(target);
+
+  const index = touch.refreshTouch(target, path.dirname(runDir('x')));
+  const tree = caps.buildTree(target, {
+    counts: touch.countsByRoute(index, []),
+    includeGone: Boolean(flags.all),
+  });
+
+  if (flags.json) {
+    console.log(JSON.stringify(tree.roots, null, 2));
+    return;
+  }
+
+  if (!tree.flat.length) {
+    console.log(
+      `\n  هنوز چیزی کشف نشده.\n` +
+        `  یک گشت (userbug tour ${target}) یا خزش (userbug map ${target}) لازم است،\n` +
+        `  بعد «userbug capabilities ${target} --rebuild».\n`
+    );
+    return;
+  }
+
+  console.log(`\n  قابلیت‌های ${target}\n  ` + '-'.repeat(52));
+
+  const show = (list, depth = 0) => {
+    for (const node of list) {
+      const pad = '  '.repeat(depth + 1);
+      const mark = node.view ? '·' : '▸';
+      const where = node.view ? `${node.route} ▸ ${node.view}` : node.route;
+
+      /**
+       * نما و صفحه دو جنسِ متفاوتِ عدد دارند و قاطی کردنشان همان سبزِ
+       * دروغینی است که `buildTree` جلویش را می‌گیرد: رخدادِ اجرا نما را
+       * نمی‌شناسد، پس دربارهٔ یک مودال فقط می‌شود گفت خزش چند کنشش را
+       * امتحان کرده.
+       */
+      const numbers = node.view
+        ? node.actions
+          ? `${node.tried}/${node.actions} کنش امتحان شد`
+          : '—'
+        : `${node.counts.scenarios.length} سناریو · ${node.counts.runs} اجرا` +
+          (node.counts.openFindings ? ` · ${node.counts.openFindings} ایرادِ باز` : '');
+
+      const flags2 = [
+        node.edited ? 'ویرایش‌شده' : '',
+        node.missing ? 'این بار دیده نشد' : '',
+        node.shelf ? 'قفسه' : '',
+        node.status === 'gone' ? 'حذف‌شده' : '',
+      ].filter(Boolean);
+
+      console.log(`${pad}${mark} ${node.title}`);
+      console.log(
+        `${pad}   ${where}  ·  ${numbers}${flags2.length ? '  ·  ' + flags2.join(' · ') : ''}`
+      );
+      console.log(`${pad}   ${node.id}`);
+      show(node.children, depth + 1);
+    }
+  };
+  show(tree.roots);
+
+  const blind = tree.flat.filter((one) => !one.view && !one.counts.scenarios.length).length;
+  console.log(`\n  ${tree.flat.length} قابلیت` + (blind ? `  ·  ${blind} بی‌سناریو` : ''));
+  console.log(`  نامِ خودت: userbug capabilities ${target} --set <شناسه> --title <نام>\n`);
 }
 
 /**
@@ -2497,6 +2621,9 @@ try {
       break;
     case 'coverage':
       await cmdCoverage(parsed);
+      break;
+    case 'capabilities':
+      await cmdCapabilities(parsed);
       break;
     case 'bundle':
       await cmdBundle(parsed);

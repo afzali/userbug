@@ -6,12 +6,27 @@
   let toneClass = $derived(tone === 'added' ? 'border-rose-500/35 bg-rose-500/5' : tone === 'gone' ? 'border-emerald-500/35 bg-emerald-500/5' : 'border-border bg-card');
   // `devices` از dedupe و تریاژ می‌آید؛ `device` تک‌مقداریِ یافتهٔ خام است.
   let devices = $derived((finding.devices?.length ? finding.devices : [finding.device]).filter(Boolean));
+  /**
+   * همان الگوی `devices`: `routes` از ادغامِ تریاژ می‌آید، `route` از یافتهٔ
+   * خام. کارت در هر دو جا استفاده می‌شود (تریاژ و مقایسه)، پس هر دو را
+   * می‌فهمد — وگرنه صفحهٔ مقایسه بی‌صدا مکان را از دست می‌داد.
+   */
+  let routes = $derived((finding.routes?.length ? finding.routes : [finding.route]).filter(Boolean));
 </script>
 
 <article class={`rounded-xl border p-4 ${toneClass}`}>
   <div class="mb-3 flex flex-wrap items-center gap-2">
     <Badge variant={finding.source === 'server' ? 'destructive' : 'secondary'}>{sourceLabel(finding.source)}</Badge>
     {#if finding.count > 1}<Badge variant="outline">{formatNumber(finding.count)} بار</Badge>{/if}
+    <!--
+      مکان کنارِ منبع می‌نشیند، نه پایینِ کارت.
+
+      «۵۰۰ روی /api/highlight» یک جمله است؛ جدا کردنِ نیمهٔ دومش به سه خط
+      پایین‌تر یعنی خواننده باید خودش بچسباندشان.
+    -->
+    {#each routes as route (route)}
+      <Badge variant="outline" class="font-mono text-[10px]" dir="ltr">{route}</Badge>
+    {/each}
     {#if finding.fingerprint}<code class="code-value me-auto text-muted-foreground">{finding.fingerprint}</code>{/if}
   </div>
   <p class="break-words text-sm font-semibold leading-7">{finding.normalized || finding.message}</p>
