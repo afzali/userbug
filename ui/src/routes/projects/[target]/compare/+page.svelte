@@ -10,7 +10,7 @@
 </script>
 
 <PageHeader eyebrow="اثر انگشت، نه متن خام" title="مقایسهٔ اجراهای {data.project.name}" description="یافته‌های تازه، رفته و مانده با همان تابع dedupe موتور محاسبه می‌شوند. فهرست فقط اجراهای همین پروژه است.">
-  {#snippet actions()}<Button href={`/projects/${encodeURIComponent(data.target)}`} variant="outline">اجرای تازه</Button>{/snippet}
+  {#snippet actions()}<Button href={`/projects/${encodeURIComponent(data.target)}/run`} variant="outline">اجرای تازه</Button>{/snippet}
 </PageHeader>
 
 <Card.Root class="mb-6 gap-4">

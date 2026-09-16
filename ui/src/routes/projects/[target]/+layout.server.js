@@ -6,6 +6,8 @@ import { loadScenarios } from '../../../../../src/scenario/load.js';
 import { listPages } from '../../../../../src/knowledge/store.js';
 import { readMap } from '../../../../../src/map/store.js';
 import { summarize } from '../../../../../src/runs/health.js';
+import { readCapabilities } from '../../../../../src/knowledge/capabilities.js';
+import { readTouch } from '../../../../../src/runs/touch.js';
 
 /**
  * فضای کاری یک پروژه.
@@ -68,9 +70,28 @@ async function counts(target) {
   const sum = summarize(health);
   const triage = await aggregateTriage(target).catch(() => []);
 
+  /**
+   * عددِ درختِ قابلیت‌ها، از فایلِ **مشتق** — نه با ساختنِ دوباره.
+   *
+   * ساختنِ درخت `map.json` و همهٔ صفحه‌ها را می‌خواند. انجامش در لایه‌ای که
+   * روی **هر** صفحهٔ پروژه اجرا می‌شود، یعنی تریاژ و سناریوها هم هزینهٔ
+   * چیزی را بدهند که نشان نمی‌دهند. خودِ صفحهٔ «اپِ من» می‌سازدش.
+   */
+  const caps = safely(() => readCapabilities(target).nodes, []);
+  const pagesOnly = caps.filter((one) => !one.view && !one.shelf);
+  /** شاخصِ ذخیره‌شده خوانده می‌شود، نه تازه — همان دلیلِ بالا. */
+  const touched = new Set(Object.keys(safely(() => readTouch(target).routes, {})));
+
   return {
     pages: safely(() => listPages(target).length, 0),
     states: map?.states?.length || 0,
+    caps: caps.length,
+    /**
+     * «بی‌سناریو» اینجا تقریبی است و عمداً: شمارشِ دقیق شاخصِ لمس را
+     * می‌خواهد که خواندنِ اجراهاست. عددِ کنارِ منو باید ارزان باشد؛ عددِ
+     * دقیق روی خودِ صفحه است.
+     */
+    blind: pagesOnly.filter((one) => !touched.has(one.route)).length,
     missions: sum.total,
     green: sum.passed,
     red: sum.failed + sum.findings,

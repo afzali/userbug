@@ -240,3 +240,21 @@ test('گرهی که این بار پیدا نشد، حذف نمی‌شود — �
   expect(old).toBeTruthy();
   expect(old.missing).toBe(true);
 });
+
+test('شمارش از مسیرِ جمع‌شده می‌آید، نه از نمونهٔ خام', async () => {
+  withProject({
+    states: [{ id: 'a', route: '/content/f2e9a6d428', view: '', actions: [] }],
+  });
+  const { rebuild, buildTree } = await load();
+  rebuild('demo');
+
+  /**
+   * شاخصِ لمس هم `normalizeCapabilityRoute` می‌زند، پس کلیدش `/content/:id`
+   * است. اگر درخت با مسیرِ خام کلید می‌خورد، هر قابلیتِ شناسه‌دار برای
+   * همیشه «۰ اجرا» می‌ماند — یعنی همان بخشی که بیشترین کار رویش شده،
+   * دست‌نخورده به نظر می‌رسید.
+   */
+  const counts = { '/content/:id': { scenarios: ['خواندن'], runs: 4, findings: 0, openFindings: 0 } };
+  const { flat } = buildTree('demo', { counts });
+  expect(flat[0].counts.runs).toBe(4);
+});

@@ -1,74 +1,105 @@
-import { listSchedules } from '../../../../../src/schedule.js';
-import { listRuns } from '$lib/server/artifacts.js';
-import { getActiveJob } from '$lib/server/jobs.js';
-import { coverageOf } from '../../../../../src/knowledge/coverage.js';
-import { listPages } from '../../../../../src/knowledge/store.js';
-import { readMap } from '../../../../../src/map/store.js';
-import { proposalsFor } from '../../../../../src/knowledge/propose.js';
+import { RUNS_DIR } from '$lib/server/paths.js';
+import { aggregateTriage } from '$lib/server/artifacts.js';
+import { buildTree, readCapabilities, rebuild } from '../../../../../src/knowledge/capabilities.js';
+import { countsByRoute, refreshTouch } from '../../../../../src/runs/touch.js';
+import { loadScenarios } from '../../../../../src/scenario/load.js';
 
 /**
- * اجراها به همین پروژه فیلتر می‌شوند.
+ * «اپِ من» — خانهٔ تازهٔ هر پروژه.
  *
- * پیش‌تر داشبورد همهٔ اجراهای همهٔ پروژه‌ها را نشان می‌داد، پس «آخرین اجرا»
- * می‌توانست مالِ پروژهٔ دیگری باشد. `listRuns` از اول پارامتر `target` داشت و
- * فقط استفاده نمی‌شد.
+ * ── چرا این صفحه جای فرمِ اجرا را گرفت ──
  *
- * فهرست پروژه‌ها از `+layout.server.js` می‌آید و اینجا تکرار نمی‌شود.
+ * خانهٔ قبلی «اجرا» بود: یک فرمِ بیست‌کنترلی از سناریو و دستگاه و پرسونا و
+ * مدل. آن فرم، پیکربندیِ **ابزار** است — و وسطِ خانه نشستنش یعنی اولین
+ * چیزی که کاربر هر روز می‌بیند، تنظیماتِ ماشین است نه وضعیتِ اپِ خودش.
+ *
+ * پرسشی که آدم صبح با آن می‌آید این است: «سایتم چه دارد، کدامش را فراموش
+ * کرده‌ام، کجا شکست؟» — و تا امروز هیچ صفحه‌ای این را نمی‌پرسید. فرمِ اجرا
+ * نرفته؛ به `/run` رفته، که همان جایی است که معنا دارد.
+ *
+ * ── چرا هر سه شمارش اینجا جمع می‌شوند ──
+ *
+ * درخت بی عدد فقط یک فهرست است. و عددها از سه جای متفاوت می‌آیند که
+ * هیچ‌کدام از دیگری خبر ندارد: شاخصِ لمس (سناریو و اجرا)، ادغامِ تریاژ
+ * (یافته)، و خودِ شناخت (کنش و قرارداد). چسباندنشان در یک جا انجام
+ * می‌شود، وگرنه هر صفحه‌ای تعریفِ خودش از «چند تا» پیدا می‌کند.
  */
 export async function load({ params }) {
-  /**
-   * زمان‌بندی‌ها هم اینجا می‌آیند، چون به همین پروژه بند‌ند.
-   *
-   * شکستشان صفحه را نمی‌خواباند: روی سیستمی که `schtasks` ندارد یا پوشهٔ
-   * `schedules/` هنوز ساخته نشده، بقیهٔ داشبورد باید کار کند.
-   */
-  let schedules = [];
-  try {
-    schedules = (await listSchedules()).filter((row) => row.target === params.target);
-  } catch {
-    schedules = [];
-  }
+  const target = params.target;
 
-  return {
-    runs: await listRuns({ target: params.target, limit: 60 }),
-    activeJob: getActiveJob(true, params.target),
-    schedules,
-    progress: readProgress(params.target),
-  };
-}
-
-/**
- * «کجای کار هستیم» — با عدد، نه با حدس.
- *
- * ── چرا این جای کارتِ «از کجا شروع کنیم» را می‌گیرد ──
- *
- * آن کارت فقط روی پروژهٔ **خالی** دیده می‌شد، پس دقیقاً وقتی ناپدید می‌شد که
- * تازه کار جدی شده بود: کاربری که یک اجرا داشت، دیگر هیچ‌جا نمی‌دید که نقشه
- * نکشیده و شناختش نصفه است.
- *
- * هر عدد از جایی می‌آید که خودش منبعِ حقیقت است؛ هیچ‌کدام اینجا حساب نمی‌شود.
- * و هر خواندن جدا محصور است: پروژه‌ای که هنوز `knowledge/` ندارد باید همین
- * صفحه را ببیند، نه یک ۵۰۰.
- */
-function readProgress(target) {
   const safely = (fn, fallback) => {
     try {
-      return fn();
+      return fn() ?? fallback;
     } catch {
       return fallback;
     }
   };
 
-  const map = safely(() => readMap(target), null);
-  const coverage = safely(() => coverageOf(target), null);
+  /**
+   * درخت خودش را می‌سازد، اگر هنوز ساخته نشده.
+   *
+   * ── چرا اینجا و نه با یک دکمه ──
+   *
+   * پروژه‌هایی که از قبل گشت و خزش دارند نباید برای دیدنِ درخت کاری بکنند:
+   * صفحه‌ای که بگوید «اول دکمهٔ بساز را بزن» در حالی که همهٔ داده‌اش روی
+   * دیسک است، فقط یک کلیکِ تشریفاتی است.
+   *
+   * ولی فقط **یک بار**. ساختنِ دوباره `map.json` و همهٔ صفحه‌ها را می‌خواند
+   * و فایل می‌نویسد؛ انجامش در هر بار باز شدنِ صفحه، همان کُندیِ بی‌دلیلی
+   * است که رابط را بی‌فایده می‌کند. تازه‌سازی دکمهٔ خودش را دارد.
+   */
+  if (!safely(() => readCapabilities(target).nodes.length, 0)) safely(() => rebuild(target), null);
+
+  const findings = await aggregateTriage(target).catch(() => []);
+  const index = safely(() => refreshTouch(target, RUNS_DIR), { routes: {} });
+  const counts = countsByRoute(index, findings);
+
+  const tree = safely(() => buildTree(target, { counts }), { roots: [], flat: [] });
 
   return {
-    pages: safely(() => listPages(target).length, 0),
-    states: map?.states?.length || 0,
-    // «چند کنش هنوز امتحان نشده» صادقانه‌تر از «نقشه کامل است» است
-    frontier: map?.frontier?.length || 0,
-    coverage: coverage?.score ?? null,
-    questions: coverage?.questionsOpen ?? 0,
-    proposals: safely(() => proposalsFor(target).open, 0),
+    tree,
+    /**
+     * سناریوهای موجود، برای دکمهٔ «اجرا» روی هر گره.
+     *
+     * فقط نام و اجراشدنی بودن لازم است؛ ریختنِ کلِ سناریو در payload یعنی
+     * هر بار باز شدنِ صفحه، چند ده کیلوبایتِ بی‌مصرف.
+     */
+    scenarios: safely(
+      () =>
+        loadScenarios(target).map((one) => ({
+          name: one.name,
+          status: one.status,
+          executable: one.status !== 'draft' || true,
+        })),
+      []
+    ),
+    ...summary(tree, findings),
+  };
+}
+
+/**
+ * سه عددِ بالای صفحه — و یکی‌شان چیزی است که کاربر هنوز نمی‌داند باید بپرسد.
+ *
+ * «چند قابلیت هیچ سناریویی ندارد» همان پرسشِ «چه چیزی را فراموش کرده‌ام»
+ * است، فقط با عدد. تا وقتی دیده نشود، کسی نمی‌پرسدش.
+ */
+function summary(tree, findings) {
+  /**
+   * فقط صفحه‌ها، نه نماها.
+   *
+   * نما شمارشِ سناریو **ندارد** (رخدادِ اجرا نما را نمی‌شناسد)، پس همه‌شان
+   * «بی‌سناریو» حساب می‌شدند و عدد را باد می‌کردند تا جایی که بی‌معنا شود.
+   * آنچه دربارهٔ یک نما می‌دانیم `tried/actions` است و جای خودش را دارد.
+   */
+  const pages = tree.flat.filter((one) => !one.view && !one.shelf);
+  const views = tree.flat.filter((one) => one.view);
+
+  return {
+    total: tree.flat.length,
+    pages: pages.length,
+    blind: pages.filter((one) => !one.counts.scenarios.length).length,
+    /** نمایی که خزش هیچ‌یک از کنش‌هایش را نزده: در عمل هرگز باز نشده. */
+    untried: views.filter((one) => one.actions && !one.tried).length,
+    open: findings.filter((one) => (one.triage?.status || 'open') === 'open').length,
   };
 }

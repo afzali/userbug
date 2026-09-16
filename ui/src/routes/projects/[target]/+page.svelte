@@ -1,715 +1,400 @@
 <script>
-  import { onMount } from 'svelte';
-  import { ACTIVE, onFinished, run, startJob as startShared } from '$lib/run-store.svelte.js';
+  /**
+   * «اپِ من» — خانهٔ تازهٔ پروژه.
+   *
+   * ── چه چیزی عوض شد و چرا ──
+   *
+   * خانهٔ قبلی «اجرا» بود: نوارِ فرمان، یک فرمِ بیست‌کنترلی، و فهرستِ
+   * اجراها. هر سه لازم‌اند و هیچ‌کدام جوابِ پرسشی نبودند که آدم صبح با آن
+   * می‌آید — «سایتم چه دارد، کدامش را فراموش کرده‌ام، کجا شکست؟»
+   *
+   * آن فرم به `/run` رفت و نوارِ فرمان به هدر؛ اینجا حالا خودِ اپ است.
+   *
+   * ── چرا این صفحه نازک است ──
+   *
+   * درس گرفته از `FoundPanel` که ۱۰۳۹ خط شد: درخت یک کامپوننت است، پنل
+   * یکی دیگر، و این فایل فقط حالت و اتصال.
+   */
+  import { invalidateAll } from '$app/navigation';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
-  import * as Card from '$lib/components/ui/card/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
-  import ModelPicker from '$lib/components/ModelPicker.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
-  import Onboarding from '$lib/components/Onboarding.svelte';
-  import RunCard from '$lib/components/RunCard.svelte';
+  import CapabilityTree from '$lib/components/CapabilityTree.svelte';
+  import CapabilityPanel from '$lib/components/CapabilityPanel.svelte';
   import { formatNumber } from '$lib/format.js';
-
+  import { run, startJob } from '$lib/run-store.svelte.js';
 
   let { data } = $props();
-  // این‌ها snapshot اولیه‌اند چون کاربر در همین صفحه آن‌ها را تغییر می‌دهد.
-  // svelte-ignore state_referenced_locally
-  let runs = $state(data.runs);
-  let scenario = $state('');
-  /**
-   * سناریوهای تیک‌خورده — «بَنچ».
-   *
-   * ── چرا کشویی کافی نبود ──
-   *
-   * کشویی فقط دو حال داشت: یک سناریو، یا همه. ولی کاری که آدم واقعاً می‌کند
-   * چیزی وسطِ این دوتاست: «این سه تا که به ورود مربوط‌اند را ببر». با
-   * کشویی یا باید سه بار اجرا می‌گرفت — سه گزارشِ جدا که هیچ‌کدام کلِ ماجرا
-   * نیست — یا همه را می‌برد و منتظرِ بیست سناریوی بی‌ربط می‌ماند.
-   */
-  let picked = $state(new Set());
-  /** اسمی روی این بار. اختیاری، ولی در تریاژ همان چیزی است که یادت می‌ماند. */
-  let bench = $state('');
-  let device = $state('');
-  let persona = $state('');
-  let depth = $state('');
-  let model = $state('');
-  let repeat = $state(1);
-  let headed = $state(false);
-  let author = $state(false);
-  let error = $state('');
-  let showSchedule = $state(false);
-  let scheduleBusy = $state(false);
-  let scheduleForm = $state({ key: '', time: '02:00', frequency: 'daily', days: 'MON' });
-  /**
-   * اجرای زنده از **حالتِ مشترک** می‌آید، نه از این صفحه.
-   *
-   * ── چرا بیرون رفت ──
-   *
-   * پیش‌تر همهٔ حالتِ اجرا اینجا بود، پس نمای زنده فقط در همین صفحه دیده
-   * می‌شد. حالا پلیر روی هر صفحه‌ای هست و این صفحه هم از همان می‌خواند —
-   * دو نسخه یعنی روزی یکی‌شان رخدادی را بگیرد که آن یکی نبیند.
-   */
 
-  // هدف از مسیر می‌آید، پس دیگر یک `$state` نیست که بشود بی‌صدا عوضش کرد.
   let target = $derived(data.target);
-  let project = $derived(data.project);
+  let base = $derived(`/projects/${encodeURIComponent(target)}`);
 
   /**
-   * پروژه‌ای که هنوز هیچ چیزی ندارد.
+   * درخت در حالتِ محلی زندگی می‌کند، چون ویرایش بلافاصله برش می‌گرداند.
    *
-   * ── چرا این حالت لازم شد ──
-   *
-   * کاربری که تازه پروژه ساخته، با فرمِ «اجرای تازه» روبه‌رو می‌شد که
-   * کشویی سناریوهایش خالی بود. یعنی نخستین چیزی که می‌دید، دکمه‌ای بود که
-   * هیچ کاری نمی‌کرد — و هیچ‌کس نمی‌گفت از کجا باید شروع کند.
-   *
-   * چهار قطعه از قبل ساخته شده بودند و ترتیبشان هم روشن بود، ولی این ترتیب
-   * فقط در ذهنِ سازنده بود: در رابط، چهار آیتمِ هم‌وزن در منوی کناری بودند.
-   *
-   * شرط «هیچ اجرایی هم نبوده» عمدی است: پروژه‌ای که سناریوهایش پاک شده ولی
-   * تاریخچه دارد، کاربرِ تازه‌کار نیست و نباید راهنمای شروع ببیند.
+   * `invalidateAll` هم می‌شد، ولی آن کلِ صفحه را دوباره می‌خواند —
+   * یعنی هر بار که یک عنوان عوض شود، `aggregateTriage` روی همهٔ اجراها
+   * دوباره اجرا می‌شود.
    */
-  let blank = $derived(!project.scenarios?.length && !runs.length && !run.job);
+  // svelte-ignore state_referenced_locally
+  let tree = $state(data.tree);
+  $effect(() => {
+    tree = data.tree;
+  });
 
-  /** سناریوهای اجراشدنی، یک بار — هم برای تیک‌ها، هم برای کشویی. */
-  let runnableScenarios = $derived((project?.scenarios || []).filter((item) => item.executable));
+  let selected = $state('');
+  let picked = $state(new Set());
+  /**
+   * کدام شاخه‌ها بازند.
+   *
+   * ── چرا پیش‌فرض «سطحِ اول باز» است و نه «همه» ──
+   *
+   * درختی که همه‌اش باز باشد، همان فهرستِ تختی است که از آن فرار کردیم.
+   * و درختی که همه‌اش بسته باشد، از کاربر می‌خواهد قبل از دیدن، حدس بزند.
+   * ریشه‌ها باز، بقیه بسته.
+   */
+  let open = $state(new Set());
+  let seeded = false;
+  $effect(() => {
+    if (seeded || !tree.roots.length) return;
+    seeded = true;
+    open = new Set(tree.roots.flatMap((one) => [one.id, ...one.children.map((two) => two.id)]));
+  });
 
-  function togglePick(name) {
+  let busy = $state('');
+  let error = $state('');
+
+  /** فیلترها — همه روی یک محور: «چه چیزی نیاز به کار دارد». */
+  let filter = $state('all');
+  let search = $state('');
+
+  const FILTERS = [
+    { key: 'all', label: 'همه' },
+    { key: 'blind', label: 'بی‌سناریو', count: () => data.blind },
+    { key: 'untried', label: 'هرگز باز نشده', count: () => data.untried },
+    { key: 'red', label: 'ایرادِ باز', count: () => data.open },
+    { key: 'edited', label: 'ویرایش‌شده' },
+  ];
+
+  function matches(node) {
+    if (search.trim()) {
+      const needle = search.trim().toLowerCase();
+      const hay = `${node.title} ${node.route} ${node.view} ${node.desc}`.toLowerCase();
+      if (!hay.includes(needle)) return false;
+    }
+    if (filter === 'blind') return !node.view && !node.shelf && !node.counts.scenarios.length;
+    if (filter === 'untried') return Boolean(node.view && node.actions && !node.tried);
+    if (filter === 'red') return node.counts.openFindings > 0;
+    if (filter === 'edited') return Boolean(node.edited);
+    return true;
+  }
+
+  /**
+   * فیلتر، بی شکستنِ درخت.
+   *
+   * ── چرا گرهِ ناهم‌خوان با فرزندِ هم‌خوان می‌ماند ──
+   *
+   * اگر فقط ردیف‌های هم‌خوان بمانند، «افزودن کتاب جدید» بی پدرش در ریشه
+   * می‌نشیند و معلوم نیست کجای اپ است — یعنی همان تختیِ بی‌بافتار که این
+   * صفحه برای رفعش ساخته شد. پس والد می‌ماند، کم‌رنگ.
+   */
+  function prune(nodes) {
+    const out = [];
+    for (const node of nodes) {
+      const children = prune(node.children);
+      const self = matches(node);
+      if (!self && !children.length) continue;
+      out.push({ ...node, children, dim: !self });
+    }
+    return out;
+  }
+
+  let filtering = $derived(filter !== 'all' || Boolean(search.trim()));
+  let roots = $derived(filtering ? prune(tree.roots) : tree.roots);
+
+  /** وقتی فیلتر هست، همه‌چیز باز است — وگرنه نتیجه زیرِ شاخهٔ بسته پنهان می‌ماند. */
+  let openIds = $derived(
+    filtering ? new Set(tree.flat.map((one) => one.id)) : open
+  );
+
+  let node = $derived(tree.flat.find((one) => one.id === selected) || null);
+
+  /** گرهِ انتخاب‌شده و همهٔ فرزندانش — «کتاب‌ها» یعنی هرچه زیرش هست. */
+  function withChildren(one, out = []) {
+    out.push(one.id);
+    for (const child of one.children || []) withChildren(child, out);
+    return out;
+  }
+
+  function togglePick(one) {
+    const ids = withChildren(one);
     const next = new Set(picked);
-    if (next.has(name)) next.delete(name);
-    else next.add(name);
+    if (ids.every((id) => next.has(id))) for (const id of ids) next.delete(id);
+    else for (const id of ids) next.add(id);
     picked = next;
   }
 
-  /**
-   * راهنمای نخستین ورود.
-   *
-   * ── چرا خودکار باز می‌شود، و چرا نه همیشه ──
-   *
-   * ترتیبِ پنج قدم هیچ‌جا نوشته نبود و روی یک پروژهٔ واقعی دیدیم چه می‌شود:
-   * کاربر حساب و فایل و کلید را درست گذاشت، خزش را زد، و خزنده روی صفحهٔ
-   * ورود ماند — چون نمی‌دانست گشت باید اول برود.
-   *
-   * ولی پروژه‌ای که هر پنج قدمش انجام شده، صاحبش این را از بر است. پس شرط
-   * دو تاست: نه رد شده باشد، و نه کار تمام شده باشد.
-   *
-   * `localStorage` جای درستش است: تصمیمِ همین مرورگرِ همین آدم است، نه
-   * دانشی دربارهٔ پروژه که در `knowledge/` بنشیند.
-   */
-  let showIntro = $state(false);
-  const introKey = $derived(`userbug-intro:${target}`);
-
-  onMount(() => {
-    try {
-      if (localStorage.getItem(introKey) === 'off') return;
-    } catch {
-      // مرورگرِ بی‌انبار؛ راهنما نشان داده می‌شود که بدتر از پنهان کردنش نیست
-    }
-    showIntro = steps.some((step) => !step.done);
-  });
-
-  function dismissIntro(never) {
-    if (!never) return;
-    try {
-      localStorage.setItem(introKey, 'off');
-    } catch {
-      // ذخیره نشد؛ دفعهٔ بعد دوباره می‌آید و همان دکمه هست
-    }
+  function toggleOpen(id) {
+    const next = new Set(open);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    open = next;
   }
 
-  let runSearch = $state('');
-  let runKind = $state('all');
-  let runBench = $state('all');
-  let runFindings = $state('all');
-  let runSort = $state('new');
-
-  let filtered = $derived(
-    Boolean(runSearch.trim()) || runKind !== 'all' || runBench !== 'all' || runFindings !== 'all' || runSort !== 'new'
-  );
-
-  function resetRunFilters() {
-    runSearch = '';
-    runKind = 'all';
-    runBench = 'all';
-    runFindings = 'all';
-    runSort = 'new';
-  }
-
-  /**
-   * نام‌های بنچی که واقعاً وجود دارند.
-   *
-   * فهرستِ از پیش تعریف‌شده‌ای در کار نیست و نباید باشد: بنچ همان چیزی است
-   * که کاربر لحظهٔ اجرا اسمش را می‌گذارد.
-   */
-  let benchNames = $derived([...new Set(runs.map((run) => run.bench).filter(Boolean))]);
-
-  /**
-   * فیلتر و مرتب‌سازی روی همان داده‌ای که از قبل هست.
-   *
-   * `kind` برای اجراهای قدیمی نیست؛ نبودش یعنی «اجرای سناریو»، چون تا پیش
-   * از آمدنِ گشت و خزش همه همین بودند.
-   */
-  let visibleRuns = $derived.by(() => {
-    const needle = runSearch.trim().toLowerCase();
-    const rows = runs.filter((run) => {
-      if (runKind !== 'all' && (run.kind || 'run') !== runKind) return false;
-      if (runBench === 'none' && run.bench) return false;
-      if (runBench !== 'all' && runBench !== 'none' && run.bench !== runBench) return false;
-      if (runFindings === 'with' && !run.findings) return false;
-      if (runFindings === 'without' && run.findings) return false;
-      if (!needle) return true;
-      return `${run.runId} ${run.bench || ''} ${(run.scenarios || []).join(' ')}`.toLowerCase().includes(needle);
+  async function send(body) {
+    const response = await fetch('/api/capabilities', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+      body: JSON.stringify({ target, ...body }),
     });
-
-    const at = (run) => Date.parse(run.startedAt || '') || 0;
-    const order = {
-      new: (a, b) => at(b) - at(a),
-      old: (a, b) => at(a) - at(b),
-      findings: (a, b) => (b.findings || 0) - (a.findings || 0) || at(b) - at(a),
-      steps: (a, b) => (b.steps || 0) - (a.steps || 0) || at(b) - at(a),
-    };
-    return rows.toSorted(order[runSort] || order.new);
-  });
-
-  /**
-   * پنج قدمِ مسیر، با وضعیتِ واقعی‌شان.
-   *
-   * `done` عمداً سخت‌گیر نیست: «یک بار انجام شده» را می‌گوید، نه «کامل است».
-   * ادعای کامل بودن همان چیزی است که این ابزار جای دیگر هم از آن پرهیز
-   * می‌کند — عددِ کنارش خودش می‌گوید چقدر مانده.
-   */
-  let steps = $derived.by(() => {
-    const p = data.progress || {};
-    const runnable = (project.scenarios || []).filter((item) => item.runnable).length;
-    const base = `/projects/${encodeURIComponent(target)}`;
-    const percent = p.coverage === null || p.coverage === undefined ? null : Math.round(p.coverage * 100);
-
-    return [
-      {
-        index: '۱',
-        label: 'گشت',
-        href: `${base}/discover`,
-        done: p.pages > 0,
-        state: p.pages ? `${p.pages} صفحه ثبت شد` : 'با هم در اپ بگردیم',
-      },
-      {
-        index: '۲',
-        label: 'نقشه',
-        href: `${base}/discover`,
-        done: p.states > 0,
-        state: p.states ? `${p.states} حالت · ${p.frontier} کنش در صف` : 'بقیه را خودش بگردد',
-      },
-      {
-        index: '۳',
-        label: 'شناخت',
-        href: `${base}/discover`,
-        done: percent !== null && percent > 0,
-        state:
-          percent === null || percent === 0
-            ? 'هنوز چیزی نمی‌دانیم'
-            : `${percent}٪${p.questions ? ` · ${p.questions} پرسشِ بی‌جواب` : ''}`,
-      },
-      {
-        index: '۴',
-        label: 'سناریو',
-        href: runnable ? `${base}/files` : `${base}/missions`,
-        done: runnable > 0,
-        state: runnable
-          ? `${runnable} سناریو${p.proposals ? ` · ${p.proposals} پیشنهادِ باز` : ''}`
-          : p.proposals
-            ? `${p.proposals} پیشنهاد آماده است`
-            : 'هنوز سناریویی نیست',
-      },
-      {
-        index: '۵',
-        label: 'اجرا',
-        href: base,
-        done: runs.length > 0,
-        state: runs.length ? `${runs.length} اجرا` : 'هنوز اجرا نشده',
-      },
-    ];
-  });
-  let job = $derived(run.job);
-  let busy = $derived(ACTIVE.has(run.job?.status));
-
-  /**
-   * شروعِ هر کاری، یک راه — و حالا آن راه بیرون از این صفحه است.
-   *
-   * فرمِ کناری و نوارِ فرمان هر دو از `run-store` می‌گذرند، همان‌جا که
-   * پلیر هم از آن می‌خواند.
-   */
-  async function startJob(options) {
-    const job = await startShared(target, options);
-    if (!job) error = run.error;
-    return job;
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || 'انجام نشد');
+    tree = { roots: payload.roots, flat: payload.flat };
+    return payload;
   }
 
-  async function start(event) {
-    event.preventDefault();
-    await startJob({
-      grep: scenario,
-      only: [...picked],
-      bench,
-      device,
-      persona,
-      depth,
-      model,
-      repeat,
-      headed,
-      author,
-    });
-  }
-
-
-  /**
-   * زمان‌بندی، با همان پرچم‌هایی که در فرم بالا انتخاب شده‌اند.
-   *
-   * صفحه بعد از هر تغییر بازخوانی می‌شود (`location.reload`) چون وضعیت واقعی
-   * در زمان‌بندِ سیستم است، نه در این صفحه — و نشان دادنِ حالتِ خوش‌بینانه
-   * دقیقاً همان چیزی است که «فعال بود ولی اجرا نشد» را می‌سازد.
-   */
-  async function scheduleRequest(url, options) {
-    scheduleBusy = true;
+  async function refresh() {
+    busy = 'rebuild';
     error = '';
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'انجام نشد');
-      location.reload();
+      await send({ action: 'rebuild' });
+      /** عددهای بالای صفحه از لودر می‌آیند، پس آن هم باید تازه شود. */
+      await invalidateAll();
     } catch (cause) {
       error = cause.message;
-      scheduleBusy = false;
+    } finally {
+      busy = '';
     }
   }
 
-  function addSchedule() {
-    return scheduleRequest('/api/schedules', {
-      method: 'POST',
-      body: JSON.stringify({
-        ...scheduleForm,
-        target,
-        grep: scenario,
-        device,
-        persona,
-        model,
-        depth,
-        repeat,
-      }),
-    });
+  /**
+   * «بگرد اینجا» — کاوشِ هدف‌دار با دامنهٔ از پیش پر.
+   *
+   * ── چرا این دکمه روی گره ارزش دارد ──
+   *
+   * همین کار امروز هم ممکن است: صفحهٔ کشف، حالتِ محدود، و نوشتنِ دستیِ
+   * مسیر. ولی کسی که در درخت روی «افزودن کتاب جدید» ایستاده، همین حالا
+   * می‌داند کجا را می‌خواهد — و دوباره تایپ کردنش فقط جایی است که اشتباه
+   * تایپی وارد می‌شود.
+   */
+  async function quest(one) {
+    busy = 'quest';
+    error = '';
+    try {
+      const goal = one.view
+        ? `در ${one.route} نمای «${one.view}» را باز کن و همه‌اش را بررسی کن`
+        : `${one.route} را بررسی کن`;
+      const job = await startJob(target, { kind: 'quest', goal, from: '' });
+      if (!job) throw new Error(run.error || 'شروع نشد');
+    } catch (cause) {
+      error = cause.message;
+    } finally {
+      busy = '';
+    }
   }
 
-  function runSchedule(key) {
-    return scheduleRequest(`/api/schedules/${encodeURIComponent(key)}`, { method: 'POST' });
-  }
-
-  function removeSchedule(key) {
-    if (!confirm(`زمان‌بندی «${key}» و تسکش در ویندوز حذف شوند؟`)) return;
-    return scheduleRequest(`/api/schedules/${encodeURIComponent(key)}`, { method: 'DELETE' });
+  async function runScenarios(names) {
+    busy = 'run';
+    error = '';
+    try {
+      const job = await startJob(target, { kind: 'run', only: names });
+      if (!job) throw new Error(run.error || 'اجرا شروع نشد');
+    } catch (cause) {
+      error = cause.message;
+    } finally {
+      busy = '';
+    }
   }
 
   /**
-   * تاریخچه بعد از پایانِ اجرا تازه می‌شود.
+   * سناریوهای همهٔ گره‌های انتخاب‌شده، بی تکرار.
    *
-   * وصل شدن به جریان کارِ لایه است، نه این صفحه. ولی «اجراهای اخیر» مالِ
-   * همین صفحه است و کسی جز خودش نمی‌داند باید تازه شود.
+   * این جنینِ «دورِ بررسی» است: امروز فقط سناریوهای موجود را می‌گیرد،
+   * و در گامِ بعد یک موجودیتِ نام‌دار می‌شود که خزش و کاوش را هم زیرِ
+   * یک اسم می‌برد.
    */
-  onMount(() => onFinished(refreshRuns));
+  let pickedScenarios = $derived([
+    ...new Set(
+      tree.flat
+        .filter((one) => picked.has(one.id))
+        .flatMap((one) => one.counts.scenarios || [])
+    ),
+  ]);
 </script>
 
-<PageHeader eyebrow={`${project.environment} · ${project.baseURL}`} title={project.name} description="بگویید چه می‌خواهید، یا از فرمِ کناری دقیق انتخاب کنید.">
-  {#snippet actions()}
-    <!-- راهِ برگشت به راهنما: بستنِ همیشگی نباید یعنی گم شدنِ همیشگی -->
-    <Button variant="ghost" onclick={() => { showIntro = true; }}>راهنما</Button>
-    <Button href={`/projects/${encodeURIComponent(target)}/files`} variant="outline">سناریوها</Button>
-  {/snippet}
-</PageHeader>
+<svelte:head><title>اپِ من — {data.project?.name || target}</title></svelte:head>
 
-<Onboarding {target} {steps} bind:open={showIntro} onDismiss={dismissIntro} />
+{#snippet actions()}
+  <Button variant="outline" size="sm" href={`${base}/discover`}>کشف</Button>
+  <Button variant="outline" size="sm" disabled={!!busy} onclick={refresh}>
+    {busy === 'rebuild' ? 'در حال ساختن…' : 'تازه‌سازی درخت'}
+  </Button>
+  <Button size="sm" href={`${base}/run`}>اجرای تازه</Button>
+{/snippet}
 
-<!--
-  درِ ورودی، بالای همه‌چیز.
+<PageHeader
+  eyebrow={`${data.project?.environment || ''} · ${data.project?.baseURL || ''}`}
+  title="اپِ من"
+  description="هر بخش و قابلیتی که از این اپ می‌شناسیم — و اینکه هر کدام چند سناریو دارد، چند بار آزموده شده، و چه ایرادی داشته."
+  {actions}
+/>
 
-  نوارِ پیشرفتِ زیرش وضعیت را می‌گوید («۲۷٪ · ۱۱ پیشنهاد») و آن تابلوی
-  وضعیت است نه قدمِ بعد. این یکی قدمِ بعد را می‌گیرد و می‌زند.
--->
+{#if error}<p class="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>{/if}
 
-<!--
-  نوارِ پنج‌قدمی از اینجا رفت — به منو.
-
-  ── چرا ──
-
-  درست بود ولی فقط روی همین صفحه دیده می‌شد: تا می‌رفتی سراغِ «کشف»، دیگر
-  نمی‌دانستی کجای کاری. کاربر گفت «همهٔ اینها هم معلوم باشد که کجاییم و چه
-  باید بکنیم» — و چیزی که باید همیشه معلوم باشد، جایش در منوست، نه در یک
-  صفحه. حالا هر ردیفِ منو عددِ خودش را زیرِ نامش دارد.
--->
-
-{#if blank}
+{#if !tree.flat.length}
   <!--
-    مسیرِ شروع، نه فهرستِ امکانات.
+    حالتِ خالی، با راهِ بیرون.
 
-    نوارِ بالا وضعیت را می‌گوید؛ این یکی **چرا** را می‌گوید، و فقط یک بار
-    لازم است. پس با نخستین قدمِ واقعی می‌رود.
+    صفحه‌ای که تا داده نداری فقط بگوید «چیزی نیست»، راهِ ساختنِ آن داده را
+    هم می‌بندد — همان ایرادی که صفحهٔ مأموریت‌ها یک بار گرفت.
   -->
-  <section class="mb-6 rounded-xl border bg-muted/30 p-6">
-    <h2 class="text-base font-semibold">از کجا شروع کنیم</h2>
-    <p class="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-      این پروژه هنوز سناریویی ندارد، و نوشتنِ سناریو از صفر کارِ سختی است.
-      راهِ کوتاه‌تر این است که یک بار با هم در اپ بگردیم، بعد ابزار خودش بقیهٔ
-      اپ را بگردد؛ آن‌وقت می‌داند چه چیزهایی باید آزموده شوند. یا همان بالا
-      بنویسید چه می‌خواهید.
+  <section class="rounded-xl border bg-muted/30 p-6">
+    <h2 class="text-base font-semibold">هنوز نمی‌دانیم این اپ چه دارد</h2>
+    <p class="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground">
+      این درخت از سه جا پر می‌شود و هر سه همین حالا در دسترس‌اند: گشتی که
+      خودتان می‌روید، خزشی که ابزار می‌کند، و سورس که بی مرورگر خوانده
+      می‌شود. هر کدام را که بروید، بخش‌ها و قابلیت‌ها همین‌جا ظاهر می‌شوند.
     </p>
-
-    <ol class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <li class="rounded-lg border bg-background p-4">
-        <p class="text-xs font-semibold text-muted-foreground">قدم ۱</p>
-        <p class="mt-1 font-medium">با هم بگردیم</p>
-        <p class="mt-1.5 text-xs leading-6 text-muted-foreground">
-          مرورگر باز می‌شود و <strong>شما</strong> می‌رانید. روی هر صفحه می‌توانید
-          بنویسید کارش چیست، و هر ایرادی که دیدید همان‌جا ثبت کنید.
-        </p>
-        <Button href={`/projects/${encodeURIComponent(target)}/discover`} class="mt-3 w-full">شروع گشت</Button>
-      </li>
-
-      <!--
-        نقشه بعد از گشت می‌آید، نه پیش از آن: بی مسیرِ ورودی که گشت نشان
-        می‌دهد، خزنده روی صفحهٔ ورود می‌ماند و یک گره پیدا می‌کند.
-      -->
-      <li class="rounded-lg border bg-background p-4">
-        <p class="text-xs font-semibold text-muted-foreground">قدم ۲</p>
-        <p class="mt-1 font-medium">بقیه را خودش بگردد</p>
-        <p class="mt-1.5 text-xs leading-6 text-muted-foreground">
-          مرورگر هر دکمهٔ امنی را می‌زند و می‌نویسد از کجا به کجا می‌رسد —
-          صفحه‌ها، و مودال‌ها و منوهایی که آدرس ندارند. بی هوش مصنوعی.
-        </p>
-        <Button href={`/projects/${encodeURIComponent(target)}/discover`} variant="ghost" class="mt-3 w-full text-xs">خزش</Button>
-      </li>
-
-      <li class="rounded-lg border bg-background p-4">
-        <p class="text-xs font-semibold text-muted-foreground">قدم ۳</p>
-        <p class="mt-1 font-medium">شناخت ساخته می‌شود</p>
-        <p class="mt-1.5 text-xs leading-6 text-muted-foreground">
-          صفحه‌ها، مسیرها و کارهای خطرناک ثبت می‌شوند. هرچه خودتان گفته باشید
-          بالاترین اعتماد را دارد — بالاتر از حدسِ مدل.
-        </p>
-        <Button href={`/projects/${encodeURIComponent(target)}/discover`} variant="ghost" class="mt-3 w-full text-xs">چه پیدا شد</Button>
-      </li>
-
-      <li class="rounded-lg border bg-background p-4">
-        <p class="text-xs font-semibold text-muted-foreground">قدم ۴</p>
-        <p class="mt-1 font-medium">سناریوها درمی‌آیند</p>
-        <p class="mt-1.5 text-xs leading-6 text-muted-foreground">
-          «چه باید آزمود» شکافِ میان آنچه می‌دانیم و آنچه می‌آزماییم را حساب
-          می‌کند و متنِ هر سناریو را آماده می‌دهد.
-        </p>
-        <Button href={`/projects/${encodeURIComponent(target)}/missions`} variant="ghost" class="mt-3 w-full text-xs">چه باید آزمود</Button>
-      </li>
-    </ol>
-
-    <!--
-      راهِ فرار، ولی کم‌رنگ.
-      کسی که می‌داند چه می‌کند نباید مجبور به گشت شود؛ کسی که نمی‌داند هم
-      نباید این را راهِ اصلی ببیند.
-    -->
-    <p class="mt-4 text-xs text-muted-foreground">
-      یا اگر خودتان سناریو دارید، مستقیم
-      <a href={`/projects/${encodeURIComponent(target)}/files`} class="underline underline-offset-2">بسازیدش</a>.
-      فرمِ اجرا پایین همین صفحه است.
-    </p>
-  </section>
-{/if}
-
-<div class="grid gap-6 xl:grid-cols-[23rem_minmax(0,1fr)]">
-  <Card.Root class="h-fit gap-5 xl:sticky xl:top-20">
-    <Card.Header>
-      <Card.Title>اجرای تازه</Card.Title>
-      <Card.Description>هر بار فقط یک روایت از GUI اجرا می‌شود تا منابع مرورگر و جریان زنده با هم تداخل نکنند.</Card.Description>
-    </Card.Header>
-    <Card.Content>
-      <form class="space-y-4" onsubmit={start}>
-        <!--
-          تیک، نه کشویی.
-
-          کشویی فقط «یکی» یا «همه» می‌داد؛ کارِ واقعی وسطِ این دوتاست. تیکِ
-          هیچ‌کدام یعنی همه — همان پیش‌فرضِ قبلی، پس کسی که تا دیروز فقط
-          «شروع اجرا» می‌زد، هیچ تغییری نمی‌بیند.
-        -->
-        <div class="space-y-1.5 text-sm font-medium">
-          <div class="flex items-baseline justify-between gap-2">
-            <span>سناریوها</span>
-            <span class="text-[11px] font-normal text-muted-foreground">
-              {picked.size ? `${formatNumber(picked.size)} انتخاب‌شده` : 'هیچ تیکی = همه'}
-            </span>
-          </div>
-
-          {#if runnableScenarios.length}
-            <div class="max-h-48 space-y-0.5 overflow-y-auto rounded-lg border p-1.5">
-              {#each runnableScenarios as item (item.path || item.name)}
-                <label class="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1 text-sm font-normal hover:bg-accent/50">
-                  <input
-                    type="checkbox"
-                    class="mt-1"
-                    checked={picked.has(item.name)}
-                    disabled={busy}
-                    onchange={() => togglePick(item.name)}
-                  />
-                  <span class="min-w-0 flex-1 break-words">
-                    {item.name}
-                    <!-- پیش‌نویس اجرا می‌شود ولی رگرسیون نیست؛ در فهرست هم باید فرق کند -->
-                    {#if item.status === 'draft'}
-                      <span class="text-[10px] text-muted-foreground">· پیش‌نویس</span>
-                    {/if}
-                  </span>
-                </label>
-              {/each}
-            </div>
-            {#if picked.size}
-              <button
-                type="button"
-                class="text-[11px] text-muted-foreground underline underline-offset-2"
-                onclick={() => { picked = new Set(); }}
-              >
-                برداشتنِ همهٔ تیک‌ها
-              </button>
-            {/if}
-          {:else}
-            <p class="rounded-lg border border-dashed p-3 text-center text-xs font-normal text-muted-foreground">
-              سناریوی اجراشدنی‌ای نیست.
-            </p>
-          {/if}
-        </div>
-
-        <!--
-          اسمِ بار.
-
-          ارزشش در فهرست نیست، در تریاژ است: یافته‌ای که هفتهٔ بعد باز می‌شود
-          باید بتواند بگوید «در بنچِ پس از اصلاح هم بود» — چیزی که رشتهٔ
-          تاریخِ اجرا هرگز نگفت.
-        -->
-        <label class="block space-y-1.5 text-sm font-medium">
-          <span>اسمِ این بار <span class="font-normal text-muted-foreground">(اختیاری)</span></span>
-          <Input bind:value={bench} placeholder="مثلاً: پیش از انتشار ۴.۲" disabled={busy} maxlength="60" />
-          <span class="block text-[11px] font-normal leading-5 text-muted-foreground">
-            در فهرست اجراها فیلتر می‌شود و در تریاژ کنارِ هر یافته می‌آید.
-          </span>
-        </label>
-        <div class="grid grid-cols-2 gap-3">
-          <label class="block space-y-1.5 text-sm font-medium">
-            <span>دستگاه</span>
-            <Input bind:value={device} placeholder={project?.device || 'desktop'} disabled={busy} />
-          </label>
-          <label class="block space-y-1.5 text-sm font-medium">
-            <span>تکرار</span>
-            <Input type="number" min="1" max="10" bind:value={repeat} disabled={busy} />
-          </label>
-        </div>
-        <label class="block space-y-1.5 text-sm font-medium">
-          <span>رفتار کاربر</span>
-          <select class="app-select" bind:value={persona} disabled={busy}>
-            <option value="">پیش‌فرض سناریو</option><option value="novice">تازه‌کار</option><option value="pro">حرفه‌ای</option>
-          </select>
-        </label>
-
-        <!--
-          انتخاب مدل، ردیفِ خودش.
-
-          ── چرا از کنارِ «رفتار کاربر» درآمد ──
-
-          نصفِ عرضِ یک ستونِ ۲۳rem جا نداشت: خودِ کنترل یک ورودی است به‌علاوهٔ
-          دکمهٔ «فهرست»، و بازشدنش پنلی است با جست‌وجو و فهرستِ بلندِ مدل‌ها با
-          قیمت — که در نصفِ ستون خوانده نمی‌شد.
-
-          و یک نقصِ واقعی هم همین‌جا بود: `div`ِ آن شبکهٔ دوستونی هرگز بسته
-          نشده بود، پس ردیفِ تیک‌های زیرش هم داخلش می‌افتاد.
-        -->
-        <ModelPicker bind:value={model} disabled={busy} />
-
-        <div class="flex flex-wrap gap-4 text-sm text-muted-foreground">
-          <label class="flex items-center gap-2"><input type="checkbox" bind:checked={headed} disabled={busy} /> مرورگر دیده شود</label>
-          <label class="flex items-center gap-2"><input type="checkbox" bind:checked={author} disabled={busy} /> ساخت پیش‌نویس کاوش</label>
-        </div>
-        {#if error}<p class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>{/if}
-        <!--
-          لغو به پلیر رفت: همان‌جایی که اجرا دیده می‌شود، همان‌جا هم متوقف
-          می‌شود. دو دکمهٔ لغو در دو جا یعنی روزی یکی‌شان وضعیت را تازه نکند.
-        -->
-        <Button type="submit" class="w-full" disabled={run.submitting || busy || !target}>
-          {run.submitting ? 'در حال شروع…' : busy ? 'اجرایی در جریان است' : 'شروع اجرا'}
-        </Button>
-      </form>
-    </Card.Content>
-
-    <!--
-      زمان‌بندی همان‌جایی است که پرچم‌ها را انتخاب می‌کنید، چون همان پرچم‌ها را
-      ذخیره می‌کند. زمان‌بندِ واقعی سیستم است؛ رابط فقط ورودی‌هایش را می‌سازد.
-    -->
-    <Card.Content class="space-y-3 border-t pt-5">
-      <div class="flex items-center justify-between gap-2">
-        <strong class="text-sm">زمان‌بندی</strong>
-        <Button variant="ghost" size="sm" onclick={() => { showSchedule = !showSchedule; }}>{showSchedule ? 'بستن' : 'افزودن'}</Button>
-      </div>
-
-      {#each data.schedules as item (item.key)}
-        <div class="rounded-lg border p-3 text-xs leading-6">
-          <div class="flex items-center justify-between gap-2">
-            <span class="code-value">{item.key}</span>
-            {#if item.installed}
-              <span class="text-emerald-700 dark:text-emerald-300">فعال</span>
-            {:else}
-              <!-- فایلش هست ولی تسک نیست: پنهان کردنش یعنی کاربر فکر کند هر شب اجرا می‌شود. -->
-              <span class="text-destructive">در زمان‌بند نیست</span>
-            {/if}
-          </div>
-          <p class="text-muted-foreground">
-            {item.frequency === 'weekly' ? `هفتگی ${item.days?.join('،')} · ${item.time}` : `روزانه ${item.time}`}
-            {#if item.grep} · {item.grep}{/if}
-          </p>
-          {#if item.lastLog}<p class="text-muted-foreground">{item.lastLog}</p>{/if}
-          <div class="mt-2 flex gap-2">
-            <Button variant="outline" size="sm" onclick={() => runSchedule(item.key)} disabled={scheduleBusy}>اجرا کن</Button>
-            <Button variant="ghost" size="sm" onclick={() => removeSchedule(item.key)} disabled={scheduleBusy}>حذف</Button>
-          </div>
-        </div>
-      {/each}
-
-      {#if showSchedule}
-        <div class="space-y-3 rounded-lg border border-dashed p-3">
-          <label class="block space-y-1.5 text-sm font-medium"><span>کلید</span><Input bind:value={scheduleForm.key} dir="ltr" placeholder="nightly" /></label>
-          <div class="grid grid-cols-2 gap-2">
-            <label class="block space-y-1.5 text-sm font-medium"><span>ساعت</span><Input bind:value={scheduleForm.time} dir="ltr" placeholder="02:00" /></label>
-            <label class="block space-y-1.5 text-sm font-medium">
-              <span>تکرار</span>
-              <select class="app-select" bind:value={scheduleForm.frequency}><option value="daily">روزانه</option><option value="weekly">هفتگی</option></select>
-            </label>
-          </div>
-          {#if scheduleForm.frequency === 'weekly'}
-            <label class="block space-y-1.5 text-sm font-medium"><span>روزها</span><Input bind:value={scheduleForm.days} dir="ltr" placeholder="MON,WED,FRI" /></label>
-          {/if}
-          <p class="text-xs leading-6 text-muted-foreground">فیلتر سناریو، دستگاه، رفتار کاربر، مدل و عمقِ همین فرمِ بالا در زمان‌بندی ذخیره می‌شوند.</p>
-          <Button class="w-full" onclick={addSchedule} disabled={scheduleBusy || !scheduleForm.key || !scheduleForm.time}>{scheduleBusy ? 'در حال ساخت…' : 'ساخت زمان‌بندی'}</Button>
-        </div>
-      {/if}
-    </Card.Content>
-  </Card.Root>
-
-  <section class="min-w-0 space-y-6">
-    <!--
-      نمای زندهٔ اجرا از این صفحه رفت.
-
-      ── چرا ──
-
-      کاربر گفت «اجرا در هر گامی ممکن است باشد؛ مثل پلیری که هر جا لازم شد
-      دیده شود». حالا `RunPlayer` در لایه‌بندی است و روی **هر** صفحه‌ای
-      همراه است. نگه‌داشتنِ یک نسخهٔ دوم اینجا یعنی دو جا یک چیز را نشان
-      دهند و دیر یا زود یکی‌شان رخدادی را نبیند.
-    -->
-    <!--
-      جدولِ سلامت از اینجا رفت — به «مأموریت‌ها».
-
-      ── چرا ──
-
-      همان فهرست، با همان داده، در دو صفحه بود. دو نمایشِ یک حقیقت یعنی
-      روزی یکی‌شان عقب می‌ماند و کسی نمی‌فهمد کدام درست است. آنجا خانهٔ
-      اوست (ستونِ «انتظار» و دکمهٔ اجرای هر سفر آنجاست)؛ اینجا خانهٔ
-      **اجراها**ست. عددِ سلامت در منو همیشه دمِ دست است.
-    -->
-
-    <div>
-      <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 class="text-xl font-bold">اجراهای اخیر</h2>
-          <p class="mt-1 text-sm text-muted-foreground">تاریخچه مستقیماً از پوشهٔ runs خوانده می‌شود.</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <!--
-            «مقایسه» از منوی کناری به اینجا آمد: دو اجرا لازم دارد، پس تا
-            وقتی اجرایی نیست فقط یک ردیفِ مرده بود کنارِ شناخت. با کمتر از دو
-            اجرا اصلاً نشان داده نمی‌شود.
-          -->
-          {#if runs.length > 1}
-            <Button href={`/projects/${encodeURIComponent(target)}/compare`} variant="outline" size="sm">
-              مقایسهٔ دو اجرا
-            </Button>
-          {/if}
-          <Badge variant="outline">
-            {visibleRuns.length === runs.length
-              ? `${formatNumber(runs.length)} اجرا`
-              : `${formatNumber(visibleRuns.length)} از ${formatNumber(runs.length)}`}
-          </Badge>
-        </div>
-      </div>
-
-      <!--
-        فیلتر و مرتب‌سازی.
-
-        ── چرا لازم شد ──
-
-        فهرست فقط از نو به کهنه ریخته می‌شد و بس. با چهل اجرا — که بعد از چند
-        روز کارِ عادی است — پیدا کردنِ «آن گشتی که دیروز رفتم» یعنی اسکرول
-        کردن و خواندنِ شناسه‌ها.
-
-        محورها همان‌هایی‌اند که آدم واقعاً با آن‌ها می‌گردد: **نوع** (اجرا،
-        کاوش، گشت، خزش)، **بنچ** (اسمی که خودش روی آن بار گذاشته)، **یافته
-        داشت یا نه**، و جست‌وجو روی شناسه و سناریو و بنچ. همه
-        سمتِ کلاینت، روی داده‌ای که از قبل بارگذاری شده — پس فیلتر کردن
-        درخواستی به سرور نمی‌زند.
-      -->
-      {#if runs.length > 3}
-        <div class="mb-4 flex flex-wrap items-center gap-2">
-          <Input bind:value={runSearch} placeholder="جست‌وجو در شناسه، بنچ یا سناریو…" class="h-8 w-52" />
-          <select bind:value={runKind} class="h-8 rounded-md border bg-background px-2 text-xs">
-            <option value="all">همهٔ انواع</option>
-            <option value="run">اجرای سناریو</option>
-            <option value="quest">کاوشِ هدف‌دار</option>
-            <option value="tour">گشت</option>
-            <option value="map">خزشِ نقشه</option>
-          </select>
-          <!--
-            کشویی بنچ فقط وقتی هست که بنچی وجود دارد: گزینه‌ای که همیشه خالی
-            است، فقط جا می‌گیرد و به کاربر می‌گوید چیزی را از دست داده.
-          -->
-          {#if benchNames.length}
-            <select bind:value={runBench} class="h-8 rounded-md border bg-background px-2 text-xs">
-              <option value="all">همهٔ بنچ‌ها</option>
-              <option value="none">بی‌بنچ</option>
-              {#each benchNames as name (name)}
-                <option value={name}>{name}</option>
-              {/each}
-            </select>
-          {/if}
-          <select bind:value={runFindings} class="h-8 rounded-md border bg-background px-2 text-xs">
-            <option value="all">با و بی یافته</option>
-            <option value="with">فقط یافته‌دارها</option>
-            <option value="without">فقط بی‌یافته‌ها</option>
-          </select>
-          <select bind:value={runSort} class="h-8 rounded-md border bg-background px-2 text-xs">
-            <option value="new">تازه‌ترین اول</option>
-            <option value="old">قدیمی‌ترین اول</option>
-            <option value="findings">پریافته‌ترین اول</option>
-            <option value="steps">پرقدم‌ترین اول</option>
-          </select>
-          {#if filtered}
-            <button class="text-xs text-muted-foreground underline underline-offset-2" onclick={resetRunFilters}>
-              پاک کردن فیلترها
-            </button>
-          {/if}
-        </div>
-      {/if}
-
-      <div class="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-        {#each visibleRuns as run (run.runId)}
-          <!-- حذف در همان لحظه از فهرست برداشته می‌شود، نه با بارگذاری دوبارهٔ صفحه -->
-          <RunCard {run} onRemoved={(id) => (runs = runs.filter((item) => item.runId !== id))} />
-        {:else}
-          <p class="rounded-xl border border-dashed p-10 text-center text-muted-foreground md:col-span-2">
-            {runs.length ? 'هیچ اجرایی با این فیلترها نیست.' : 'هنوز اجرایی ثبت نشده است.'}
-          </p>
-        {/each}
-      </div>
+    <div class="mt-4 flex flex-wrap gap-2">
+      <Button href={`${base}/discover`} size="sm">کشف — گشت، خزش، یا سورس</Button>
+      <Button href={`${base}/run`} variant="outline" size="sm">فرمِ اجرا</Button>
     </div>
   </section>
-</div>
+{:else}
+  <!--
+    عددها بالای درخت.
+
+    «چند بی‌سناریو» مهم‌ترینشان است و چیزی است که کاربر هنوز نمی‌داند باید
+    بپرسد — همان نقشی که «بی‌انتظار» در صفحهٔ مأموریت‌ها داشت.
+  -->
+  <div class="mb-5 flex flex-wrap gap-3 text-sm">
+    <div class="rounded-xl border px-4 py-2">
+      <span class="block text-[11px] text-muted-foreground">قابلیت</span>
+      <span class="text-lg font-bold">
+        {formatNumber(data.total)}<span class="text-sm font-normal text-muted-foreground"> · {formatNumber(data.pages)} صفحه</span>
+      </span>
+    </div>
+    {#if data.blind}
+      <div class="rounded-xl border border-amber-500/40 px-4 py-2">
+        <span class="block text-[11px] text-muted-foreground">بی‌سناریو</span>
+        <span class="text-lg font-bold text-amber-600 dark:text-amber-400">{formatNumber(data.blind)}</span>
+      </div>
+    {/if}
+    {#if data.untried}
+      <div class="rounded-xl border border-amber-500/40 px-4 py-2">
+        <span class="block text-[11px] text-muted-foreground">هرگز باز نشده</span>
+        <span class="text-lg font-bold text-amber-600 dark:text-amber-400">{formatNumber(data.untried)}</span>
+      </div>
+    {/if}
+    {#if data.open}
+      <div class="rounded-xl border border-destructive/40 px-4 py-2">
+        <span class="block text-[11px] text-muted-foreground">ایرادِ باز</span>
+        <span class="text-lg font-bold text-destructive">{formatNumber(data.open)}</span>
+      </div>
+    {/if}
+  </div>
+
+  {#if data.blind}
+    <p class="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 text-sm leading-7">
+      <strong>{formatNumber(data.blind)} بخش هیچ سناریویی ندارد.</strong>
+      یعنی هیچ اجرایی تا امروز آن‌ها را نیازموده. روی هر کدام بزنید تا ببینید
+      چیست و همان‌جا سناریو بسازید یا بگویید ابزار برود همان‌جا را بگردد.
+    </p>
+  {/if}
+
+  <div class="mb-4 flex flex-wrap items-center gap-2">
+    {#each FILTERS as item (item.key)}
+      {@const count = item.count?.()}
+      <button
+        type="button"
+        class={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+          filter === item.key ? 'border-primary bg-accent' : 'hover:bg-accent/50'
+        }`}
+        onclick={() => { filter = item.key; }}
+      >
+        {item.label}{count ? ` (${formatNumber(count)})` : ''}
+      </button>
+    {/each}
+    <Input bind:value={search} class="h-8 w-56" placeholder="جست‌وجوی نام یا مسیر…" />
+  </div>
+
+  <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+    <section class="min-w-0">
+      <div class="rounded-xl border bg-card">
+        {#if !roots.length}
+          <p class="p-6 text-center text-sm text-muted-foreground">
+            هیچ قابلیتی با این فیلتر نیست.
+          </p>
+        {:else}
+          <CapabilityTree
+            {roots}
+            {selected}
+            {picked}
+            open={openIds}
+            onPick={togglePick}
+            onOpen={(one) => { selected = one.id; }}
+            onToggle={toggleOpen}
+          />
+        {/if}
+      </div>
+
+      <!--
+        نوارِ انتخاب — جنینِ «دکمهٔ مادر».
+
+        ── چرا همین حالا و نه در گامِ «دور» ──
+
+        انتخابِ چند شاخه و اجرای همان‌ها، همین امروز کارِ واقعی‌ای است که
+        هیچ صفحه‌ای نمی‌کرد: فهرستِ اجرا بر اساسِ **فایلِ سناریو** بود، نه
+        بر اساسِ بخشی از اپ که می‌خواهی بررسی کنی.
+      -->
+      {#if picked.size}
+        <div class="sticky bottom-4 mt-3 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 shadow-lg">
+          <span class="text-sm font-medium">{formatNumber(picked.size)} قابلیت انتخاب شده</span>
+          <span class="text-[11px] text-muted-foreground">
+            {pickedScenarios.length
+              ? `${formatNumber(pickedScenarios.length)} سناریو رویشان`
+              : 'هیچ سناریویی رویشان نیست'}
+          </span>
+          <div class="ms-auto flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              disabled={!!busy || !pickedScenarios.length}
+              onclick={() => runScenarios(pickedScenarios)}
+            >
+              {busy === 'run' ? 'شروع…' : 'همین‌ها را بگیر'}
+            </Button>
+            <Button size="sm" variant="ghost" onclick={() => { picked = new Set(); }}>برداشتنِ تیک‌ها</Button>
+          </div>
+        </div>
+      {/if}
+    </section>
+
+    <div class="min-w-0">
+      {#if node}
+        <CapabilityPanel
+          {node}
+          {target}
+          busy={Boolean(busy) || run.submitting}
+          onEdit={(patch) => send({ action: 'edit', ...patch })}
+          onReset={(id) => send({ action: 'reset', id })}
+          onClose={() => { selected = ''; }}
+          onRun={runScenarios}
+          onQuest={quest}
+        />
+      {:else}
+        <aside class="sticky top-20 rounded-xl border border-dashed p-6 text-center text-xs leading-6 text-muted-foreground">
+          روی هر ردیف بزنید تا ببینید چیست، چند سناریو دارد، چند بار آزموده
+          شده، و چه ایرادی داشته — و همان‌جا نامش را عوض کنید یا بگویید
+          ابزار برود بگرددش.
+        </aside>
+      {/if}
+    </div>
+  </div>
+
+  <p class="mt-6 text-[11px] leading-6 text-muted-foreground">
+    این درخت از گشت و خزش و سورس ساخته می‌شود، بی یک فراخوانی مدل — پس
+    نام‌ها گاهی خامند. هر نامی که خودتان بگذارید <Badge variant="secondary" class="text-[10px]">by: user</Badge>
+    می‌شود و هیچ تازه‌سازی‌ای عوضش نمی‌کند.
+  </p>
+{/if}

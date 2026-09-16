@@ -12,7 +12,7 @@ import { UNIVERSAL } from '../../../../../../src/checks/universal.js';
  * یافته‌ای ساخته که قلابی است — یعنی همین‌جا، نه در صفحه‌ای که برای ثبتِ
  * حساب باز می‌شود.
  */
-export async function load({ params }) {
+export async function load({ params, url }) {
   const safely = (fn, fallback) => {
     try {
       return fn();
@@ -23,6 +23,16 @@ export async function load({ params }) {
 
   return {
     findings: await aggregateTriage(params.target),
+    /**
+     * فیلترِ مکان از آدرس.
+     *
+     * ── چرا لازم شد ──
+     *
+     * پنلِ یک قابلیت دکمهٔ «ایرادهایش» دارد. بی این، آن دکمه به تریاژِ
+     * **همه‌چیز** می‌رسید و کاربر باید خودش دوباره همان مسیر را از کشویی
+     * پیدا می‌کرد — یعنی پیوندی که وعده‌اش را نگه نمی‌دارد.
+     */
+    place: String(url.searchParams.get('place') || ''),
     checksConfig: safely(() => readChecksConfig(params.target), { checks: {} }),
     checkDefinitions: UNIVERSAL.map((check) => ({
       id: check.id,
