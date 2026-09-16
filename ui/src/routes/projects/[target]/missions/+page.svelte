@@ -127,11 +127,16 @@
     <h2 class="text-base font-semibold">هنوز سفری نیست</h2>
     <p class="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground">
       سفر همان سناریوست: چند قدم که کاربر واقعاً برمی‌دارد، و انتظارهایی که
-      می‌گویند بعدش چه باید دیده شود. سه راه برای آوردنشان هست:
+      می‌گویند بعدش چه باید دیده شود.
+      {#if proposalCount}
+        و {formatNumber(proposalCount)} تای آماده همین پایین منتظرند — از کشفی که
+        قبلاً کرده‌اید درآمده‌اند.
+      {:else}
+        هنوز هیچ راهی برایشان باز نشده:
+      {/if}
     </p>
     <div class="mt-4 flex flex-wrap gap-2">
       <Button href={`${base}/discover`} size="sm">کشف — گشت یا خزش</Button>
-      
       <Button href={`${base}/files`} variant="outline" size="sm">خودم می‌نویسم</Button>
     </div>
   </section>
@@ -261,30 +266,38 @@
     {/each}
   </div>
 
-  <!--
-    از کجا سفرِ تازه بیاورم — ته صفحه، نه بالای آن.
-
-    کسی که ده سفر دارد، هر روز دنبالِ ساختنِ یازدهمی نیست؛ دنبالِ وضعیتِ همان
-    ده تاست. ولی **پیوند** به فهرستِ پیشنهادها کافی نبود: صفحه‌ای که باید
-    یادت بماند وجود دارد، عملاً وجود ندارد. پس خودِ فهرست اینجاست، بسته.
-  -->
-  <section class="mt-8 space-y-3">
-    <h2 class="text-sm font-semibold">سفرِ تازه از کجا بیاورم؟</h2>
-
-    <details class="rounded-xl border bg-muted/30 p-4">
-      <summary class="cursor-pointer text-sm font-medium">
-        چه باید آزمود؟{proposalCount ? ` — ${formatNumber(proposalCount)} پیشنهاد از کشف` : ' — فعلاً پیشنهادی نیست'}
-      </summary>
-      <div class="mt-4">
-        <ProposalsPanel {data} {target} />
-      </div>
-    </details>
-
-    <div class="flex flex-wrap gap-2">
-      <Button href={`${base}/discover`} variant="outline" size="sm">کشف</Button>
-      <Button href={`${base}/files`} variant="outline" size="sm">
-        فایل‌های پروژه{data.others ? ` (${formatNumber(data.others)} پیش‌نویس و اسکریپت)` : ''}
-      </Button>
-    </div>
-  </section>
 {/if}
+
+<!--
+  از کجا سفرِ تازه بیاورم — ته صفحه، نه بالای آن.
+
+  کسی که ده سفر دارد، هر روز دنبالِ ساختنِ یازدهمی نیست؛ دنبالِ وضعیتِ همان
+  ده تاست. ولی **پیوند** به فهرستِ پیشنهادها کافی نبود: صفحه‌ای که باید
+  یادت بماند وجود دارد، عملاً وجود ندارد. پس خودِ فهرست اینجاست، بسته.
+
+  ── چرا بیرونِ شرطِ «سفری هست یا نه» ──
+
+  اول داخلش بود، و آن دقیقاً حلقه را پاره می‌کرد: صفحهٔ «کشف» می‌گفت «۱۲
+  سفرِ پیشنهادی از همین کشف»، کاربر می‌زد، و به صفحه‌ای می‌رسید که می‌گفت
+  «هنوز سفری نیست» — در حالی که همان ۱۲ تا چند پیکسل پایین‌تر، پنهان، بودند.
+  روی پروژهٔ خالی باز هم می‌شود، چون آنجا تنها کارِ ممکن همین است.
+-->
+<section class="mt-8 space-y-3">
+  <h2 class="text-sm font-semibold">سفرِ تازه از کجا بیاورم؟</h2>
+
+  <details class="rounded-xl border bg-muted/30 p-4" open={!missions.length}>
+    <summary class="cursor-pointer text-sm font-medium">
+      چه باید آزمود؟{proposalCount ? ` — ${formatNumber(proposalCount)} پیشنهاد از کشف` : ' — فعلاً پیشنهادی نیست'}
+    </summary>
+    <div class="mt-4">
+      <ProposalsPanel {data} {target} />
+    </div>
+  </details>
+
+  <div class="flex flex-wrap gap-2">
+    <Button href={`${base}/discover`} variant="outline" size="sm">کشف</Button>
+    <Button href={`${base}/files`} variant="outline" size="sm">
+      فایل‌های پروژه{data.others ? ` (${formatNumber(data.others)} پیش‌نویس و اسکریپت)` : ''}
+    </Button>
+  </div>
+</section>
