@@ -289,7 +289,7 @@
     خودِ پروژه این است: پیش‌نویسی که یک بار اجرا نشده، سناریو نیست.
   -->
   {#snippet actions()}
-    <Button href={`/projects/${encodeURIComponent(data.target)}/run`}>اجرایش کن</Button>
+    <Button href={`/projects/${encodeURIComponent(data.target)}/rounds`}>اجرایش کن</Button>
     <Button href={`/projects/${encodeURIComponent(data.target)}/missions`} variant="ghost">چه باید آزمود</Button>
     <!--
       «حساب و چک» از منو برداشته شد و اینجا نشست: حساب و فایلِ آپلودی چیزی

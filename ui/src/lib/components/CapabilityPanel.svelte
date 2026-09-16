@@ -396,7 +396,7 @@
           به یک فهرستِ عمومی پرت می‌شد و باید خودش دوباره پیدایش می‌کرد.
           ساختِ سناریو حالا بالاتر است، کنارِ همان زاویه‌ای که می‌خواهد.
         -->
-        <Button size="sm" variant="outline" href={`${base}/missions`}>همهٔ سناریوها</Button>
+        <Button size="sm" variant="outline" href={`${base}/missions`}>فایل‌های سناریو</Button>
         <Button
           size="sm"
           variant="outline"

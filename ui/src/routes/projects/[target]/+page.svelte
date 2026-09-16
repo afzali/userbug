@@ -8,7 +8,7 @@
    * اجراها. هر سه لازم‌اند و هیچ‌کدام جوابِ پرسشی نبودند که آدم صبح با آن
    * می‌آید — «سایتم چه دارد، کدامش را فراموش کرده‌ام، کجا شکست؟»
    *
-   * آن فرم به `/run` رفت و نوارِ فرمان به هدر؛ اینجا حالا خودِ اپ است.
+   * آن فرم به «بررسی» رفت و نوارِ فرمان به هدر؛ اینجا حالا خودِ اپ است.
    *
    * ── چرا این صفحه نازک است ──
    *
@@ -164,6 +164,61 @@
     tree.flat.filter((one) => !one.view && !one.shelf && one.titleBy === 'derived').length
   );
   let nameNote = $state('');
+
+  /**
+   * راهِ بررسیِ یک پروژه — پنج قدم، و هر کدام عددِ خودش.
+   *
+   * ── چرا `done` سخت‌گیر نیست ──
+   *
+   * «یک بار انجام شده» را می‌گوید، نه «کامل است». ادعای کامل بودن همان
+   * چیزی است که این ابزار همه‌جا از آن پرهیز می‌کند — و عددِ کنارش خودش
+   * می‌گوید چقدر مانده.
+   *
+   * ── چرا قدمِ ناتمام برجسته است، نه قدمِ تمام ──
+   *
+   * تیکِ سبز پاداش است و کارِ بعدی را نشان نمی‌دهد. حاشیهٔ رنگی روی چیزی
+   * می‌نشیند که هنوز مانده — همان که آدم دنبالش است.
+   */
+  const PATH = [
+    {
+      key: 'discover',
+      label: 'کشف',
+      href: `${base}/discover`,
+      done: () => data.total > 0,
+      state: () => (data.total ? `${formatNumber(data.total)} قابلیت شناخته شد` : 'هنوز نگشته‌ایم'),
+    },
+    {
+      key: 'name',
+      label: 'شناختن',
+      href: base,
+      done: () => data.pages > 0 && !unnamed,
+      state: () => (unnamed ? `${formatNumber(unnamed)} بخش بی‌نامِ خوانا` : 'همه نام دارند'),
+    },
+    {
+      key: 'scenario',
+      label: 'سناریو',
+      href: `${base}/missions`,
+      done: () => data.pages > 0 && !data.blind,
+      state: () => (data.blind ? `${formatNumber(data.blind)} بخش بی‌سناریو` : 'همه سناریو دارند'),
+    },
+    {
+      key: 'review',
+      label: 'بررسی',
+      href: `${base}/rounds`,
+      done: () => data.pages > 0 && data.total > 0 && tree.flat.some((one) => one.counts.runs),
+      state: () => {
+        const runs = tree.flat.reduce((sum, one) => sum + (one.counts.runs || 0), 0);
+        return runs ? `${formatNumber(runs)} اجرا تا امروز` : 'هنوز اجرایی نبوده';
+      },
+    },
+    {
+      key: 'triage',
+      label: 'یافته‌ها',
+      href: `${base}/triage`,
+      done: () => !data.open,
+      state: () => (data.open ? `${formatNumber(data.open)} بازِ بی‌قضاوت` : 'همه قضاوت شده'),
+    },
+  ];
 
   /**
    * نام‌گذاری — و چرا نتیجه‌اش با عدد گزارش می‌شود.
@@ -359,7 +414,7 @@
   <Button variant="outline" size="sm" disabled={!!busy} onclick={refresh}>
     {busy === 'rebuild' ? 'در حال ساختن…' : 'تازه‌سازی'}
   </Button>
-  <Button size="sm" href={`${base}/run`}>اجرای تازه</Button>
+  <Button size="sm" href={`${base}/rounds`}>بررسی کن</Button>
 {/snippet}
 
 <PageHeader
@@ -370,6 +425,53 @@
 />
 
 {#if error}<p class="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>{/if}
+
+<!--
+  راهِ بررسی — همیشه دیده می‌شود، نه فقط روی پروژهٔ خالی.
+
+  ── چرا این نوار لازم شد ──
+
+  همهٔ قطعه‌ها ساخته شده بودند و ترتیبشان هم روشن بود، ولی آن ترتیب فقط در
+  ذهنِ سازنده بود. کارتِ «از کجا شروع کنیم» وجود داشت و دو ایراد داشت: در
+  صفحهٔ اجرا دفن شده بود، و فقط روی پروژهٔ **خالی** دیده می‌شد — یعنی دقیقاً
+  وقتی ناپدید می‌شد که کار تازه جدی شده بود.
+
+  پرسشِ «حالا چه کار کنم؟» با یک اجرا از بین نمی‌رود. پس نوار می‌ماند، و
+  هر قدم عددِ خودش را می‌گوید: عدد هم می‌گوید کجاییم، هم می‌گوید هنوز چقدر
+  مانده.
+
+  ── چرا حلقه است و نه خطِ صاف ──
+
+  بعد از تریاژ برنمی‌گردی خانه؛ برمی‌گردی سرِ کشف، چون یافته‌ها معمولاً
+  می‌گویند جایی را ندیده‌ای. فلشِ آخر عمداً به اول برمی‌گردد.
+-->
+{#if tree.flat.length}
+  <ol class="mb-5 flex flex-wrap items-stretch gap-2 text-xs">
+    {#each PATH as step, index (step.key)}
+      <li class="flex items-center gap-2">
+        <a
+          href={step.href}
+          class="flex min-w-36 flex-col rounded-lg border px-3 py-2 transition-colors hover:bg-accent/50 {step.done()
+            ? ''
+            : 'border-primary bg-accent/30'}"
+        >
+          <span class="flex items-center gap-1.5 font-medium">
+            <span class="text-muted-foreground">{formatNumber(index + 1)}</span>
+            {step.label}
+            {#if step.done()}<span class="text-emerald-600 dark:text-emerald-400">✓</span>{/if}
+          </span>
+          <span class="text-[11px] text-muted-foreground">{step.state()}</span>
+        </a>
+        {#if index < PATH.length - 1}
+          <span class="text-muted-foreground/50" aria-hidden="true">←</span>
+        {/if}
+      </li>
+    {/each}
+    <li class="flex items-center text-[11px] text-muted-foreground">
+      <span class="me-1" aria-hidden="true">↺</span> و دوباره از اول
+    </li>
+  </ol>
+{/if}
 
 {#if !tree.flat.length}
   <!--
@@ -387,7 +489,7 @@
     </p>
     <div class="mt-4 flex flex-wrap gap-2">
       <Button href={`${base}/discover`} size="sm">کشف — گشت، خزش، یا سورس</Button>
-      <Button href={`${base}/run`} variant="outline" size="sm">فرمِ اجرا</Button>
+      <Button href={`${base}/rounds`} variant="outline" size="sm">مستقیم بررسی کن</Button>
     </div>
   </section>
 {:else}

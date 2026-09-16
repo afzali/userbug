@@ -78,7 +78,7 @@
 <PageHeader
   eyebrow="پروژهٔ {data.project?.name || data.target}"
   title="کشف"
-  description="بگرد، سورس را ببین، یا بگو کجا را بخزد — و پایینِ همین صفحه ببین چه پیدا شد."
+  description="اپ را به ابزار بشناسان — خودت بگردانش، بگذار خودش بگردد، یا سورس را بخوان. هرچه پیدا شود، در «اپِ من» به‌شکلِ درخت دیده می‌شود."
 />
 
 <div class="space-y-6">
@@ -148,13 +148,13 @@
     یک پیشنهاد است. عدد می‌گوید واقعاً چه تولید شده — و صفر هم یک خبر است.
   -->
   <div class="flex flex-wrap items-center gap-2">
-    <Button href={`${base}/missions`} size="sm">
+    <Button href={base} size="sm">
       {data.found.proposals
-        ? `${formatNumber(data.found.proposals)} سفرِ پیشنهادی از همین کشف`
-        : 'مأموریت‌ها'}
+        ? `آنچه پیدا شد، در «اپِ من» — با ${formatNumber(data.found.proposals)} سناریوی پیشنهادی`
+        : 'آنچه پیدا شد، در «اپِ من»'}
     </Button>
     <span class="text-[11px] text-muted-foreground">
-      آنچه کشف شد، آنجا به سفر و انتظار تبدیل می‌شود.
+      هر بخش با شمارِ سناریو و اجرا و ایرادش، و پیشنهادِ اینکه چه باید آزمود.
     </span>
   </div>
 
