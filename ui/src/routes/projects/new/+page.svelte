@@ -72,7 +72,6 @@
    */
   let splitSource = $state(false);
 
-  let picking = $state('');
 
   /**
    * پنجرهٔ واقعیِ انتخاب پوشه.
@@ -81,21 +80,67 @@
    * اگر پنجره‌ای باز نشد — سرورِ بی‌دسکتاپ، یا انصرافِ کاربر — ورودی متنی
    * سرِ جایش می‌ماند و چیزی خراب نمی‌شود.
    */
+  /**
+   * انتخابِ پوشه نباید فرم را گروگان بگیرد.
+   *
+   * ── چرا این را اضافه کردیم ──
+   *
+   * یک بار واقعاً خوردیم: دکمه زده شد، پنجرهٔ ویندوز جایی پشتِ مرورگر (یا
+   * روی یک نشستِ بی‌دسکتاپ اصلاً هیچ‌جا) باز شد، و دکمه تا **سه دقیقه** روی
+   * «…» ماند. راهِ بیرون آمدن فقط رفرش بود — که کلِ فرمِ نیمه‌پرشده را هم
+   * می‌برد.
+   *
+   * حالا دو چیز عوض شده: بعد از یک ثانیه می‌گوید پنجره شاید پشتِ مرورگر
+   * باشد، و همان دکمه تبدیل به «بی‌خیال» می‌شود که انتظار را قطع می‌کند.
+   * پنجرهٔ سیستم سرِ جایش می‌ماند (دستِ ما نیست)، ولی فرم آزاد می‌شود و
+   * ورودی متنی همیشه بوده و هست.
+   */
+  let picking = $state('');
+  let pickHint = $state('');
+  let pickAbort = null;
+
+  function stopPicking() {
+    pickAbort?.abort();
+    pickAbort = null;
+    picking = '';
+    pickHint = 'انتظار رها شد. اگر پنجره باز است می‌توانید ببندیدش — یا مسیر را همین‌جا بنویسید.';
+  }
+
   async function pickFolder(field) {
+    if (picking) return stopPicking();
+
     picking = field;
+    pickHint = '';
+    pickAbort = new AbortController();
+
+    // پنجره‌ای که پشتِ مرورگر باز شود، از «دکمه کار نمی‌کند» قابلِ تشخیص نیست
+    const late = setTimeout(() => {
+      if (picking === field) pickHint = 'پنجرهٔ انتخاب پوشه باز شده — شاید پشتِ مرورگر باشد.';
+    }, 1000);
+
     try {
       const response = await fetch('/api/fs/pick', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
         body: JSON.stringify({}),
+        signal: pickAbort.signal,
       });
       const payload = await response.json();
-      if (payload.ok && payload.path) form[field] = payload.path;
-      else if (payload.reason === 'no-dialog') error = 'پنجرهٔ انتخاب پوشه روی این سیستم باز نشد؛ مسیر را دستی بنویسید.';
+      if (payload.ok && payload.path) {
+        form[field] = payload.path;
+        pickHint = '';
+      } else if (payload.reason === 'no-dialog') {
+        pickHint = 'پنجرهٔ انتخاب پوشه روی این سیستم باز نشد؛ مسیر را دستی بنویسید.';
+      } else {
+        pickHint = '';
+      }
     } catch (cause) {
-      error = cause.message;
+      // رها کردنِ عمدی خطا نیست؛ پیامش را همان `stopPicking` گذاشته
+      if (cause.name !== 'AbortError') error = cause.message;
     } finally {
-      picking = '';
+      clearTimeout(late);
+      if (picking === field) picking = '';
+      pickAbort = null;
     }
   }
 
@@ -186,13 +231,23 @@
       منطقاً فکر می‌کرد خروجی ترمینال هم گرفته می‌شود. نمی‌شود — و ندانستنش
       یعنی کاربر منتظرِ خطایی می‌ماند که هیچ‌وقت نمی‌آید.
     -->
-    <p class="text-xs leading-6 text-muted-foreground">
-      خطاهای کنسول مرورگر خودکار گرفته می‌شوند و مسیر نمی‌خواهند. این دو فقط <strong>فایل</strong> می‌خوانند.
-      خروجیِ ترمینالِ اپ گرفته نمی‌شود، چون userbug اپ شما را بالا نمی‌آورد و پروسه‌اش دستش نیست.
-      اگر لاگتان فقط روی ترمینال است، آن را به فایل بریزید:
-      <span class="code-value" dir="ltr">npm run dev &gt; dev.log 2&gt;&amp;1</span>
-      و همان فایل را اینجا بدهید.
-    </p>
+          <!--
+        ── چرا این متن عوض شد ──
+
+        تا گام ۶ فقط `type: 'file'` وجود داشت و اینجا نوشته بود «خروجیِ
+        ترمینالِ اپ گرفته نمی‌شود». حالا `type: 'command'` هست و همان جمله
+        کاربر را از کاری که می‌تواند بکند منصرف می‌کرد — بدترین نوعِ متنِ
+        کهنه، چون دربارهٔ خودِ ابزار دروغ می‌گفت.
+      -->
+      <p class="text-xs leading-6 text-muted-foreground">
+        خطاهای کنسول مرورگر خودکار گرفته می‌شوند و مسیر نمی‌خواهند. این دو
+        فقط <strong>فایل</strong> می‌خوانند. اگر لاگتان فقط روی ترمینال است دو
+        راه دارید: یا به فایل بریزیدش
+        (<code class="code-value">npm run dev &gt; dev.log 2&gt;&amp;1</code>) و همان
+        را اینجا بدهید، یا در فایلِ پیکربندیِ پروژه یک لاگِ
+        <code class="code-value">type: 'command'</code> بگذارید تا userbug خودش
+        دستور را اجرا کند و خروجی‌اش را بخواند.
+      </p>
 
     <div class="space-y-3 rounded-lg border p-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
@@ -207,19 +262,24 @@
         <span class="font-medium">{splitSource ? 'پوشهٔ فرانت' : 'پوشهٔ پروژه'}</span>
         <span class="flex gap-2">
           <Input bind:value={form.sourceRoot} dir="ltr" placeholder="D:/Projects/my-app" />
-          <Button variant="outline" class="shrink-0" disabled={picking === 'sourceRoot'} onclick={() => pickFolder('sourceRoot')}>
-            {picking === 'sourceRoot' ? '…' : 'انتخاب…'}
+          <Button variant="outline" class="shrink-0" onclick={() => pickFolder('sourceRoot')}>
+            {picking === 'sourceRoot' ? 'بی‌خیال' : 'انتخاب…'}
           </Button>
         </span>
       </label>
+
+      <!-- پنجره‌ای که پشتِ مرورگر باز شود، از «دکمه کار نمی‌کند» قابلِ تشخیص نیست -->
+      {#if pickHint}
+        <p class="text-[11px] leading-5 text-muted-foreground">{pickHint}</p>
+      {/if}
 
       {#if splitSource}
         <label class="block space-y-1.5 text-sm">
           <span class="font-medium">پوشهٔ بک</span>
           <span class="flex gap-2">
             <Input bind:value={form.backRoot} dir="ltr" placeholder="D:/Projects/my-api" />
-            <Button variant="outline" class="shrink-0" disabled={picking === 'backRoot'} onclick={() => pickFolder('backRoot')}>
-              {picking === 'backRoot' ? '…' : 'انتخاب…'}
+            <Button variant="outline" class="shrink-0" onclick={() => pickFolder('backRoot')}>
+              {picking === 'backRoot' ? 'بی‌خیال' : 'انتخاب…'}
             </Button>
           </span>
         </label>

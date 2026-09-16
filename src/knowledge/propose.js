@@ -35,6 +35,7 @@ import { knowledgeDir, listPages, readDossier } from './store.js';
 import { listInvariants } from './invariants.js';
 import { readMap } from '../map/store.js';
 import { mergeActions } from '../map/state.js';
+import { BY_LABEL, unifiedStates } from '../map/merge.js';
 
 /**
  * پیشنهادهای ردشده — `knowledge/<کلید>/dismissed.json`.
@@ -345,6 +346,96 @@ const USER_FACING = /^(e?mail|name|title|slug|username|user_?name|phone|mobile|c
  * اینجا ساخته می‌شود فقط **متنِ خواسته** است؛ مدل وقتی می‌آید که کاربر
  * «بساز» بزند — مثل هر پیشنهادِ دیگری.
  */
+/**
+ * هر جایی که **کشف** پیدا کرده و هیچ سفری سراغش نمی‌رود.
+ *
+ * ── چرا لازم شد ──
+ *
+ * یک بار از اول مثل کاربرِ تازه رفتم: پروژه ساختم، سورس را خواندم، و ۱۲
+ * پیشنهاد گرفتم که **هر ۱۲ تا** از جنسِ قاعدهٔ دیتابیس بودند — «دو بار
+ * email یکسان بساز»، «فرمِ خالی بفرست». هیچ‌کدام ثبت‌نام و ورود و هایلایت
+ * نبود؛ یعنی دقیقاً همان سفرهایی که کاربر گفته بود می‌خواهد بداند سالم‌اند.
+ *
+ * علتش این بود که بندِ «صفحه‌ای که آزموده نمی‌شود» فقط `dossier.routes` را
+ * می‌خواند، و آن را `learn` پر می‌کند که **مدل** لازم دارد. پس راهِ رایگانِ
+ * «سورس را بخوان» ۱۱ روت پیدا می‌کرد و هیچ‌کدام به پیشنهاد نمی‌رسید.
+ *
+ * حالا منبعش همان نقشهٔ یکپارچه است: خزش، گشت، و سورس — هر سه.
+ *
+ * ── چرا متنِ هر کدام فرق دارد ──
+ *
+ * چون دانشِ پشتشان فرق دارد، و متنی که وانمود کند بیشتر می‌داند، سناریوی
+ * حدسی می‌سازد:
+ *
+ *   گشت   هدفِ نوشتهٔ آدم را دارد → همان را نقل می‌کند
+ *   خزش   عنوان و کنش‌های واقعی را دارد → نامشان را می‌برد
+ *   سورس  فقط مسیر را دارد → فقط همان را می‌گوید، و ادعای دیگری نمی‌کند
+ */
+function fromPlaces(target, { touched, haystacks }) {
+  const out = [];
+
+  for (const place of unifiedStates(target)) {
+    // نمای بی‌روت (مودال) کارِ بندِ نقشه است، نه اینجا
+    if (!place.route || place.view) continue;
+    if (matches(place.route, touched)) continue;
+    if (mentionedIn(haystacks, [place.route])) continue;
+
+    /**
+     * دو پرسشِ جدا، که یک بار قاتی شدند.
+     *
+     * نسخهٔ اول `source` را از `by` می‌ساخت و بعد متن را از `source`. نتیجه
+     * این شد که صفحه‌ای که **گشت رفته بود** ولی `purpose` نداشت، متنِ «هنوز
+     * هیچ‌کس اینجا نرفته» می‌گرفت — یعنی پیشنهاد دربارهٔ واقعیت دروغ می‌گفت،
+     * همان چیزی که کلِ این فهرست برای پرهیز از آن ساخته شد.
+     *
+     * پس «چه می‌دانیم» و «چه کسی رفته» دو چیزند و جدا پرسیده می‌شوند.
+     */
+    const visited = place.by.includes('tour') || place.by.includes('crawl');
+    const name = place.title || place.route;
+
+    /**
+     * سه متن، سه سطحِ ادعا.
+     *
+     * هیچ‌کدام «انتظار» را از پیش در دهانِ سناریو نمی‌گذارد — همان درسی که
+     * بندِ «کارِ بازگشت‌ناپذیر» یک بار داد: پیشنهادی که خودش قضاوت کند،
+     * یافتهٔ اشتباه را یک مرحله زودتر می‌سازد.
+     */
+    const text = place.purpose
+      ? `به عنوان کاربر وارد ${place.route} شو. ${place.purpose}\n` +
+        'مسیر اصلی این صفحه را تا آخر برو و بررسی کن که چیزی نمی‌شکند.'
+      : visited
+        ? `به عنوان کاربر وارد ${place.route} شو («${name}»).\n` +
+          (place.actions
+            ? `این صفحه ${place.actions} کارِ کلیک‌شدنی دارد و خزش ${place.tried} تایش را زده. `
+            : '') +
+          'کارِ اصلیِ صفحه را از اول تا آخر انجام بده و بررسی کن نتیجه‌اش همان است که باید.'
+        : `به عنوان کاربر وارد ${place.route} شو.\n` +
+          'هنوز هیچ‌کس اینجا نرفته — این مسیر فقط در سورس دیده شده. ' +
+          'ببین این صفحه چه کاری به کاربر می‌دهد، همان کار را تا آخر انجام بده، ' +
+          'و بررسی کن که نه خطایی می‌دهد نه خالی می‌ماند.';
+
+    out.push({
+      id: idOf('place', place.route),
+      kind: 'place',
+      title: visited
+        ? `${name}${place.title ? ` (${place.route})` : ''} آزموده نمی‌شود`
+        : `${place.route} هنوز هیچ‌کس نرفته`,
+      why: place.purpose
+        ? place.purpose
+        : visited
+          ? `${place.by.includes('crawl') ? 'خزش' : 'گشت'} این صفحه را دیده` +
+            (place.actions ? ` و ${place.actions} کنش رویش شمرده` : '') +
+            '؛ هیچ سناریویی سراغش نمی‌رود.'
+          : 'این مسیر در سورس هست ولی نه خزش آنجا رفته، نه گشت، نه هیچ سناریویی.',
+      evidence: `از ${place.by.map((one) => BY_LABEL[one] || one).join(' و ')}`,
+      routes: [place.route],
+      text,
+    });
+  }
+
+  return out;
+}
+
 function fromInvariants(target, { haystacks }) {
   /**
    * `mode: 'off'` اینجا معنای دیگری دارد.
@@ -591,7 +682,19 @@ export function proposalsFor(target) {
   /* ── ۶. حالتی که نقشه پیدا کرده و هیچ سناریویی سراغش نمی‌رود ── */
   for (const proposal of fromMap(target, { touched, haystacks })) out.push(proposal);
 
-  /* ── ۷. قاعده‌ای که schema گفته و هیچ سناریویی تلاش نمی‌کند بشکندش ── */
+  /* ── ۷. جایی که کشف پیدا کرده و هیچ سفری سراغش نمی‌رود ── */
+  const already = new Set(out.map((item) => item.routes?.[0]).filter(Boolean));
+  for (const proposal of fromPlaces(target, { touched, haystacks })) {
+    /**
+     * بندِ ۱ همین روت را با `purpose`ِ پرونده گفته باشد، این یکی حرفِ
+     * کمتری دارد. دو ردیف برای یک صفحه، فهرست را همان‌قدر بی‌اعتبار می‌کند
+     * که ردیفِ بی‌ربط.
+     */
+    if (already.has(proposal.routes[0])) continue;
+    out.push(proposal);
+  }
+
+  /* ── ۸. قاعده‌ای که schema گفته و هیچ سناریویی تلاش نمی‌کند بشکندش ── */
   for (const proposal of fromInvariants(target, { haystacks })) out.push(proposal);
 
   /**
@@ -610,6 +713,16 @@ export function proposalsFor(target) {
     proposals: out,
     open: out.filter((item) => !item.dismissed).length,
     coveredRoutes: touched.size,
-    totalRoutes: (dossier.routes || []).length,
+    /**
+     * مخرج از **کشف** می‌آید، نه فقط از پرونده.
+     *
+     * `dossier.routes` را مدل پر می‌کند؛ روی پروژه‌ای که فقط سورس خوانده،
+     * صفر است و نسبت می‌شد «۰ از ۰» — که هم بی‌معناست هم خوش‌بین.
+     */
+    totalRoutes: new Set([
+      ...(dossier.routes || []).map((one) => one.path).filter(Boolean),
+      ...out.filter((one) => one.routes?.[0]).map((one) => one.routes[0]),
+      ...touched,
+    ]).size,
   };
 }

@@ -108,9 +108,26 @@ export function unifiedStates(target) {
 
   /* ── سورس: جایی که هست و هیچ‌کس نرفته ── */
   const known = new Set([...nodes.values()].map((one) => one.route));
+
+  /**
+   * دو منبع، دو شکلِ داده — و یک بارِ `.path` روی هر دو.
+   *
+   * ── باگی که ستونِ «فقط در سورس» را همیشه صفر نگه داشت ──
+   *
+   * `dossier.routes` آرایه‌ای از **شیء** است (`{ path, purpose }`) ولی
+   * `endpoints.routes` آرایه‌ای از **رشته** (`'/login'`). هر دو `.map(one =>
+   * one.path)` می‌خوردند، پس نیمهٔ دوم `undefined` می‌شد و `filter(Boolean)`
+   * بی‌صدا دورش می‌ریخت.
+   *
+   * نتیجه: پروژه‌ای که ۱۱ روت از سورس داشت، در «جاهای اپ» می‌دید «۰ فقط در
+   * سورس» — یعنی سومین منبعِ همان نقشهٔ یکپارچه‌ای که گام ۴ ساخت، مرده بود و
+   * هیچ خطایی هم نمی‌داد. خروجیِ صفر همیشه شبیهِ «چیزی نیست» است، نه شبیهِ
+   * «خراب است».
+   */
+  const pathOf = (one) => (typeof one === 'string' ? one : one?.path);
   const fromSource = [
-    ...safely(() => (readDossier(target).routes || []).map((one) => one.path), []),
-    ...safely(() => (readEndpoints(target).routes || []).map((one) => one.path), []),
+    ...safely(() => (readDossier(target).routes || []).map(pathOf), []),
+    ...safely(() => (readEndpoints(target).routes || []).map(pathOf), []),
   ].filter(Boolean);
 
   for (const route of new Set(fromSource)) {

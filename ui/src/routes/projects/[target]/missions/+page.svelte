@@ -25,6 +25,7 @@
   import ProposalsPanel from '$lib/components/ProposalsPanel.svelte';
   import { formatNumber } from '$lib/format.js';
   import { daysSinceGreen, summarize } from '../../../../../../src/runs/health.js';
+  import { describeFailure, isTranslated } from '../../../../../../src/report/failure.js';
 
   let { data } = $props();
 
@@ -238,10 +239,31 @@
                 {/if}
               </div>
 
+              <!--
+                جمله جلو، خطای خام پشتش.
+
+                ── چرا ──
+
+                ردیفِ قرمز این بود: `TimeoutError: locator.check: Timeout
+                15000ms exceeded.` — حرفِ واقعی‌اش «تیکی که باید زده می‌شد،
+                زده نشد» بود. کسی که Playwright نمی‌شناسد از آن خط چیزی
+                برنمی‌دارد جز «یک چیزی خراب است».
+
+                ولی خام هم می‌ماند، چون جمله **تفسیر** است و خام **شاهد**:
+                روزی که تفسیر غلط باشد، باید راهی برای دیدنش بماند.
+              -->
               {#if row.error}
-                <p dir="ltr" class="mt-1.5 truncate text-start font-mono text-[11px] text-muted-foreground">
-                  {row.error}
+                <p class="mt-1.5 text-start text-[11px] leading-5 text-muted-foreground">
+                  {describeFailure(row.error)}
                 </p>
+                {#if isTranslated(row.error)}
+                  <details class="mt-0.5">
+                    <summary class="cursor-pointer text-[11px] text-muted-foreground/70">خطای خام</summary>
+                    <p dir="ltr" class="mt-1 text-start font-mono text-[11px] break-all text-muted-foreground">
+                      {row.error}
+                    </p>
+                  </details>
+                {/if}
               {/if}
             </div>
 

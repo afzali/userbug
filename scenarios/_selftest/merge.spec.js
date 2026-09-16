@@ -20,7 +20,7 @@ import { MAP_VERSION } from '../../src/map/store.js';
  * `USERBUG_ROOT` همان چیزی است که بقیهٔ خودآزماها هم استفاده می‌کنند؛ متغیرِ
  * دیگری ساختن یعنی دو تعریف از «کجا داده‌ها هستند».
  */
-function withProject({ map = null, pages = [], dossierRoutes = [] } = {}) {
+function withProject({ map = null, pages = [], dossierRoutes = [], endpointRoutes = null } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ub-merge-'));
   process.env.USERBUG_ROOT = root;
 
@@ -40,6 +40,19 @@ function withProject({ map = null, pages = [], dossierRoutes = [] } = {}) {
     JSON.stringify({ version: 1, routes: dossierRoutes.map((one) => ({ path: one })) }),
     'utf8'
   );
+  /**
+   * روت‌های اسکنِ بی‌مدل — **رشته**، نه شیء.
+   *
+   * همین تفاوتِ شکل بود که ستونِ «فقط در سورس» را همیشه صفر نگه داشت.
+   */
+  if (endpointRoutes) {
+    fs.writeFileSync(
+      path.join(know, 'endpoints.json'),
+      JSON.stringify({ version: 1, endpoints: [], routes: endpointRoutes }),
+      'utf8'
+    );
+  }
+
   return root;
 }
 
@@ -120,4 +133,24 @@ test('پروژهٔ خالی خطا نمی‌دهد، فهرستِ خالی می�
   withProject();
   const { unifiedStates } = await import(`../../src/map/merge.js?e=${Date.now()}`);
   expect(unifiedStates('demo')).toEqual([]);
+});
+
+/**
+ * ── باگی که یک بار واقعاً خورد ──
+ *
+ * `dossier.routes` آرایه‌ای از شیء است و `endpoints.routes` آرایه‌ای از
+ * رشته، ولی هر دو `.map(one => one.path)` می‌خوردند. نیمهٔ دوم `undefined`
+ * می‌شد و `filter(Boolean)` بی‌صدا دورش می‌ریخت.
+ *
+ * پروژه‌ای که ۱۱ روت از سورس داشت، «۰ فقط در سورس» می‌دید — و صفر همیشه
+ * شبیهِ «چیزی نیست» است، نه شبیهِ «خراب است». برای همین کسی نفهمید.
+ */
+test('روتِ اسکنِ بی‌مدل رشته است، و باز هم گره می‌شود', async () => {
+  withProject({ endpointRoutes: ['/login', '/contents'] });
+  const { coverage, unifiedStates } = await import(`../../src/map/merge.js?c=${Date.now()}`);
+
+  const states = unifiedStates('demo');
+  expect(states.map((one) => one.route).sort()).toEqual(['/contents', '/login']);
+  expect(states.every((one) => one.by.includes('source'))).toBe(true);
+  expect(coverage(states).untouched).toBe(2);
 });
