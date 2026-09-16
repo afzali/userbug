@@ -5,6 +5,7 @@ import { listProjects } from '$lib/server/projects.js';
 import { jsonError } from '$lib/server/http.js';
 import { assertMutationRequest } from '$lib/server/security.js';
 import { STATUS, buildTree, rebuild, setEdit } from '../../../../../src/knowledge/capabilities.js';
+import { anglesFor } from '../../../../../src/knowledge/angles.js';
 import { countsByRoute, refreshTouch } from '../../../../../src/runs/touch.js';
 
 /**
@@ -70,6 +71,25 @@ export async function POST(event) {
 
       setEdit(target, id, patch);
       return json({ target, ...(await treeOf(target, await aggregateTriage(target).catch(() => []))) });
+    }
+
+    /**
+     * زاویه‌های آزمونِ یک قابلیت — و چرا فقط با درخواستِ صریح.
+     *
+     * ── چرا در لودرِ صفحه حساب نمی‌شود ──
+     *
+     * هر زاویه `map.json` را می‌خواند و والدِ هر حالت را پیدا می‌کند.
+     * انجامش برای **هر** گرهِ درخت، در هر بار باز شدنِ صفحه، یعنی خواندنِ
+     * چند مگابایت برای چیزی که کاربر شاید به یکی‌اش نگاه کند.
+     *
+     * پس با کلیک روی گره می‌آید — همان لحظه‌ای که واقعاً خواسته شده.
+     */
+    if (action === 'angles') {
+      const id = String(body?.id ?? '').trim();
+      const tree = await treeOf(target, await aggregateTriage(target).catch(() => []));
+      const node = tree.flat.find((one) => one.id === id);
+      if (!node) throw new Error('قابلیت پیدا نشد');
+      return json({ target, id, angles: anglesFor(target, node, { covered: node.counts.scenarios }) });
     }
 
     if (action === 'reset') {

@@ -25,11 +25,57 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
-  import { formatDate, formatNumber } from '$lib/format.js';
+  import { faDigits, formatDate, formatNumber } from '$lib/format.js';
 
   let { node, target, busy = false, onEdit, onReset, onClose, onRun, onQuest } = $props();
 
   let base = $derived(`/projects/${encodeURIComponent(target)}`);
+
+  /**
+   * زاویه‌های آزمون — «برای این قابلیت چند سناریو لازم است؟»
+   *
+   * ── چرا با کلیک می‌آیند و نه با صفحه ──
+   *
+   * حسابشان `map.json` را می‌خواند و والدِ هر حالت را پیدا می‌کند. انجامش
+   * برای همهٔ گره‌ها در هر بار باز شدنِ صفحه، خواندنِ چند مگابایت است برای
+   * چیزی که کاربر شاید به یکی‌اش نگاه کند.
+   */
+  let angles = $state([]);
+  let anglesFor = $state('');
+  let anglesBusy = $state(false);
+
+  $effect(() => {
+    const id = node?.id;
+    if (!id || anglesFor === id) return;
+    anglesFor = id;
+    angles = [];
+    anglesBusy = true;
+    fetch('/api/capabilities', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+      body: JSON.stringify({ target, action: 'angles', id }),
+    })
+      .then((response) => response.json())
+      .then((payload) => {
+        /** گرهِ عوض‌شده وسطِ راه: جوابِ کهنه نباید روی گرهِ تازه بنشیند. */
+        if (anglesFor === id) angles = payload.angles || [];
+      })
+      .catch(() => {
+        if (anglesFor === id) angles = [];
+      })
+      .finally(() => {
+        if (anglesFor === id) anglesBusy = false;
+      });
+  });
+
+  /**
+   * ساخت از همان مسیرِ متن→YAML که پیشنهادها می‌روند.
+   *
+   * یک مسیرِ ساخت، نه دو تا — همان قاعده‌ای که `propose.js` رویش اصرار
+   * دارد. مقدمهٔ قطعی (مسیرِ رسیدن، از نقشه) در آدرس نمی‌آید؛ متن کافی
+   * است، چون خودِ متن می‌گوید کجا باید باز شود.
+   */
+  const composeHref = (angle) => `${base}/files?compose=${encodeURIComponent(angle.text)}`;
 
   let editing = $state(false);
   let title = $state('');
@@ -257,6 +303,64 @@
     {/if}
 
     <!--
+      «چه سناریوهایی برای این لازم است؟»
+
+      ── چرا این بخش از فهرستِ پیشنهادها جداست ──
+
+      `propose.js` دنبالِ **شکاف** است: روتی که هیچ سناریویی ندارد. با
+      نخستین سناریو ساکت می‌شود، چون شکاف پر شده. ولی یک قابلیت با یک
+      سناریو، از یک زاویه آزموده شده و از پنج زاویه نه.
+
+      اینجا همان پنج زاویه است — و هر کدام شاهدِ خودش را دارد، وگرنه
+      فهرستی می‌شود که دو بار چیزِ بی‌ربط بدهد و بارِ سوم بسته شود.
+    -->
+    <div class="mb-4 border-t pt-3">
+      <p class="mb-2 text-xs font-semibold">
+        چه سناریوهایی برای این لازم است؟
+        {#if angles.length}
+          <span class="font-normal text-muted-foreground">({formatNumber(angles.length)} زاویه)</span>
+        {/if}
+      </p>
+
+      {#if anglesBusy}
+        <p class="text-[11px] text-muted-foreground">در حال حساب کردن…</p>
+      {:else if !angles.length}
+        <p class="text-[11px] leading-5 text-muted-foreground">
+          از ساختارِ این نما چیزی درنیامد. زاویه‌ها از کنش‌های واقعیِ خزش
+          ساخته می‌شوند؛ جایی که خزش نرفته، حدسی هم نمی‌زنیم.
+        </p>
+      {:else}
+        <ul class="space-y-1.5">
+          {#each angles as angle (angle.id)}
+            <li class="rounded-lg border p-2 {angle.covered ? 'opacity-55' : ''}">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="text-xs font-medium">
+                    {angle.title}
+                    {#if angle.covered}
+                      <!--
+                        «شاید پوشش دارد» و نه «دارد»: تطبیق از روی نامِ
+                        سناریوست و نامِ سناریو همیشه کارش را نمی‌گوید.
+                        ادعای قطعی اینجا یعنی زاویه‌ای که لازم است پنهان
+                        بماند.
+                      -->
+                      <span class="text-[10px] font-normal text-muted-foreground">· شاید پوشش دارد</span>
+                    {/if}
+                  </p>
+                  <p class="text-[11px] leading-5 text-muted-foreground">{angle.why}</p>
+                  <p class="text-[10px] leading-4 text-muted-foreground/70">شاهد: {faDigits(angle.evidence)}</p>
+                </div>
+                <Button size="sm" variant="outline" class="h-7 shrink-0 text-[11px]" href={composeHref(angle)}>
+                  بساز
+                </Button>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+
+    <!--
       کارها — با دامنهٔ از پیش پر.
 
       ── چرا این مهم‌ترین قسمتِ پنل است ──
@@ -274,7 +378,14 @@
         بگرد اینجا
       </Button>
       <div class="grid grid-cols-2 gap-2">
-        <Button size="sm" variant="outline" href={`${base}/missions`}>سناریو بساز</Button>
+        <!--
+          ── چرا این دکمه دیگر «سناریو بساز» نیست ──
+
+          بود، و به فهرستِ مأموریت‌ها می‌رفت — یعنی کاربر از یک قابلیتِ مشخص
+          به یک فهرستِ عمومی پرت می‌شد و باید خودش دوباره پیدایش می‌کرد.
+          ساختِ سناریو حالا بالاتر است، کنارِ همان زاویه‌ای که می‌خواهد.
+        -->
+        <Button size="sm" variant="outline" href={`${base}/missions`}>همهٔ سناریوها</Button>
         <Button
           size="sm"
           variant="outline"
