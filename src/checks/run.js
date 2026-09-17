@@ -121,7 +121,36 @@ export async function runContractCheck({ page, target, record, step = 'قرار�
 
   const { verifyContract, reinforce, contractFrom, contractFinding, LEARNING_VISITS } = await import('./contract.js');
 
-  const { missing } = await verifyContract(page, record.contract);
+  let { missing } = await verifyContract(page, record.contract);
+
+  /**
+   * همه‌چیز غایب یعنی صفحه هنوز نیامده، نه اینکه صفحه عوض شده.
+   *
+   * ── یافتهٔ دروغینی که با ورود به نپی پیدا شد ──
+   *
+   * قرارداد در پایانِ هر قدم سنجیده می‌شود، با این فرض که «صفحه از قبل
+   * نشسته». برای یک کلیک درست است. برای `go:` به یک اپِ تک‌صفحه‌ای نه:
+   * لحظه‌ای که ناوبری تمام می‌شود، نپی هنوز «در حال بارگذاری…» است و
+   * مهاجرتِ دیتابیس را می‌رود.
+   *
+   * نتیجه این بود: «چیزی که در /login همیشه بود، حالا نیست: ایمیل، رمز
+   * عبور، ورود / ثبت‌نام» — یعنی کلِ صفحه. و روی هر سناریویی تکرار
+   * می‌شد، پس تریاژ را با نویز پر می‌کرد و کاربر یاد می‌گرفت قرارداد را
+   * جدی نگیرد.
+   *
+   * ── چرا فقط وقتی **همه** غایب‌اند ──
+   *
+   * اگر نیمی هست و نیمی نیست، صفحه آمده و واقعاً چیزی کم است. ولی وقتی
+   * هیچ‌کدام نیست، احتمالِ «هنوز رندر نشده» بسیار بیشتر از «دوازده چیز
+   * با هم حذف شدند» است. پس فقط در همین یک حالت، یک بار دیگر — و
+   * هزینه‌اش در حالتِ عادی صفر است.
+   */
+  const total = record.contract.must?.length || 0;
+  if (total && missing.length === total) {
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    ({ missing } = await verifyContract(page, record.contract));
+  }
+
   const learning = (record.contract.seenIn || 0) < LEARNING_VISITS;
 
   const findings = [];

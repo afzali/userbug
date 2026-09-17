@@ -63,3 +63,90 @@ export function loadScenario(file) {
     steps: doc.steps,
   };
 }
+
+/**
+ * «کدام سناریو» — از نام، یا از مسیر.
+ *
+ * ── باگی که با رفتنِ کلِ حلقه روی نپی پیدا شد ──
+ *
+ * `--from` فقط **مسیرِ فایل** می‌پذیرفت. ولی کشویی «اول با این سناریو وارد
+ * شو» در رابط، **نام** سناریو را می‌داد — چون نام همان چیزی است که آدم
+ * می‌شناسد و روی صفحه می‌بیند.
+ *
+ * نتیجه: کاربر «ورود» را انتخاب می‌کرد، خزش شروع می‌شد، و یک ثانیه بعد با
+ * `سناریوی مسیرِ ورود پیدا نشد: D:/Projects/userbug/ورود` می‌مرد — بی هیچ
+ * پوشهٔ اجرایی، پس رابط هم چیزی برای نشان دادن نداشت. از بیرون: دکمه‌ای که
+ * هیچ کاری نمی‌کرد.
+ *
+ * ── چرا هر دو، و به این ترتیب ──
+ *
+ * مسیر اول امتحان می‌شود تا رفتارِ امروزِ خط فرمان دست‌نخورده بماند؛ بعد
+ * نام، داخلِ پوشهٔ همان هدف. نامِ سناریو با مسیرِ فایل اشتباه گرفته نمی‌شود
+ * چون اولی وقتی برنده است که فایلی واقعاً همان‌جا باشد.
+ */
+export function resolveScenarioRef(targetName, ref) {
+  const raw = String(ref || '').trim();
+  if (!raw) return '';
+
+  /** مسیر — چه مطلق چه نسبت به جایی که کاربر ایستاده. */
+  const asPath = path.resolve(raw);
+  if (fs.existsSync(asPath) && fs.statSync(asPath).isFile()) return asPath;
+
+  const dir = scenarioDir(targetName);
+
+  /** مسیرِ نسبی به پوشهٔ همان هدف — همان شکلی که رابط در فهرست نشان می‌دهد. */
+  const inside = path.resolve(dir, raw);
+  if (fs.existsSync(inside) && fs.statSync(inside).isFile()) return inside;
+
+  for (const suffix of ['.yml', '.yaml']) {
+    const guess = `${inside}${suffix}`;
+    if (fs.existsSync(guess)) return guess;
+  }
+
+  /**
+   * و در آخر، نامِ داخلِ فایل — چون نامی که کاربر می‌بیند `name:` است،
+   * نه نامِ فایل. روی نپی این دو یکی بودند و همین پنهانش کرده بود.
+   */
+  const named = [];
+  const walk = (folder) => {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(folder, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(folder, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== '_learned') walk(full);
+        continue;
+      }
+      if (!/\.ya?ml$/i.test(entry.name)) continue;
+      try {
+        const one = loadScenario(full);
+        named.push(one.name);
+        if (one.name === raw) throw { hit: full };
+      } catch (cause) {
+        if (cause?.hit) throw cause;
+        // فایلِ خراب؛ بقیه هنوز نامزدند
+      }
+    }
+  };
+
+  try {
+    walk(dir);
+  } catch (cause) {
+    if (cause?.hit) return cause.hit;
+    throw cause;
+  }
+
+  /**
+   * پیامِ خطا نامزدها را می‌گوید.
+   *
+   * «پیدا نشد: D:/Projects/userbug/ورود» به کاربر می‌گفت ابزار دنبالِ
+   * فایلی در ریشهٔ مخزن گشته — که هیچ ربطی به چیزی که او انتخاب کرده بود
+   * نداشت و راهنمایی‌اش نمی‌کرد.
+   */
+  const hint = named.length ? ` — این‌ها هست: ${named.slice(0, 8).join('، ')}` : ' — این پروژه هنوز سناریویی ندارد';
+  throw new Error(`سناریوی «${raw}» پیدا نشد${hint}`);
+}

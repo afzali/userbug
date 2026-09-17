@@ -822,6 +822,36 @@ export class MapSession extends EventEmitter {
     }
 
     const rest = this.entryPath.slice(1);
+
+    /**
+     * اگر از قبل داخلیم، مسیرِ ورود را دوباره نمی‌رویم.
+     *
+     * ── چرا این تفاوتِ «نقشهٔ اپ» و «نقشهٔ صفحهٔ ورود» است ──
+     *
+     * `goTo` برای **هر** گره `enterRoot` را صدا می‌زند، و `enterRoot` کلِ
+     * مسیرِ ورود را بازپخش می‌کند. روی نپی هر ورود حدود بیست ثانیه است
+     * (مهاجرتِ دیتابیس، مشتقِ کلید از رمز، دو پنجرهٔ مزاحم).
+     *
+     * نتیجه با دادهٔ واقعی: خزشِ دوازده‌دقیقه‌ای با ۲۳۶ کنش در صف تمام شد
+     * و **هرگز داخلِ یک کتاب نرفت**. کلِ بودجه صرفِ ورودِ دوباره شده بود،
+     * نه گشتن.
+     *
+     * ── چرا این سنجه، و نه یک پرچم ──
+     *
+     * پرچمِ «یک بار وارد شدم» دروغ می‌شود: نشست منقضی می‌شود، اپ قفل
+     * می‌کند، کاربر خارج می‌شود. پس هر بار **می‌پرسیم**: رفتن به نقطهٔ
+     * شروعِ ورود، خودش ما را به مقصدِ ورود رساند؟ اگر بله، یعنی داخلیم و
+     * بقیهٔ قدم‌ها بی‌اثرند. اگر نه، مسیر کامل می‌رود.
+     *
+     * و مسیرِ ورود از قبل باید بی‌اثر باشد وقتی واردیم (شرطِ `when`)، پس
+     * این فقط **وقت** را برمی‌دارد، نه رفتار را.
+     */
+    if (rest.length && this.entryLanding) {
+      const here = await this.settle();
+      const route = routeOf(this.page.url());
+      if (route && route === this.entryLanding) return here;
+    }
+
     try {
       await replayPath({ page: this.page, steps: rest, ctx: this.replayCtx(), baseURL: this.target.baseURL, target: this.targetName });
     } catch (cause) {
@@ -845,7 +875,11 @@ export class MapSession extends EventEmitter {
       await dismissBlockers(this.page).catch(() => {});
       await replayPath({ page: this.page, steps: rest, ctx: this.replayCtx(), baseURL: this.target.baseURL, target: this.targetName });
     }
-    return await this.settle();
+
+    const landed = await this.settle();
+    /** مقصدِ ورود، برای اینکه دفعهٔ بعد بشود پرسید «هنوز اینجاییم؟». */
+    this.entryLanding = routeOf(this.page.url()) || this.entryLanding;
+    return landed;
   }
 
   /** مسیرِ ورود + مسیرِ گره. همیشه از ابتدا، چون حالتِ میانی قابل اتکا نیست. */

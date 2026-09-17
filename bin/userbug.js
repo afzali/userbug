@@ -1683,7 +1683,7 @@ async function cmdQuest({ flags, positional }) {
   const YAML = (await import('yaml')).default;
   const { readMap } = await import('../src/map/store.js');
   const { pickState, questScenario, questSlug } = await import('../src/map/quest.js');
-  const { scenarioDir, loadScenario } = await import('../src/scenario/load.js');
+  const { scenarioDir, loadScenario, resolveScenarioRef } = await import('../src/scenario/load.js');
 
   const map = readMap(target);
   const found = pickState(map, goal);
@@ -1713,8 +1713,7 @@ async function cmdQuest({ flags, positional }) {
   const fromFlag = flags.from && flags.from !== true ? String(flags.from) : map.entry?.scenario || '';
   let entrySteps = [];
   if (fromFlag) {
-    const file = path.resolve(fromFlag);
-    if (!fs.existsSync(file)) throw new Error('سناریوی مسیرِ ورود پیدا نشد: ' + file);
+    const file = resolveScenarioRef(target, fromFlag);
     entrySteps = loadScenario(file).steps;
     console.log('  مسیرِ ورود: ' + fromFlag);
   }
@@ -2278,9 +2277,14 @@ async function cmdMap({ flags, positional }) {
   let entrySteps = [];
   let entryLabel = '';
   if (flags.from && flags.from !== true) {
-    const { loadScenario } = await import('../src/scenario/load.js');
-    const file = path.resolve(String(flags.from));
-    if (!fs.existsSync(file)) throw new Error(`سناریوی مسیرِ ورود پیدا نشد: ${file}`);
+    /**
+     * نام یا مسیر — هر دو، چون رابط نام می‌دهد و خط فرمان مسیر.
+     *
+     * پیش‌تر فقط مسیر بود و کشویی رابط نام می‌فرستاد؛ نتیجه‌اش خزشی بود که
+     * یک ثانیه بعد بی‌صدا می‌مرد.
+     */
+    const { loadScenario, resolveScenarioRef } = await import('../src/scenario/load.js');
+    const file = resolveScenarioRef(target, String(flags.from));
     const scenario = loadScenario(file);
     entrySteps = scenario.steps;
     entryLabel = path.relative(ROOT, file).split(path.sep).join('/');
@@ -2297,8 +2301,8 @@ async function cmdMap({ flags, positional }) {
   let seedSteps = [];
   let seedLabel = '';
   if (flags.seed && flags.seed !== true) {
-    const { loadScenario } = await import('../src/scenario/load.js');
-    const file = path.resolve(String(flags.seed));
+    const { loadScenario, resolveScenarioRef } = await import('../src/scenario/load.js');
+    const file = resolveScenarioRef(target, String(flags.seed));
     if (!fs.existsSync(file)) throw new Error(`سناریوی دانه پیدا نشد: ${file}`);
     seedSteps = loadScenario(file).steps;
     seedLabel = path.relative(ROOT, file).split(path.sep).join('/');

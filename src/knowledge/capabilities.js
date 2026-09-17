@@ -575,6 +575,57 @@ export function confidenceOf(node, edit) {
  * محاسبه‌شدنی باشند — و همان دلیلی که `firstSeen` در تریاژ هست: بی زمان،
  * «چه عوض شد» جوابی ندارد.
  */
+/**
+ * آیا درختِ مشتق از منبعش عقب افتاده؟
+ *
+ * ── باگی که با رفتنِ کلِ حلقه روی نپی پیدا شد ──
+ *
+ * خزش تمام شد و ۲۳ قابلیت پیدا کرد — از جمله یازده مودالِ صفحهٔ کتاب‌ها
+ * که تا آن لحظه هیچ‌کس ندیده بودشان. بعد «اپِ من» باز شد و **۱۲ قابلیت**
+ * نشان داد، همان‌هایی که از سورس آمده بودند.
+ *
+ * نه خطایی، نه نشانی از کهنگی. فقط یک درختِ قدیمی که شبیهِ درختِ امروز
+ * بود. تازه‌سازی دکمه داشت، ولی کسی که نمی‌داند عقب افتاده، دکمه را
+ * نمی‌زند — و این بدترین حالتِ «کار می‌کند ولی دروغ می‌گوید» است، روی
+ * صفحه‌ای که کلِ ارزشش همین است.
+ *
+ * ── چرا مقایسهٔ زمانِ فایل ──
+ *
+ * درخت **مشتق** است: ساختنش از `map.json` و `pages/` رایگانِ نسبی است و
+ * دور ریختنش هیچ‌چیزی از بین نمی‌برد (حرفِ آدم در فایلِ دیگری است). پس
+ * لازم نیست بپرسیم «چه عوض شد»؛ کافی است بدانیم «چیزی تازه‌تر از من
+ * هست یا نه».
+ */
+export function isStale(target) {
+  const mine = mtimeOf(derivedFile(target));
+  if (!mine) return true;
+
+  const dir = knowledgeDir(target);
+  const sources = [path.join(dir, 'map.json'), path.join(dir, 'endpoints.json'), path.join(dir, 'dossier.json')];
+
+  let newest = 0;
+  for (const file of sources) newest = Math.max(newest, mtimeOf(file));
+
+  /** صفحه‌ها هم منبع‌اند: نام و قرارداد از آن‌ها می‌آید. */
+  try {
+    for (const entry of fs.readdirSync(path.join(dir, 'pages'), { withFileTypes: true })) {
+      if (entry.isFile()) newest = Math.max(newest, mtimeOf(path.join(dir, 'pages', entry.name)));
+    }
+  } catch {
+    // پروژه‌ای که هنوز صفحه‌ای ثبت نکرده
+  }
+
+  return newest > mine;
+}
+
+function mtimeOf(file) {
+  try {
+    return fs.statSync(file).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
 export function rebuild(target) {
   const previous = readJson(derivedFile(target), { nodes: [] });
   const seen = new Map((previous.nodes || []).map((one) => [one.id, one]));

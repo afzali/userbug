@@ -30,6 +30,25 @@ export const REPLAY_VERBS = [
   'wait',
   'clearState',
   'when',
+  /**
+   * سنجش — و چرا بازپخش هم باید بفهمدش.
+   *
+   * ── چه چیزی بی این می‌شکست ──
+   *
+   * سناریوی ورود دو نقش دارد: یک آزمونِ مستقل، و مقدمهٔ بازپخش‌شونده برای
+   * خزش. در نقشِ اول، `expect` همان چیزی است که سناریو را قابلِ اعتماد
+   * می‌کند («واقعاً وارد شدیم؟»). در نقشِ دوم، تا دیروز کلِ فایل را رد
+   * می‌کرد: «فعلی که خزش اجرا نمی‌کند: expect».
+   *
+   * یعنی کاربر باید یا سناریوی بی‌ادعا می‌نوشت، یا دو فایلِ تقریباً یکسان
+   * نگه می‌داشت.
+   *
+   * و بی آن، بدتر: خزشی که ورودش نگرفته باشد بی‌صدا ادامه می‌دهد و
+   * صفحهٔ ورود را نقشه می‌کند. همان «خزش وارد نشد» که بعداً باید حدس زده
+   * شود. حالا همان‌جا، با پیامِ روشن، می‌ایستد.
+   */
+  'expect',
+  'assert',
   'upload',
   /**
    * بستنِ پنجرهٔ مزاحم.
@@ -46,6 +65,44 @@ export const REPLAY_VERBS = [
 ];
 
 const TIMEOUT = 8000;
+
+/**
+ * زیرمجموعهٔ شرط‌هایی که بازپخش می‌فهمد.
+ *
+ * عمداً کوچک است و با `checkCondition`ِ مفسرِ سناریو یکی نشد: آن به `ctx`،
+ * بودجه، مدل و فایلِ دانلود بند است و کشیدنش به اینجا همان دو مسیرِ
+ * اجرایی را می‌سازد که مقدمهٔ این فایل از آن پرهیز می‌کند.
+ *
+ * آنچه یک **مسیرِ ورود** واقعاً لازم دارد همین چهارتاست: کجا رسیدیم، چه
+ * دیده می‌شود، چه دیگر دیده نمی‌شود، و چه متنی روی صفحه است.
+ */
+async function checkReplayCondition(page, cond) {
+  const timeout = Number(cond.timeout) || TIMEOUT;
+
+  if (cond.url !== undefined) {
+    return await page
+      .waitForURL(new RegExp(cond.url), { timeout })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  if (cond.visible !== undefined) {
+    const { locator } = resolveTarget(page, cond.visible);
+    return await locator.waitFor({ state: 'visible', timeout }).then(() => true).catch(() => false);
+  }
+
+  if (cond.hidden !== undefined) {
+    const { locator } = resolveTarget(page, cond.hidden);
+    return await locator.waitFor({ state: 'hidden', timeout }).then(() => true).catch(() => false);
+  }
+
+  if (cond.text !== undefined) {
+    const { locator } = resolveTarget(page, { text: cond.text });
+    return await locator.first().waitFor({ state: 'visible', timeout }).then(() => true).catch(() => false);
+  }
+
+  throw new Error(`شرطی که بازپخش نمی‌فهمد: ${JSON.stringify(cond)}`);
+}
 
 /** کلیدهایی که فعل نیستند: برچسبِ گروه، مقدار، و بدنهٔ شرط. */
 const IGNORED = new Set(['as', 'note', 'value', 'then']);
@@ -102,7 +159,9 @@ export async function replayStep({ page, step, ctx = {}, baseURL = '', target = 
      */
     case 'when': {
       if (await conditionHolds(page, body)) {
-        for (const sub of step.then || []) await replayStep({ page, step: sub, ctx, baseURL, target });
+        /** همان دو شکل که مفسرِ سناریو می‌پذیرد — وگرنه باز واگرا می‌شوند. */
+        const branch = step.then || body?.then || [];
+        for (const sub of branch) await replayStep({ page, step: sub, ctx, baseURL, target });
       }
       break;
     }
@@ -112,9 +171,30 @@ export async function replayStep({ page, step, ctx = {}, baseURL = '', target = 
       await page.goto(absolute, { waitUntil: 'domcontentloaded' });
       break;
     }
-    case 'wait':
+    /**
+     * `wait` دو شکل دارد — و بازپخش فقط عدد را می‌فهمید.
+     *
+     * ── چه چیزی بی‌صدا از بین می‌رفت ──
+     *
+     * `{wait: {visible: …, timeout: …}}` شکلی است که آدم برای اپِ کند
+     * می‌نویسد: «صبر کن تا فرم بیاید». بازپخش `Number({})` می‌گرفت، صفر
+     * می‌شد، و **اصلاً صبر نمی‌کرد** — بی هیچ خطایی. یعنی همان انتظاری که
+     * کاربر صریح نوشته بود، در مسیرِ خزش وجود نداشت.
+     */
+    case 'wait': {
+      if (body && typeof body === 'object') {
+        const { timeout, ...cond } = body;
+        const ok = await checkReplayCondition(page, { ...cond, timeout });
+        if (!ok) {
+          throw new Error(
+            `انتظارِ مسیرِ ورود نخورد: ${JSON.stringify(cond).slice(0, 80)} — الان اینجاییم: ${page.url()}`
+          );
+        }
+        break;
+      }
       await page.waitForTimeout(Math.min(Number(body) || 0, 10_000));
       break;
+    }
 
     /**
      * دادنِ فایل به اپ — تا خزش بتواند اپِ **پُر** را ببیند، نه خالی.
@@ -153,6 +233,31 @@ export async function replayStep({ page, step, ctx = {}, baseURL = '', target = 
       break;
 
     /**
+     * `expect` می‌شکند، `assert` فقط می‌گوید — همان تفاوتِ مفسرِ سناریو.
+     *
+     * شرط‌های پشتیبانی‌شده همان‌هایی‌اند که این ماژول ابزارش را دارد؛
+     * شرطِ ناشناس بلند می‌شکند، چون سکوت در برابر سنجشی که انجام نشده
+     * یعنی مسیری که فکر می‌کنیم طی شده و نشده.
+     */
+    case 'expect':
+    case 'assert': {
+      const ok = await checkReplayCondition(page, body || {});
+      if (verb === 'expect' && !ok) {
+        /**
+         * پیام می‌گوید **کجا** ایستادیم.
+         *
+         * «سنجش نخورد: {url: /contents}» به تنهایی فقط می‌گوید نشد. آنچه
+         * لازم است این است که به‌جایش کجا رفتیم — همان یک کلمه تفاوتِ بینِ
+         * «حدس بزن» و «فهمیدم».
+         */
+        throw new Error(
+          `سنجشِ مسیرِ ورود نخورد: ${JSON.stringify(body)} — الان اینجاییم: ${page.url()}`
+        );
+      }
+      break;
+    }
+
+    /**
      * اینجا یافته ثبت نمی‌شود، برخلافِ مفسرِ سناریو.
      *
      * همان تصمیمِ `enterRoot`: مزاحمی که **پیش از شروعِ کار** بسته شود قدمِ
@@ -184,7 +289,40 @@ export async function replayStep({ page, step, ctx = {}, baseURL = '', target = 
         })
         .catch(() => {});
       break;
+    /**
+     * `fill` و `type` دو شکل دارند — و بازپخش فقط یکی را می‌فهمید.
+     *
+     * ── واگراییِ واقعی، با یک نمونهٔ واقعی ──
+     *
+     * مفسرِ سناریو هر دو را می‌پذیرد:
+     *
+     *   {fill: {label: «ایمیل»}, value: «a@b.c»}     ← شکلِ بلند
+     *   {fill: {«ایمیل»: «a@b.c»}}                    ← شکلِ کوتاه
+     *
+     * شکلِ کوتاه همان است که ضبط‌کنندهٔ گشت و مدل هر دو می‌سازند — یعنی
+     * شکلِ غالبِ سناریوهای واقعی. بازپخش فقط بلند را می‌فهمید و کوتاه را
+     * می‌داد به `resolveTarget` که می‌گفت «توصیف هدف نامفهوم».
+     *
+     * نتیجه: سناریوی ورودی که در اجراگر سبز بود، در خزش می‌مرد. و مقدمهٔ
+     * همین فایل دقیقاً از این می‌ترسید: «دو مسیرِ اجرا که دیر یا زود
+     * واگرا می‌شوند». واگرا شده بودند.
+     */
     default: {
+      const typing = verb === 'fill' || verb === 'type';
+
+      /** شکلِ کوتاه: کلیدها برچسب‌اند و مقدارها متن. */
+      if (typing && value === undefined && body && typeof body === 'object') {
+        for (const [label, text] of Object.entries(body)) {
+          const { locator } = resolveTarget(page, { label });
+          if (verb === 'fill') await locator.fill(String(text ?? ''), { timeout: TIMEOUT });
+          else {
+            await locator.click({ timeout: TIMEOUT });
+            await page.keyboard.type(String(text ?? ''), { delay: 20 });
+          }
+        }
+        break;
+      }
+
       const { locator } = resolveTarget(page, body);
       if (verb === 'click') await locator.click({ timeout: TIMEOUT });
       else if (verb === 'dblclick') await locator.dblclick({ timeout: TIMEOUT });
@@ -208,26 +346,23 @@ export async function replayStep({ page, step, ctx = {}, baseURL = '', target = 
  * بقیه (`download`, `text`, …) عمداً نیامده‌اند: شرطِ ناشناس `false` می‌دهد و
  * `then` اجرا نمی‌شود، که یعنی مسیرِ ورودِ نیمه‌کاره. پس ناشناس بلند می‌شکند.
  */
+/**
+ * شرطِ `when` — همان ارزیابِ `expect`، نه نسخهٔ دوم.
+ *
+ * ── چرا یکی شدند ──
+ *
+ * این فایل دو ارزیابِ شرط داشت که کمی با هم فرق داشتند: یکی `text` را
+ * می‌فهمید و آن یکی نه. دو تعریف از «شرط» در **یک** ماژول، همان
+ * واگرایی است که مقدمهٔ این فایل دربارهٔ `run.js` هشدار می‌دهد — فقط
+ * کوچک‌تر و پنهان‌تر.
+ */
 async function conditionHolds(page, cond = {}) {
   const timeout = cond.timeout ?? 5000;
-  if (cond.url !== undefined) {
-    return await page
-      .waitForURL(new RegExp(cond.url), { timeout })
-      .then(() => true)
-      .catch(() => false);
+  try {
+    return await checkReplayCondition(page, { ...cond, timeout });
+  } catch (cause) {
+    throw new Error(`شرطِ بی‌پشتیبانی در مسیرِ ورود: ${cause.message}`);
   }
-  for (const [key, state] of [
-    ['visible', 'visible'],
-    ['hidden', 'hidden'],
-  ]) {
-    if (cond[key] === undefined) continue;
-    const { locator } = resolveTarget(page, cond[key]);
-    return await locator
-      .waitFor({ state, timeout })
-      .then(() => true)
-      .catch(() => false);
-  }
-  throw new Error(`شرطِ بی‌پشتیبانی در مسیرِ ورود: ${JSON.stringify(cond).slice(0, 80)}`);
 }
 
 /** زنجیره. اولین شکست، کلِ بازپخش را می‌شکند — مسیرِ نیمه‌طی‌شده بی‌معناست. */

@@ -538,7 +538,21 @@ async function execute({ page, ub, ctx, step }) {
     case 'when': {
       const ok = await checkCondition(page, body, ctx);
       if (ok) {
-        for (const sub of raw.then || []) {
+        /**
+         * `then` هم کنارِ `when` پذیرفته می‌شود هم داخلش.
+         *
+         * ── چرا، با یک نمونهٔ واقعی ──
+         *
+         * شکلِ درست `then` را **کنارِ** `when` می‌گذارد. ولی تورفتگیِ YAML
+         * این را آسان اشتباه می‌کند، و آن‌وقت `then` می‌شود یکی از کلیدهای
+         * بدنهٔ شرط: `checkCondition` نادیده‌اش می‌گیرد، `raw.then` خالی
+         * است، و **کلِ بلوک بی‌صدا اجرا نمی‌شود**.
+         *
+         * خودم همین را نوشتم و ساعتی دنبالش گشتم: سناریوی ورود سبز بود،
+         * هیچ خطایی نداشت، و هرگز وارد نمی‌شد. بدترین نوعِ ایراد — چون
+         * شبیهِ کار کردن است.
+         */
+        for (const sub of raw.then || body?.then || []) {
           const s = normalizeStep(sub);
           await execute({ page, ub, ctx, step: s });
         }

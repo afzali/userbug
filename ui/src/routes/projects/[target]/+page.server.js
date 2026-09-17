@@ -2,7 +2,7 @@ import path from 'node:path';
 import { RUNS_DIR, SCENARIOS_DIR } from '$lib/server/paths.js';
 import { aggregateTriage } from '$lib/server/artifacts.js';
 import { listScenarios } from '$lib/server/projects.js';
-import { buildTree, readCapabilities, rebuild } from '../../../../../src/knowledge/capabilities.js';
+import { buildTree, isStale, rebuild } from '../../../../../src/knowledge/capabilities.js';
 import { countsByRoute, refreshTouch } from '../../../../../src/runs/touch.js';
 import { loadScenario, loadScenarios } from '../../../../../src/scenario/load.js';
 import { routesTouchedBy } from '../../../../../src/knowledge/propose.js';
@@ -52,7 +52,19 @@ export async function load({ params }) {
    * و فایل می‌نویسد؛ انجامش در هر بار باز شدنِ صفحه، همان کُندیِ بی‌دلیلی
    * است که رابط را بی‌فایده می‌کند. تازه‌سازی دکمهٔ خودش را دارد.
    */
-  if (!safely(() => readCapabilities(target).nodes.length, 0)) safely(() => rebuild(target), null);
+  /**
+   * درخت وقتی شناخت تازه‌تر شد، خودش را می‌سازد.
+   *
+   * ── چرا «فقط یک بار، وقتی خالی است» کافی نبود ──
+   *
+   * دقیقاً پس از یک خزشِ موفق شکست: خزش یازده مودالِ تازه پیدا کرد،
+   * این صفحه باز شد، و همان درختِ قدیمی را نشان داد — بی هیچ نشانی از
+   * کهنگی. کاربری که نمی‌داند عقب افتاده، دکمهٔ تازه‌سازی را نمی‌زند.
+   *
+   * حالا شرط «خالی بودن» نیست، «عقب بودن» است — و چون درخت مشتق است،
+   * ساختنِ دوباره هیچ حرفِ آدمی را نمی‌برد.
+   */
+  if (safely(() => isStale(target), false)) safely(() => rebuild(target), null);
 
   const findings = await aggregateTriage(target).catch(() => []);
   const index = safely(() => refreshTouch(target, RUNS_DIR), { routes: {} });
