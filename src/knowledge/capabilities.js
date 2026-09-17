@@ -496,6 +496,22 @@ export function setEdit(target, id, patch) {
     if ('desc' in patch) clean.desc = String(patch.desc ?? '').trim().slice(0, 500);
     if ('parent' in patch) clean.parent = patch.parent ? String(patch.parent).trim() : null;
     if ('status' in patch) clean.status = STATUS.includes(patch.status) ? patch.status : 'active';
+    /**
+     * تأییدِ آدم — «این هست، من دیدمش».
+     *
+     * سورس می‌گوید `/sqlite` وجود دارد و هیچ خزشی به آن نرسیده. دو دلیل
+     * ممکن است: یا واقعاً نیست، یا هست و خزنده راهش را بلد نبود. تنها
+     * کسی که می‌داند، شمایید.
+     */
+    if ('confirmed' in patch) clean.confirmed = Boolean(patch.confirmed);
+    /**
+     * «از کجا می‌شود رسید» — همان چیزی که خزنده نداشت.
+     *
+     * جمله‌ای مثل «از منوی کاربر ← تنظیمات پیشرفته» هم شک را برمی‌دارد و
+     * هم به سناریوی بعدی می‌گوید چطور برود. بی آن، تأیید فقط یک تیک است
+     * که دفعهٔ بعد هم کسی نمی‌داند چطور به آنجا برسد.
+     */
+    if ('reach' in patch) clean.reach = String(patch.reach ?? '').trim().slice(0, 300);
     clean.by = 'user';
     clean.at = new Date().toISOString();
     all[key] = clean;
@@ -522,6 +538,34 @@ export function setEdit(target, id, patch) {
  * روز است دیده نشده». تصمیمِ «دیگر لازم نیست بگردیم» تصمیمِ آدم است.
  */
 export const STATUS = ['active', 'gone', 'ignored'];
+
+/**
+ * قطعی یا مشکوک — یک درخت، نه دو.
+ *
+ * ── مسئله‌ای که این حل می‌کند ──
+ *
+ * اسکنِ سورس یازده روت می‌دهد و خزش دو حالت پیدا می‌کند. تا امروز هر دو
+ * در درخت بودند با برچسبِ `by` — ولی برچسب فقط **می‌گفت** از کجا آمده و
+ * هیچ کاری از کسی نمی‌خواست.
+ *
+ * وسوسه این بود که دو فهرست بسازیم: «آنچه دیده‌ایم» و «آنچه سورس می‌گوید».
+ * و آن دقیقاً همان دو درختی است که کاربر گفت نباید داشته باشیم.
+ *
+ * راهِ درست: یک درخت، و هر گره یکی از دو حالت را دارد —
+ *
+ *   قطعی    کسی واقعاً آنجا بوده (گشت، خزش) یا شما تأیید کرده‌اید
+ *   مشکوک   فقط سورس یا مدل می‌گوید هست؛ هیچ مرورگری آنجا نرفته
+ *
+ * و مشکوک یک **وضعیتِ قابلِ حل** است، نه یک برچسبِ ابدی: یا خزشِ بعدی به
+ * آن می‌رسد، یا شما می‌گویید «هست، از این راه». دومی `by: user` می‌شود و
+ * دیگر هیچ حلقهٔ خودکاری عوضش نمی‌کند.
+ */
+const WITNESSED = new Set(['crawl', 'tour', 'run']);
+
+export function confidenceOf(node, edit) {
+  if (edit?.confirmed) return 'confirmed';
+  return (node.by || []).some((one) => WITNESSED.has(one)) ? 'confirmed' : 'suspected';
+}
 
 /**
  * ساختِ درخت و نوشتنِ فایلِ مشتق.
@@ -618,6 +662,11 @@ export function buildTree(target, { counts = {}, includeGone = false } = {}) {
       status: edit?.status || 'active',
       /** هر بند می‌گوید از کجا آمده — همان قاعدهٔ پروندهٔ شناخت. */
       titleBy: edit?.title ? 'user' : named?.title ? 'model' : 'derived',
+      confidence: confidenceOf(node, edit),
+      /** چطور تأیید شد — «خودم رفتم دیدم» با «خزش رسید» فرق دارد. */
+      confirmedBy: edit?.confirmed ? 'user' : null,
+      /** راهِ رسیدن، اگر شما نوشته‌اید. مستقیم به prompt سناریو می‌رود. */
+      reach: edit?.reach || '',
       edited: Boolean(edit),
       /**
        * نما عددِ صفحهٔ میزبانش را **نمی‌گیرد**.

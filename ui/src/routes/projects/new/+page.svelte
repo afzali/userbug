@@ -96,6 +96,32 @@
    * پنجرهٔ سیستم سرِ جایش می‌ماند (دستِ ما نیست)، ولی فرم آزاد می‌شود و
    * ورودی متنی همیشه بوده و هست.
    */
+  /**
+   * تستِ آدرس — «بالاست یا نه»، پیش از اینکه پروژه‌ای وجود داشته باشد.
+   *
+   * از `POST /api/health` می‌رود، نه `GET`: در این لحظه هیچ پروژه‌ای در
+   * `targets/` نیست که آدرسش را از آن بخوانیم.
+   */
+  let probing = $state(false);
+  let probed = $state(null);
+
+  async function probe() {
+    probing = true;
+    probed = null;
+    try {
+      const response = await fetch('/api/health', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({ baseURL: form.baseURL, apiURL: form.apiURL }),
+      });
+      if (response.ok) probed = await response.json();
+    } catch {
+      // خودِ رابط در دسترس نیست؛ سکوت بهتر از پیامِ گمراه‌کننده است
+    } finally {
+      probing = false;
+    }
+  }
+
   let picking = $state('');
   let pickHint = $state('');
   let pickAbort = null;
@@ -429,6 +455,38 @@
       <label class="block space-y-1.5 text-sm font-medium"><span>نام خوانا</span><Input bind:value={form.name} placeholder="اپ من" /></label>
       <label class="block space-y-1.5 text-sm font-medium"><span>آدرس فرانت</span><Input bind:value={form.baseURL} dir="ltr" placeholder="http://localhost:3000" /></label>
       <label class="block space-y-1.5 text-sm font-medium"><span>آدرس API</span><Input bind:value={form.apiURL} dir="ltr" placeholder="http://127.0.0.1:8080" /></label>
+    </div>
+
+    <!--
+      تستِ آدرس، پیش از ذخیره.
+
+      ── چرا اینجا و نه بعدش ──
+
+      آدرسِ غلط تا امروز **وسطِ نخستین کشف** خودش را نشان می‌داد: مرورگر
+      باز می‌شد، یک دقیقه می‌گذشت، و بعد «اپِ هدف بالا نیست». اعتبارسنجی
+      باید نزدیک‌ترین جا به اشتباه بایستد — همان‌جا که آدرس تایپ شده.
+
+      و «بالا نیست» خطا نیست: شاید هنوز سرور را بالا نیاورده‌ای. پس فقط
+      می‌گوید، جلوی ساختِ پروژه را نمی‌گیرد.
+    -->
+    <div class="flex flex-wrap items-center gap-2">
+      <Button variant="outline" size="sm" disabled={probing || !form.baseURL.trim()} onclick={probe}>
+        {probing ? 'در حال تست…' : 'تستِ آدرس‌ها'}
+      </Button>
+      {#if probed}
+        {#each [['فرانت', probed.front], ['بک', probed.back]] as [label, one] (label)}
+          {#if one.configured}
+            <span class="flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px]">
+              <span class={`size-2 rounded-full ${one.ok ? 'bg-emerald-500' : 'bg-destructive'}`}></span>
+              {label}: {one.ok ? `بالاست · ${one.status}` : one.why}
+              {#if one.ms}<span class="text-muted-foreground">· {one.ms}ms</span>{/if}
+            </span>
+          {/if}
+        {/each}
+      {/if}
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-2">
     </div>
 
     <div class="grid gap-3 sm:grid-cols-3">

@@ -120,7 +120,11 @@
         class="flex min-w-0 flex-1 items-baseline gap-2 text-start"
         onclick={() => onOpen?.(node)}
       >
-        <span class={`truncate ${node.shelf ? 'text-muted-foreground' : 'font-medium'}`}>
+        <span
+          class={`truncate ${node.shelf ? 'text-muted-foreground' : 'font-medium'} ${
+            node.confidence === 'suspected' ? 'opacity-60' : ''
+          }`}
+        >
           {node.view ? '· ' : ''}{node.title}
         </span>
         {#if node.children.length && !isOpen}
@@ -131,6 +135,26 @@
         {/if}
         {#if node.missing}
           <span class="shrink-0 text-[10px] text-amber-600 dark:text-amber-400" title="در آخرین کشف دیده نشد">؟</span>
+        {/if}
+        <!--
+          مشکوک — یک درخت، نه دو.
+
+          ── چرا نشانِ کوچک و نه فهرستِ جدا ──
+
+          وسوسه این بود که «آنچه دیده‌ایم» و «آنچه سورس می‌گوید» دو فهرست
+          شوند. آن دقیقاً همان دو درختی است که نباید داشته باشیم.
+
+          پس همان یک درخت، و گرهی که هیچ مرورگری به آن نرسیده کم‌رنگ است و
+          یک نشان دارد. حلش هم یک کلیک است: یا خزشِ بعدی می‌رسد، یا شما
+          می‌گویید «هست، از این راه».
+        -->
+        {#if node.confidence === 'suspected'}
+          <span
+            class="shrink-0 rounded border border-dashed px-1 text-[9px] text-muted-foreground"
+            title="فقط سورس یا مدل می‌گوید اینجا هست — هیچ مرورگری هنوز نرسیده"
+          >
+            مشکوک
+          </span>
         {/if}
       </button>
 

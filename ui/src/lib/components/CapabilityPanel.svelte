@@ -78,6 +78,28 @@
   const composeHref = (angle) => `${base}/files?compose=${encodeURIComponent(angle.text)}`;
 
   let editing = $state(false);
+  let confirming = $state(false);
+  let reach = $state('');
+
+  /**
+   * تأییدِ آدم که گرهِ مشکوک واقعاً هست.
+   *
+   * `confirmed` و `reach` هر دو `by: user` می‌شوند و هیچ استخراجی بعداً
+   * عوضشان نمی‌کند — همان قاعده‌ای که نامِ دستی رویش بنا شده.
+   */
+  async function confirm() {
+    saving = true;
+    error = '';
+    try {
+      await onEdit?.({ id: node.id, confirmed: true, reach });
+      confirming = false;
+      reach = '';
+    } catch (cause) {
+      error = cause.message;
+    } finally {
+      saving = false;
+    }
+  }
   let title = $state('');
   let desc = $state('');
   let saving = $state(false);
@@ -93,6 +115,8 @@
     const id = node?.id;
     if (!id) return;
     editing = false;
+    confirming = false;
+    reach = '';
     title = node.title || '';
     desc = node.desc || '';
     error = '';
@@ -215,6 +239,69 @@
     {/if}
 
     {#if error}<p class="mb-3 text-xs text-destructive">{error}</p>{/if}
+
+    <!--
+      حلِ شک — کاری که فقط آدم می‌تواند بکند.
+
+      ── چرا این بخش لازم بود ──
+
+      اسکنِ سورس یازده روت می‌دهد و خزش به دوتایش می‌رسد. نُه گرهِ باقی
+      دو حالتِ کاملاً متفاوت دارند و ابزار نمی‌تواند تفکیکشان کند:
+
+        واقعاً نیست (کدِ مرده، فیچرِ حذف‌شده)
+        هست، ولی خزنده راهش را بلد نبود
+
+      تنها کسی که می‌داند شمایید. و «از چه راهی می‌شود رسید» همان چیزی
+      است که خزنده نداشت — پس هم شک را برمی‌دارد هم به سناریوی بعدی
+      می‌گوید چطور برود.
+    -->
+    {#if node.confidence === 'suspected'}
+      <div class="mb-4 rounded-lg border border-dashed p-2.5">
+        <p class="text-xs font-semibold">هنوز کسی اینجا نرفته</p>
+        <p class="mt-1 text-[11px] leading-5 text-muted-foreground">
+          {node.by.includes('source')
+            ? 'سورس می‌گوید این مسیر هست، ولی هیچ گشت و خزشی به آن نرسیده.'
+            : 'مدل حدس زده که این هست؛ هنوز دیده نشده.'}
+          یا واقعاً نیست، یا هست و خزنده راهش را بلد نبود — و این را فقط
+          شما می‌دانید.
+        </p>
+
+        {#if confirming}
+          <Input
+            bind:value={reach}
+            class="mt-2 h-8 text-xs"
+            maxlength="300"
+            placeholder="از چه راهی می‌شود رسید؟ مثلاً: منوی کاربر ← تنظیمات پیشرفته"
+          />
+          <div class="mt-2 flex gap-2">
+            <Button size="sm" disabled={saving} onclick={confirm}>
+              {saving ? 'ذخیره…' : 'هست — ثبت کن'}
+            </Button>
+            <Button size="sm" variant="ghost" disabled={saving} onclick={() => { confirming = false; }}>انصراف</Button>
+          </div>
+          <p class="mt-1 text-[10px] leading-5 text-muted-foreground">
+            جمله اختیاری است ولی بی آن، تأیید فقط یک تیک است — دفعهٔ بعد
+            هم کسی نمی‌داند چطور به اینجا برسد.
+          </p>
+        {:else}
+          <div class="mt-2 flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" disabled={saving} onclick={() => { confirming = true; }}>
+              هست، من دیده‌ام
+            </Button>
+            <Button size="sm" variant="ghost" class="text-muted-foreground" disabled={saving} onclick={() => mark('gone')}>
+              نیست، حذفش کن
+            </Button>
+          </div>
+        {/if}
+      </div>
+    {:else if node.confirmedBy === 'user'}
+      <div class="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
+        <p class="text-xs">
+          <strong>شما تأیید کرده‌اید که اینجا هست.</strong>
+          {#if node.reach}<span class="block text-[11px] text-muted-foreground">راهش: {node.reach}</span>{/if}
+        </p>
+      </div>
+    {/if}
 
     <!--
       ── چرا نما و صفحه دو جدولِ متفاوت دارند ──

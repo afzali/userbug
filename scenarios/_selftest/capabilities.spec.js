@@ -334,3 +334,58 @@ test('جانگهدارِ فریم‌ورک هم مثلِ مقدار جمع می�
   // کلمهٔ آدم هنوز سالم است
   expect(norm('/settings/profile')).toBe('/settings/profile');
 });
+
+test('قطعیت: دیده‌شده قطعی است، سورس‌تنها مشکوک', async () => {
+  withProject({
+    states: [{ id: 'a', route: '/contents', view: '', actions: [] }],
+    pages: [],
+  });
+  /** یک روت که فقط سورس می‌شناسدش. */
+  const know = path.join(process.env.USERBUG_ROOT, 'knowledge', 'demo');
+  fs.writeFileSync(
+    path.join(know, 'endpoints.json'),
+    JSON.stringify({ version: 1, endpoints: [], routes: ['/sqlite'] })
+  );
+
+  const { rebuild, buildTree } = await load();
+  rebuild('demo');
+  const { flat } = buildTree('demo');
+
+  const crawled = flat.find((one) => one.route === '/contents');
+  const guessed = flat.find((one) => one.route === '/sqlite');
+
+  expect(crawled.confidence).toBe('confirmed');
+  /**
+   * ── چرا این تفکیک لازم بود ──
+   *
+   * سورس یازده روت می‌دهد و خزش به دوتایش می‌رسد. تا امروز هر دو یک شکل
+   * دیده می‌شدند و `by` فقط یک برچسب بود که هیچ کاری از کسی نمی‌خواست.
+   * حالا مشکوک یک **وضعیتِ قابلِ حل** است.
+   */
+  expect(guessed.confidence).toBe('suspected');
+});
+
+test('تأییدِ کاربر شک را برمی‌دارد و از استخراج جان سالم می‌برد', async () => {
+  withProject({ states: [] });
+  const know = path.join(process.env.USERBUG_ROOT, 'knowledge', 'demo');
+  fs.writeFileSync(
+    path.join(know, 'endpoints.json'),
+    JSON.stringify({ version: 1, endpoints: [], routes: ['/sqlite', '/admin'] })
+  );
+
+  const { rebuild, buildTree, setEdit, capabilityId } = await load();
+  rebuild('demo');
+  const id = capabilityId('/sqlite', '');
+
+  setEdit('demo', id, { confirmed: true, reach: 'از منوی کاربر ← ابزار توسعه' });
+
+  const after = buildTree('demo').flat.find((one) => one.route === '/sqlite');
+  expect(after.confidence).toBe('confirmed');
+  expect(after.confirmedBy).toBe('user');
+  // «از چه راهی می‌شود رسید» همان چیزی است که خزنده نداشت
+  expect(after.reach).toContain('ابزار توسعه');
+
+  /** تأیید هم مثل نام، `by: user` است و هیچ استخراجی نمی‌بردش. */
+  rebuild('demo');
+  expect(buildTree('demo').flat.find((one) => one.route === '/sqlite').confidence).toBe('confirmed');
+});

@@ -6,6 +6,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import RunPlayer from '$lib/components/RunPlayer.svelte';
   import CommandBar from '$lib/components/CommandBar.svelte';
+  import UpIndicator from '$lib/components/UpIndicator.svelte';
   import { attach, close, run, startJob, ACTIVE } from '$lib/run-store.svelte.js';
 
   let { children } = $props();
@@ -455,6 +456,17 @@
           busy={run.submitting || ACTIVE.has(run.job?.status)}
           onRun={(job) => startJob(target, job)}
         />
+        <!--
+          نشانگرِ بالا بودن، کنارِ نوارِ فرمان.
+
+          ── چرا در هدر و نه در صفحهٔ اپ ──
+
+          همان استدلالِ خودِ نوارِ فرمان: چیزی که همیشه لازم است، مالِ یک
+          صفحه نیست. و لحظه‌ای که واقعاً مهم است، وسطِ تریاژ است — وقتی
+          داری یافته‌ها را می‌خوانی و نمی‌دانی آن ۵۰۰ها از باگ بود یا از
+          اینکه بک اصلاً بالا نبود.
+        -->
+        <UpIndicator {target} />
       {:else}
         <span class="ms-auto flex items-center gap-2 text-xs text-muted-foreground"><span class="size-2 rounded-full bg-emerald-500"></span> آمادهٔ اجرای محلی</span>
       {/if}

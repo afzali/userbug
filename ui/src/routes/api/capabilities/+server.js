@@ -67,6 +67,15 @@ export async function POST(event) {
         if (!STATUS.includes(body.status)) throw new Error('وضعیت نامعتبر است');
         patch.status = body.status;
       }
+      /**
+       * تأییدِ آدم که گرهِ مشکوک واقعاً هست.
+       *
+       * سورس می‌گوید `/sqlite` وجود دارد و هیچ خزشی به آن نرسیده. تنها
+       * کسی که می‌داند «هست ولی خزنده راهش را بلد نبود» یا «واقعاً نیست»،
+       * خودِ کاربر است.
+       */
+      if ('confirmed' in body) patch.confirmed = body.confirmed;
+      if ('reach' in body) patch.reach = body.reach;
       if (!Object.keys(patch).length) throw new Error('چیزی برای ذخیره نیست');
 
       setEdit(target, id, patch);
