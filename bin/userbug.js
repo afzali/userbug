@@ -2385,6 +2385,32 @@ async function cmdMap({ flags, positional }) {
       console.log('    بدهید، یا روتِ مشخص تا مستقیم برود.');
     }
   }
+  /**
+   * خزشی که پشتِ درِ ورود ماند، **شکست است** نه نقشه.
+   *
+   * ── چرا این هشدار لازم شد ──
+   *
+   * یک پروژهٔ تازه از صفر ساخته شد و «خودت برو بگرد» زده شد. نتیجه: دو
+   * حالت، هر دو روی `/login`، صفِ صفر، پنج قدم. خروجی هیچ‌چیزِ غیرعادی
+   * نگفت و رابط تیکِ سبز گذاشت — «۱ اجرا تا امروز».
+   *
+   * ولی خزنده اصلاً وارد نشده بود. اپ ورود دارد و حسابی در کار نبود، پس
+   * از همان صفحهٔ اول رد نشد. دقیقاً همان شکستِ خاموشی که این ابزار برای
+   * شکارش ساخته شده، در خودِ ابزار.
+   *
+   * نشانه‌اش قطعی است و حدس نمی‌خواهد: همهٔ حالت‌ها روی یک روت، و آن روت
+   * همان `auth.loginPath` است.
+   */
+  const routes = new Set((map.states || []).map((one) => one.route).filter(Boolean));
+  const stuck = loginPath && routes.size === 1 && routes.has(loginPath);
+  if (stuck) {
+    console.log('');
+    console.log('  ! خزش از صفحهٔ ورود رد نشد — همهٔ حالت‌ها روی ' + loginPath + ' ماندند.');
+    console.log('    خزنده حسابی ندارد که با آن وارد شود، پس بقیهٔ اپ برایش وجود ندارد.');
+    console.log('    یک بار گشتِ زنده بروید و وارد شوید (`userbug tour ' + target + ' --profile`)،');
+    console.log('    بعد همین خزش را با `--profile` تکرار کنید — نشست می‌ماند.');
+  }
+
   console.log(`\n  یافته‌ها: ${session.findings.length} ثبت‌شده از ${session.seenFindings.size} یکتا`);
   console.log(`  نقشه: knowledge/${target}/map.json  ·  اجرا: runs/${session.runId}/report.html\n`);
 

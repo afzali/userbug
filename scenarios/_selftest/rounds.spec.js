@@ -157,3 +157,61 @@ test('دور بی‌نام ثبت نمی‌شود', async () => {
   const { saveRound } = await load();
   expect(() => saveRound('demo', '   ')).toThrow();
 });
+
+test('خزش و گشت سناریو حساب نمی‌شوند', async () => {
+  const root = withProject();
+  const touch = await import(`../../src/runs/touch.js?t=${Date.now()}${Math.random()}`);
+
+  const runs = path.join(root, 'runs');
+  const make = (name, kind, scenario) => {
+    const dir = path.join(runs, name);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'run.json'),
+      JSON.stringify({ target: 'demo', kind, startedAt: '2026-09-10T10:00:00Z' })
+    );
+    fs.writeFileSync(
+      path.join(dir, 'events.ndjson'),
+      JSON.stringify({ kind: 'step', route: '/login', scenario }) + '\n'
+    );
+  };
+
+  make('a_map', 'map', 'نقشهٔ اپ');
+  make('b_tour', 'tour', 'گشت زنده');
+
+  const counts = touch.countsByRoute(touch.refreshTouch('demo', runs), []);
+  /**
+   * ── سبزِ دروغینی که با ساختنِ یک پروژهٔ تازه پیدا شد ──
+   *
+   * خزش در هر قدم `scenario: 'نقشهٔ اپ'` می‌نویسد — نامِ راننده‌ی خودش.
+   * شاخص آن را سناریو می‌شمرد، پس `/login` از فهرستِ «بی‌سناریو» بیرون
+   * می‌ماند و درخت می‌گفت آزموده شده. یعنی همان سنجه‌ای که کلِ درخت
+   * برایش ساخته شد، با گشتنِ خودِ ابزار سبز می‌شد.
+   */
+  expect(counts['/login'].scenarios).toEqual([]);
+  expect(counts['/login'].runs).toBe(0);
+  // ولی «رفته‌ایم آنجا» خودش یک خبر است و گم نمی‌شود
+  expect(counts['/login'].visits).toBe(2);
+});
+
+test('اجرای واقعیِ سناریو شمرده می‌شود', async () => {
+  const root = withProject();
+  const touch = await import(`../../src/runs/touch.js?t=${Date.now()}${Math.random()}`);
+
+  const runs = path.join(root, 'runs');
+  const dir = path.join(runs, 'c_run');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, 'run.json'),
+    JSON.stringify({ target: 'demo', kind: 'run', startedAt: '2026-09-11T10:00:00Z' })
+  );
+  fs.writeFileSync(
+    path.join(dir, 'events.ndjson'),
+    JSON.stringify({ kind: 'step', route: '/login', scenario: 'ورود' }) + '\n'
+  );
+
+  const counts = touch.countsByRoute(touch.refreshTouch('demo', runs), []);
+  expect(counts['/login'].scenarios).toEqual(['ورود']);
+  expect(counts['/login'].runs).toBe(1);
+  expect(counts['/login'].visits).toBe(0);
+});

@@ -141,7 +141,7 @@
   <Card.Root class="h-fit gap-5">
     <Card.Header>
       <Card.Title>یک بررسی تازه</Card.Title>
-      <Card.Description>هر بار یک اجرا، چون همه مرورگر باز می‌کنند. اسمی که بگذارید، این بار را در «دورها» و در کنارِ هر یافته نشان می‌دهد.</Card.Description>
+      <Card.Description>هر بار یک اجرا، چون همه مرورگر باز می‌کنند. اسمی که بگذارید، این بار را در فهرستِ پایین و کنارِ هر یافته نشان می‌دهد.</Card.Description>
     </Card.Header>
     <Card.Content>
       <form class="space-y-4" onsubmit={start}>

@@ -317,3 +317,20 @@ test('نامی که کاربر گذاشته به مدل داده نمی‌شود
    */
   expect(pendingNames('demo').map((one) => one.route)).toEqual(['/login']);
 });
+
+test('جانگهدارِ فریم‌ورک هم مثلِ مقدار جمع می‌شود', async () => {
+  const { normalizeCapabilityRoute: norm } = await load();
+
+  /**
+   * سورس الگو می‌دهد و خزش مقدار. بی این، `/content/[id_book]` و
+   * `/content/f2e9a6d428` دو گره می‌شدند — یکی «فقط در سورس» و آن یکی
+   * خزیده‌شده، هر کدام با نصفِ عددها.
+   */
+  expect(norm('/content/[id_book]')).toBe('/content/:id');
+  expect(norm('/users/{userId}/roles')).toBe('/users/:id/roles');
+  expect(norm('/post/<slug>')).toBe('/post/:id');
+  expect(norm('/content/:idBook')).toBe('/content/:id');
+  expect(norm('/content/f2e9a6d428')).toBe('/content/:id');
+  // کلمهٔ آدم هنوز سالم است
+  expect(norm('/settings/profile')).toBe('/settings/profile');
+});

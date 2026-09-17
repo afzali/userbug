@@ -80,6 +80,24 @@ export function looksLikeId(segment) {
   const raw = String(segment || '');
   if (!raw) return false;
 
+  /**
+   * جانگهدارِ خودِ فریم‌ورک — `[id_book]`، `{slug}`، `:id`، `<id>`.
+   *
+   * ── چرا این جا افتاده بود، و چطور پیدا شد ──
+   *
+   * فقط **مقدارها** جمع می‌شدند (`f2e9a6d428`)، نه **الگوها**. ولی سورس
+   * الگو می‌دهد: اسکنِ نپی `/content/[id_book]` برمی‌گرداند و خزش از
+   * همان صفحه `/content/f2e9a6d428` می‌بیند.
+   *
+   * نتیجه دو گره برای یک قابلیت بود — یکی «فقط در سورس» و آن یکی
+   * خزیده‌شده، هر کدام با نصفِ عددها. روی `nepi4` که از صفر ساخته شد
+   * همان بار اول دیده شد.
+   *
+   * `propose.js` این را از قبل می‌دانست (`\[[^\]]+\]|:[A-Za-z_]\w*`)؛
+   * الگویش در مخزن بود و این فایل ندیده بودش.
+   */
+  if (/^(\[.+\]|\{.+\}|<.+>|:[A-Za-z_]\w*)$/.test(raw)) return true;
+
   /** فقط رقم: `/42`, `/2024`. */
   if (/^\d+$/.test(raw)) return true;
   /** UUID، با یا بی خط تیره. */
@@ -586,7 +604,7 @@ export function buildTree(target, { counts = {}, includeGone = false } = {}) {
   const edits = readEdits(target);
   const stored = readCapabilities(target);
   const names = stored.names || {};
-  const NONE = { scenarios: [], runs: 0, findings: 0, openFindings: 0, firstAt: '', lastAt: '' };
+  const NONE = { scenarios: [], planned: [], runs: 0, visits: 0, findings: 0, openFindings: 0, firstAt: '', lastAt: '' };
 
   const rows = stored.nodes.map((node) => {
     const edit = edits[node.id] || null;
@@ -616,7 +634,7 @@ export function buildTree(target, { counts = {}, includeGone = false } = {}) {
        * یک نما واقعاً می‌دانیم از خزش می‌آید و روی خودِ گره هست:
        * `tried` از `actions`. همان را نشان می‌دهیم، نه عددِ قرضی.
        */
-      counts: node.view ? { ...NONE, hostRoute: node.route } : counts[node.route] || NONE,
+      counts: node.view ? { ...NONE, hostRoute: node.route } : { ...NONE, ...(counts[node.route] || {}) },
     };
   });
 

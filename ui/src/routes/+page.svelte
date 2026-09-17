@@ -245,7 +245,15 @@
 
         <Card.Footer class="gap-2 px-5">
           <Button href={workspace(project.key)} class="flex-1">ورود به پروژه</Button>
-          <Button href={`${workspace(project.key)}/files`} variant="outline">سناریوها</Button>
+          <!--
+            ── چرا دکمهٔ دوم عوض شد ──
+
+            «سناریوها» بود و به ویرایشگرِ فایل‌ها می‌رفت — یعنی دومین چیزی
+            که روی هر کارت دیده می‌شد، یک صفحهٔ مرجع بود. کسی که از فهرستِ
+            پروژه‌ها می‌آید یا می‌خواهد ببیند اپ چه دارد، یا می‌خواهد
+            بیازمایدش. میان‌بر باید همان دومی باشد.
+          -->
+          <Button href={`${workspace(project.key)}/rounds`} variant="outline">بررسی</Button>
           <!--
             حذف کم‌رنگ و آخر از همه. کارِ روزمره نیست و نباید هم‌وزنِ
             «ورود به پروژه» دیده شود.

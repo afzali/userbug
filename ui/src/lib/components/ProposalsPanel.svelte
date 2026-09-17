@@ -1,4 +1,5 @@
 <script>
+  import { formatNumber } from '$lib/format.js';
   /**
    * «چه باید آزمود» — شکافِ میان آنچه کشف شده و آنچه می‌آزماییم.
    *
@@ -121,10 +122,10 @@
   {/if}
 
   <div class="flex flex-wrap items-center gap-3 rounded-lg border p-4 text-sm">
-    <span><strong>{stats.open}</strong> پیشنهادِ باز</span>
+    <span><strong>{formatNumber(stats.open)}</strong> پیشنهادِ باز</span>
     <span class="h-4 w-px bg-border"></span>
     <span class="text-muted-foreground">
-      {stats.coveredRoutes} از {stats.totalRoutes} صفحهٔ شناخته‌شده، سناریو دارد
+      {formatNumber(stats.coveredRoutes)} از {formatNumber(stats.totalRoutes)} صفحهٔ شناخته‌شده، سناریو دارد
     </span>
     {#if dismissedCount}
       <Button variant="ghost" size="sm" class="ms-auto text-xs" onclick={() => (showDismissed = !showDismissed)}>

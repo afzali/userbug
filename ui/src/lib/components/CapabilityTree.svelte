@@ -38,11 +38,41 @@
     if (node.shelf) return { text: '', tone: '' };
 
     const count = node.counts.scenarios.length;
+    if (count) {
+      return {
+        text: `${formatNumber(count)} سناریو · ${formatNumber(node.counts.runs)} اجرا`,
+        tone: 'text-muted-foreground',
+      };
+    }
+
+    /**
+     * سناریوی نوشته‌شده‌ای که هنوز اجرا نشده.
+     *
+     * ── چرا حالتِ سومی لازم شد ──
+     *
+     * دو حالت داشتیم: «سناریو دارد» و «بی‌سناریو». کاربری که همین حالا از
+     * یک زاویه سناریو ساخته، در هیچ‌کدام نمی‌گنجد — و چون شمارش از
+     * **اجراها** می‌آمد، در «بی‌سناریو» می‌ماند. یعنی کارش را می‌کرد و
+     * صفحه همان عدد را می‌گفت.
+     *
+     * «نوشته، نیازموده» هم صادق است هم قدمِ بعدی را نشان می‌دهد.
+     */
+    const planned = node.counts.planned?.length || 0;
+    if (planned) {
+      const draft = node.counts.planned.some((one) => one.draft);
+      return {
+        text: draft ? `${formatNumber(planned)} پیش‌نویس` : `${formatNumber(planned)} نیازموده`,
+        tone: 'text-sky-600 dark:text-sky-400',
+      };
+    }
+
+    /**
+     * «رفته‌ایم و نیازموده‌ایم» از «اصلاً نرفته‌ایم» بدتر نیست — ولی یکی
+     * نیست. خزش که رویش رفته یعنی می‌دانیم واقعاً وجود دارد.
+     */
     return {
-      text: count
-        ? `${formatNumber(count)} سناریو · ${formatNumber(node.counts.runs)} اجرا`
-        : 'بی‌سناریو',
-      tone: count ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-400',
+      text: node.counts.visits ? 'کشف شده · بی‌سناریو' : 'بی‌سناریو',
+      tone: 'text-amber-600 dark:text-amber-400',
     };
   }
 </script>

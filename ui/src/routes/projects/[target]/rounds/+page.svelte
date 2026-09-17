@@ -94,7 +94,7 @@
     <p class="mt-3 rounded-xl border border-dashed p-3 text-[11px] leading-6 text-muted-foreground">
       می‌خواهید فقط بخشی از اپ بررسی شود؟ در
       <a class="underline underline-offset-2" href={base}>اپِ من</a>
-      همان بخش‌ها را تیک بزنید و «دورِ تازه» را بزنید — دامنه خودش پر می‌شود.
+      همان بخش‌ها را تیک بزنید و «بررسیِ این‌ها» را بزنید — دامنه خودش پر می‌شود.
     </p>
   </div>
 

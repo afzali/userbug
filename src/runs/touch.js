@@ -27,7 +27,14 @@ import path from 'node:path';
 import { knowledgeDir } from '../knowledge/store.js';
 import { normalizeCapabilityRoute } from '../knowledge/capabilities.js';
 
-export const TOUCH_VERSION = 1;
+/**
+ * نسخه ۲: `visits` از `runs` جدا شد.
+ *
+ * شاخص‌های موجود با نسخهٔ ۱ ساخته شده‌اند و خزش را مثلِ اجرا شمرده‌اند. چون
+ * کاملاً از `runs/` بازسازی‌شدنی است، بالا بردنِ نسخه یعنی همه از نو و
+ * درست — به‌جای کدِ مهاجرتی که باید تا ابد نگه داشته شود.
+ */
+export const TOUCH_VERSION = 2;
 
 function touchFile(target) {
   return path.join(knowledgeDir(target), 'touch.json');
@@ -60,14 +67,33 @@ export function readTouch(target) {
  * که هیچ `step`ی رویش ثبت نشده (مثلاً خطایی که بینِ دو قدم آمد). شمارشی که
  * آن را نبیند، دقیقاً همان قابلیتی را کم‌خطرتر نشان می‌دهد که خطر دارد.
  */
-function scanRun(dir) {
+function scanRun(dir, kind) {
   const routes = new Map();
+
+  /**
+   * «رفته‌ایم آنجا» با «آزموده‌ایمش» یکی نیست.
+   *
+   * ── سبزِ دروغینی که با ساختنِ یک پروژهٔ تازه پیدا شد ──
+   *
+   * خزش در هر رخدادِ `step` می‌نویسد `scenario: 'نقشهٔ اپ'` و گشت
+   * `'گشت زنده'` — نامِ راننده‌ی خودشان، نه یک آزمون. شاخص هر دو را
+   * مثلِ سناریو می‌شمرد، پس روی پروژهٔ `nepi4` که فقط یک خزش رفته بود،
+   * `/login` می‌گفت «۱ سناریو» و از فهرستِ «بی‌سناریو» بیرون می‌ماند.
+   *
+   * یعنی دقیقاً همان سنجه‌ای که کلِ درخت برایش ساخته شد — «چه چیزی را
+   * فراموش کرده‌ام» — با گشتنِ خودِ ابزار سبز می‌شد.
+   *
+   * پس دو شمارنده: `scenarios` فقط از اجرای واقعیِ سناریو، و `visits`
+   * از کشف. دومی خبرِ خودش را دارد («اینجا رفته‌ایم و هیچ آزمونی
+   * ندارد») و جای اولی را نمی‌گیرد.
+   */
+  const tested = kind === 'run';
 
   const add = (route, scenario) => {
     const key = normalizeCapabilityRoute(route);
     if (!key) return;
     const entry = routes.get(key) || { scenarios: new Set() };
-    if (scenario) entry.scenarios.add(scenario);
+    if (scenario && tested) entry.scenarios.add(scenario);
     routes.set(key, entry);
   };
 
@@ -136,9 +162,17 @@ export function refreshTouch(target, runsRoot) {
     }
 
     const at = meta.startedAt || '';
-    for (const [route, data] of scanRun(dir)) {
-      const row = index.routes[route] || { runs: 0, scenarios: {}, firstAt: at, lastAt: at };
-      row.runs += 1;
+    const kind = meta.kind || 'run';
+    for (const [route, data] of scanRun(dir, kind)) {
+      const row = index.routes[route] || { runs: 0, visits: 0, scenarios: {}, firstAt: at, lastAt: at };
+      /**
+       * `runs` فقط اجرای سناریوست؛ کشف در `visits` می‌نشیند.
+       *
+       * قاطی کردنشان یعنی «۱۱ اجرا» روی صفحه‌ای که فقط خزنده رویش رفته —
+       * عددی که شبیهِ پوشش است و نیست.
+       */
+      if (kind === 'run') row.runs += 1;
+      else row.visits = (row.visits || 0) + 1;
       for (const scenario of data.scenarios) {
         row.scenarios[scenario] = (row.scenarios[scenario] || 0) + 1;
       }
@@ -184,6 +218,8 @@ export function countsByRoute(index, findings = []) {
     counts[route] = {
       scenarios: Object.keys(row.scenarios || {}).filter(Boolean).sort(),
       runs: row.runs || 0,
+      /** «رفته‌ایم آنجا» — از خزش و گشت و کاوش. خبرِ خودش را دارد. */
+      visits: row.visits || 0,
       firstAt: row.firstAt || '',
       lastAt: row.lastAt || '',
       findings: 0,
@@ -198,6 +234,7 @@ export function countsByRoute(index, findings = []) {
       const row = (counts[route] ||= {
         scenarios: [],
         runs: 0,
+        visits: 0,
         firstAt: '',
         lastAt: '',
         findings: 0,

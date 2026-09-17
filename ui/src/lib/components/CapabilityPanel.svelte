@@ -286,6 +286,49 @@
       {/if}
     </dl>
 
+    {#if node.counts.planned?.length}
+      <!--
+        سناریوی نوشته‌شده که هنوز اجرا نشده.
+
+        ── چرا این بخش لازم بود ──
+
+        با ساختنِ `nepi4` کلِ حلقه را رفتم: قابلیت ← زاویه ← بساز ← ذخیره.
+        فایل ساخته شد و **هیچ‌جا دیده نشد** — درخت همان «بی‌سناریو» را
+        می‌گفت. کاربری که همه‌چیز را درست انجام دهد و صفر بازخورد بگیرد،
+        دفعهٔ بعد امتحانش نمی‌کند.
+
+        و پیش‌نویس باید بگوید که **اجرا نمی‌شود**: تا رسمی نشود،
+        `loadScenarios` برش نمی‌دارد و در فرمِ بررسی هم نمی‌آید. سکوت
+        دربارهٔ این یعنی کاربر منتظرِ نتیجه‌ای می‌ماند که هرگز نمی‌آید.
+      -->
+      <div class="mb-4 rounded-lg border border-sky-500/40 bg-sky-500/5 p-2.5">
+        <p class="text-xs font-semibold">
+          {formatNumber(node.counts.planned.length)} سناریو نوشته شده، هنوز اجرا نشده
+        </p>
+        <ul class="mt-1 space-y-1">
+          {#each node.counts.planned as one (one.path)}
+            <li class="flex items-center gap-2 text-xs">
+              <span class="min-w-0 flex-1 truncate">{one.name}</span>
+              {#if one.draft}<Badge variant="outline" class="shrink-0 text-[10px]">پیش‌نویس</Badge>{/if}
+              <a
+                class="shrink-0 text-[11px] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                href={`${base}/files?kind=scenario&relative=${encodeURIComponent(one.path)}`}
+              >
+                باز کن
+              </a>
+            </li>
+          {/each}
+        </ul>
+        {#if node.counts.planned.some((one) => one.draft)}
+          <p class="mt-1.5 text-[11px] leading-5 text-muted-foreground">
+            پیش‌نویس تا <strong>رسمی</strong> نشود اجرا نمی‌شود — نه در فرمِ بررسی
+            می‌آید و نه رگرسیون شمرده می‌شود. بازش کنید، بازبینی کنید، و
+            «رسمی‌اش کن» را بزنید.
+          </p>
+        {/if}
+      </div>
+    {/if}
+
     {#if node.counts.scenarios.length}
       <!--
         سناریوها با نام، نه فقط با عدد.

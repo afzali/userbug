@@ -83,7 +83,8 @@
       const hay = `${node.title} ${node.route} ${node.view} ${node.desc}`.toLowerCase();
       if (!hay.includes(needle)) return false;
     }
-    if (filter === 'blind') return !node.view && !node.shelf && !node.counts.scenarios.length;
+    if (filter === 'blind')
+      return !node.view && !node.shelf && !node.counts.scenarios.length && !node.counts.planned?.length;
     if (filter === 'untried') return Boolean(node.view && node.actions && !node.tried);
     if (filter === 'red') return node.counts.openFindings > 0;
     if (filter === 'edited') return Boolean(node.edited);
@@ -199,24 +200,51 @@
       label: 'سناریو',
       href: `${base}/missions`,
       done: () => data.pages > 0 && !data.blind,
-      state: () => (data.blind ? `${formatNumber(data.blind)} بخش بی‌سناریو` : 'همه سناریو دارند'),
+      state: () =>
+        data.blind
+          ? `${formatNumber(data.blind)} بخش بی‌سناریو`
+          : data.planned
+            ? `${formatNumber(data.planned)} نوشته، هنوز نیازموده`
+            : 'همه سناریو دارند',
     },
     {
       key: 'review',
       label: 'بررسی',
       href: `${base}/rounds`,
-      done: () => data.pages > 0 && data.total > 0 && tree.flat.some((one) => one.counts.runs),
+      /**
+       * ── چرا خزش اینجا تیک نمی‌گیرد ──
+       *
+       * `counts.runs` حالا فقط اجرای سناریوست. پیش از این خزش هم شمرده
+       * می‌شد، پس روی `nepi4` که تنها یک خزشِ شکست‌خورده داشت، این قدم
+       * سبز بود و می‌گفت «۱ اجرا تا امروز». تیکی که با کارِ خودِ ابزار
+       * سبز شود، هیچ چیزی دربارهٔ اپ نمی‌گوید.
+       */
+      done: () => tree.flat.some((one) => one.counts.runs),
       state: () => {
         const runs = tree.flat.reduce((sum, one) => sum + (one.counts.runs || 0), 0);
-        return runs ? `${formatNumber(runs)} اجرا تا امروز` : 'هنوز اجرایی نبوده';
+        if (runs) return `${formatNumber(runs)} اجرا تا امروز`;
+        const visits = tree.flat.reduce((sum, one) => sum + (one.counts.visits || 0), 0);
+        return visits ? 'فقط کشف شده، هنوز آزموده نشده' : 'هنوز اجرایی نبوده';
       },
     },
     {
       key: 'triage',
       label: 'یافته‌ها',
       href: `${base}/triage`,
-      done: () => !data.open,
-      state: () => (data.open ? `${formatNumber(data.open)} بازِ بی‌قضاوت` : 'همه قضاوت شده'),
+      /**
+       * ── چرا «صفر یافته» تیک نمی‌گیرد ──
+       *
+       * روی پروژه‌ای که هنوز هیچ اجرایی نداشته، «همه قضاوت شده ✓» یک
+       * جملهٔ درست دربارهٔ مجموعهٔ تهی است و یک ادعای غلط دربارهٔ اپ.
+       * ندانستن با نداشتن فرق دارد.
+       */
+      done: () => tree.flat.some((one) => one.counts.runs) && !data.open,
+      state: () =>
+        data.open
+          ? `${formatNumber(data.open)} بازِ بی‌قضاوت`
+          : tree.flat.some((one) => one.counts.runs)
+            ? 'همه قضاوت شده'
+            : 'هنوز چیزی آزموده نشده',
     },
   ];
 
@@ -528,9 +556,15 @@
 
   {#if data.blind}
     <p class="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 text-sm leading-7">
-      <strong>{formatNumber(data.blind)} بخش هیچ سناریویی ندارد.</strong>
-      یعنی هیچ اجرایی تا امروز آن‌ها را نیازموده. روی هر کدام بزنید تا ببینید
-      چیست و همان‌جا سناریو بسازید یا بگویید ابزار برود همان‌جا را بگردد.
+      <strong>{formatNumber(data.blind)} بخش هیچ سناریویی ندارد</strong> — نه
+      نوشته‌شده، نه اجراشده. روی هر کدام بزنید تا ببینید چیست و همان‌جا سناریو
+      بسازید یا بگویید ابزار برود همان‌جا را بگردد.
+      {#if data.planned}
+        <span class="block text-sky-600 dark:text-sky-400">
+          و {formatNumber(data.planned)} بخش سناریو دارد ولی هنوز یک بار هم
+          اجرا نشده.
+        </span>
+      {/if}
     </p>
   {/if}
 
@@ -599,7 +633,7 @@
                 disabled={!!busy}
                 onclick={() => { roundOpen = !roundOpen; }}
               >
-                دورِ تازه
+                بررسیِ این‌ها
               </Button>
               {#if pickedScenarios.length}
                 <Button
@@ -630,8 +664,8 @@
           {#if roundOpen}
             <div class="mt-3 space-y-2 border-t pt-3">
               <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <Input bind:value={roundName} class="h-9" maxlength="60" placeholder="اسمِ این دور — مثلاً: پیش از انتشار ۴.۲" />
-                <Input bind:value={roundNote} class="h-9" maxlength="300" placeholder="چرا این دور؟ (اختیاری)" />
+                <Input bind:value={roundName} class="h-9" maxlength="60" placeholder="اسمِ این بررسی — مثلاً: پیش از انتشار ۴.۲" />
+                <Input bind:value={roundNote} class="h-9" maxlength="300" placeholder="چرا این بررسی؟ (اختیاری)" />
               </div>
 
               <div class="flex flex-wrap gap-3 text-xs">
@@ -659,7 +693,7 @@
                   اول سناریوها، بعد خزش — پشتِ سرِ هم، چون هر دو مرورگر باز می‌کنند.
                   دومی وقتی اولی تمام شد خودش شروع می‌شود.
                 {:else}
-                  هر دو زیرِ همین اسم ثبت می‌شوند و در «دورها» و در تریاژ کنارِ هر یافته دیده می‌شوند.
+                  هر دو زیرِ همین اسم ثبت می‌شوند و در «بررسی» و کنارِ هر یافته دیده می‌شوند.
                 {/if}
               </p>
 
@@ -669,9 +703,9 @@
                   disabled={!!busy || !roundName.trim() || (!roundScenarios && !roundCrawl)}
                   onclick={startRound}
                 >
-                  {busy === 'round' ? 'در حال شروع…' : 'شروعِ دور'}
+                  {busy === 'round' ? 'در حال شروع…' : 'شروعِ بررسی'}
                 </Button>
-                <Button size="sm" variant="ghost" href={`${base}/rounds`}>دورهای قبلی</Button>
+                <Button size="sm" variant="ghost" href={`${base}/rounds`}>بررسی‌های قبلی</Button>
               </div>
             </div>
           {/if}
