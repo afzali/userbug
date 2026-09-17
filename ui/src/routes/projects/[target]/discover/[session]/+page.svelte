@@ -198,7 +198,7 @@
   <div class="mt-4 flex flex-wrap gap-2">
     <Button size="sm" href={base}>آنچه پیدا شد، در اپِ من</Button>
     <Button size="sm" variant="outline" href={`/runs/${encodeURIComponent(session.id)}`}>
-      گزارشِ کاملِ اجرا
+      عکس‌ها و خطِ زمانی
     </Button>
   </div>
 {/if}

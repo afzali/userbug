@@ -79,7 +79,7 @@
 
   <Card.Footer class="flex-col items-stretch gap-2 px-5">
     <div class="flex gap-2">
-      <Button href={`/runs/${encodeURIComponent(run.runId)}`} variant="outline" class="flex-1">دیدن خط زمانی</Button>
+      <Button href={`/runs/${encodeURIComponent(run.runId)}`} variant="outline" class="flex-1">عکس‌ها و خطِ زمانی</Button>
       <Button variant="ghost" size="icon" disabled={busy} onclick={remove} title="حذفِ این اجرا" aria-label="حذفِ این اجرا">
         ✕
       </Button>
