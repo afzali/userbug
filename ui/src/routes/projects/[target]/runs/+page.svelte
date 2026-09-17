@@ -126,7 +126,28 @@
                 {formatDate(one.at)}{one.steps ? ` · ${formatNumber(one.steps)} قدم` : ''}
               </span>
             </span>
-            {#if !one.done}<Badge variant="outline" class="shrink-0 text-[10px]">ناتمام</Badge>{/if}
+            <!--
+              دو حالتِ متفاوت، و عمداً دو واژهٔ متفاوت.
+
+              «نیمه‌کاره» یعنی خودِ اجرا تمام نشد. «سناریو نداد» یعنی تمام
+              شد و چیزی به‌جا نگذاشت که بشود فردا اجرایش کرد — ملاکی که
+              کاربر گذاشت. یک واژه برای هر دو یعنی هیچ‌کدام فهمیده نشود.
+            -->
+            {#if !one.done}
+              <Badge variant="outline" class="shrink-0 text-[10px]">نیمه‌کاره</Badge>
+            {:else if one.yield && !one.yield.complete}
+              <Badge
+                variant="outline"
+                class="shrink-0 border-amber-500/40 text-[10px] text-amber-600 dark:text-amber-400"
+                title="این کشف تمام شد ولی هیچ سناریویی نساخت"
+              >
+                سناریو نداد
+              </Badge>
+            {:else if one.yield?.made?.length}
+              <Badge variant="outline" class="shrink-0 text-[10px]">
+                {formatNumber(one.yield.made.length)} سناریو
+              </Badge>
+            {/if}
             {#if one.findings}
               <Badge variant="destructive" class="shrink-0 text-[10px]">{formatNumber(one.findings)}</Badge>
             {/if}

@@ -23,6 +23,7 @@
   import TourPanel from '$lib/components/TourPanel.svelte';
   import CrawlPanel from '$lib/components/CrawlPanel.svelte';
   import MapReport from '$lib/components/MapReport.svelte';
+  import Harvest from '$lib/components/Harvest.svelte';
   import { formatDate, formatNumber } from '$lib/format.js';
 
   let { data } = $props();
@@ -67,6 +68,15 @@
   {/if}
 {:else if session.kind === 'source'}
   <div class="space-y-4">
+    <!--
+      همان حکم، برای سورس هم.
+
+      خواندنِ سورس ارزان‌ترین کشف است و به همین دلیل بیشترین احتمال را
+      دارد که چیزی به‌جا نگذارد: یازده روت پیدا می‌کند، هیچ‌کدام آزمون
+      نمی‌گیرند، و رابط می‌گوید «انجام شد».
+    -->
+    <Harvest harvest={data.harvest} {target} />
+
     <div class="flex flex-wrap gap-3 text-sm">
       {#each [['فایلِ خوانده‌شده', data.source.files], ['endpoint', data.source.total], ['روت', data.source.routes.length], ['نیازموده', data.source.untouched.length]] as [label, value] (label)}
         <div class="rounded-xl border px-4 py-2">
@@ -111,6 +121,15 @@
     صفحهٔ قبلی «صفحه‌های ثبت‌شده» و «یافته‌ها» را از کلِ پروژه می‌آورد، پس
     بعد از ده گشت هیچ‌کدام دربارهٔ گشتی نبودند که باز کرده بودی.
   -->
+  <!--
+    حکمِ کشف، پیش از هر عددِ دیگری.
+
+    «۲۸ حالت» و «۹۴ کنش» عددهای بزرگی‌اند که کارِ نکرده را کرده نشان
+    می‌دهند. سوالی که واقعاً مهم است این است که فردا چه چیزی هست که بشود
+    اجرایش کرد — پس اول می‌آید.
+  -->
+  <Harvest harvest={data.harvest} {target} />
+
   <div class="mb-5 flex flex-wrap gap-3 text-sm">
     {#each [['قدم', session.steps], ['یافته', session.findings]] as [label, value] (label)}
       <div class="rounded-xl border px-4 py-2">

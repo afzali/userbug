@@ -1,8 +1,12 @@
+import path from 'node:path';
+import { RUNS_DIR } from '$lib/server/paths.js';
 import { aggregateTriage, listRuns } from '$lib/server/artifacts.js';
 import { listSchedules } from '../../../../../../src/schedule.js';
 import { groupRounds, printsByRound, readRounds } from '../../../../../../src/runs/rounds.js';
 import { discoverySessions } from '../../../../../../src/knowledge/sessions.js';
 import { readCapabilities } from '../../../../../../src/knowledge/capabilities.js';
+import { allScenarios, yieldOf } from '../../../../../../src/knowledge/yield.js';
+import { countsByRoute, refreshTouch } from '../../../../../../src/runs/touch.js';
 
 /**
  * «بررسی» — یک بار بررسی کن، و ببین بارهای قبل چه دادند.
@@ -50,6 +54,36 @@ export async function load({ params }) {
    * صفحه باید کار کند.
    */
   const discoveries = safely(() => discoverySessions(target, runs), []);
+
+  /**
+   * حکمِ هر کشف، در خودِ فهرست.
+   *
+   * ── چرا یک تعریف، در هر دو جا ──
+   *
+   * وسوسه این بود که فهرست تقریبِ ارزان‌تری بزند («سناریویی بعد از این
+   * تاریخ ساخته شده؟») و صفحهٔ جلسه حکمِ دقیق را بدهد. ولی آن‌وقت یک
+   * کلمه دو معنا دارد و روزی فهرست «ناتمام» می‌گوید و صفحه «✓».
+   *
+   * و ارزان هم هست: `events.ndjson`ِ این پروژه میانگین ۱۱ کیلوبایت است.
+   * سنگینیِ `runs/` از عکس و trace می‌آید، نه از رخدادها.
+   */
+  const scenarios = safely(() => allScenarios(target), []);
+  const counts = safely(() => countsByRoute(refreshTouch(target, RUNS_DIR), findings), {});
+
+  for (const one of discoveries) {
+    if (!one.done) continue;
+    one.yield = safely(
+      () =>
+        yieldOf({
+          session: one,
+          runDir: one.kind === 'source' ? '' : path.join(RUNS_DIR, one.id),
+          target,
+          scenarios,
+          counts,
+        }),
+      null
+    );
+  }
 
   const schedules = await listSchedules()
     .then((all) => all.filter((row) => row.target === target))

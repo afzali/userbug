@@ -15,6 +15,7 @@
    * درس گرفته از `FoundPanel` که ۱۰۳۹ خط شد: درخت یک کامپوننت است، پنل
    * یکی دیگر، و این فایل فقط حالت و اتصال.
    */
+  import { page } from '$app/state';
   import { invalidateAll } from '$app/navigation';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
@@ -81,6 +82,27 @@
     { key: 'red', label: 'ایرادِ باز', count: () => data.open },
     { key: 'edited', label: 'ویرایش‌شده' },
   ];
+
+  /**
+   * فیلتر و جستجو از آدرس هم می‌آیند.
+   *
+   * ── چرا لازم شد ──
+   *
+   * حکمِ پایانِ یک کشف می‌گوید «۶ جا دیدیم و هیچ آزمونی ندارند» و به
+   * همین‌جا لینک می‌دهد. لینکی که صفحه را باز کند و کاربر دوباره باید
+   * خودش فیلتر را بزند، همان کنترلِ بی‌اثری است که هیچ خطایی نمی‌دهد.
+   *
+   * و یک بار: بعدش دستِ کاربر است. `$effect`ی که هر بار از آدرس
+   * بازنویسی کند، فیلترِ عوض‌شده را پس می‌گیرد.
+   */
+  let fromUrl = $state(false);
+  $effect(() => {
+    if (fromUrl) return;
+    fromUrl = true;
+    const wanted = page.url.searchParams.get('filter') || '';
+    if (FILTERS.some((one) => one.key === wanted)) filter = wanted;
+    search = page.url.searchParams.get('q') || '';
+  });
 
   function matches(node) {
     if (search.trim()) {

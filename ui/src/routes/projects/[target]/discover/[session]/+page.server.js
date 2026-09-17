@@ -18,6 +18,8 @@ import { mispredictions } from '../../../../../../../src/map/classify.js';
 import { loadScenario, scenarioDir } from '../../../../../../../src/scenario/load.js';
 import { unsupportedVerbs } from '../../../../../../../src/map/replay.js';
 import { looksRecorded } from '../../../../../../../src/scenario/entry.js';
+import { countsByRoute, refreshTouch } from '../../../../../../../src/runs/touch.js';
+import { allScenarios, yieldOf } from '../../../../../../../src/knowledge/yield.js';
 
 /**
  * داخلِ یک جلسهٔ کشف.
@@ -106,6 +108,17 @@ export async function load({ params }) {
       },
       hasSource: Boolean(project?.sourceRoot),
       sourceRoot: project?.sourceRoot || '',
+      harvest: safely(
+        () =>
+          yieldOf({
+            session: { kind: 'source', at: snapshot.at },
+            runDir: '',
+            target,
+            scenarios: allScenarios(target),
+            counts: countsByRoute(refreshTouch(target, RUNS_DIR), []),
+          }),
+        null
+      ),
     };
   }
 
@@ -149,6 +162,30 @@ export async function load({ params }) {
       source: one.source,
       route: one.route || '',
     })),
+
+    /**
+     * «این کشف چه چیزی برای اجرا ساخت؟»
+     *
+     * ── چرا در لودر و نه با یک دکمه ──
+     *
+     * این جوابِ سوالِ اصلیِ صفحه است، نه یک جزئیاتِ اختیاری. کاربر گفت
+     * ملاکِ درست انجام شدنِ کشف همین است — و ملاکی که باید دنبالش بگردی،
+     * ملاک نیست.
+     *
+     * هزینه‌اش هم مالِ **یک** اجراست: `events.ndjson`ِ همین جلسه، نه
+     * همهٔ اجراها.
+     */
+    harvest: safely(
+      () =>
+        yieldOf({
+          session: { kind: row.kind, at: row.startedAt },
+          runDir: path.join(RUNS_DIR, id),
+          target,
+          scenarios: allScenarios(target),
+          counts: countsByRoute(refreshTouch(target, RUNS_DIR), []),
+        }),
+      null
+    ),
   };
 }
 
