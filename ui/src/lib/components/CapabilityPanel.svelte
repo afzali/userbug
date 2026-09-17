@@ -27,7 +27,7 @@
   import { Textarea } from '$lib/components/ui/textarea/index.js';
   import { faDigits, formatDate, formatNumber } from '$lib/format.js';
 
-  let { node, target, busy = false, onEdit, onReset, onClose, onRun, onQuest } = $props();
+  let { node, target, busy = false, onEdit, onReset, onClose, onRun, onQuest, onFeats, featNote = '', hasFeats = false } = $props();
 
   let base = $derived(`/projects/${encodeURIComponent(target)}`);
 
@@ -49,6 +49,14 @@
     if (!id || anglesFor === id) return;
     anglesFor = id;
     angles = [];
+    /**
+     * فیچر زاویه ندارد — هنوز.
+     *
+     * `anglesFor` کنش‌های **صفحه** را می‌خواند، پس پرسیدنش برای یک فیچر
+     * زاویه‌های کلِ صفحه را برمی‌گرداند و زیرِ نامِ «هایلایت» می‌نشاند.
+     * جوابِ دقیقاً غلط، بدتر از جوابِ نداشتن است.
+     */
+    if (node.feature) return;
     anglesBusy = true;
     fetch('/api/capabilities', {
       method: 'POST',
@@ -102,6 +110,18 @@
   }
   let title = $state('');
   let desc = $state('');
+  /**
+   * «کارِ درستش چیست» — تنها جای این ابزار که انتظار به زبانِ آدم نوشته
+   * می‌شود.
+   *
+   * کاربر گفت: «وقتی فلان اکت شد باید این‌جوری بشه». امروز سناریو فقط
+   * می‌گوید چه کن، نه چه باید ببینی — و بی آن، هر اجرا فقط می‌تواند
+   * خطای صریح را ببیند، نه کارِ غلطِ بی‌خطا.
+   *
+   * اینجا کوچک شروع می‌شود: یک جمله، روی فیچر، که مستقیم به prompt
+   * سناریو می‌رود.
+   */
+  let expected = $state('');
   let saving = $state(false);
   let error = $state('');
 
@@ -119,6 +139,7 @@
     reach = '';
     title = node.title || '';
     desc = node.desc || '';
+    expected = node.expected || '';
     error = '';
   });
 
@@ -126,7 +147,7 @@
     saving = true;
     error = '';
     try {
-      await onEdit?.({ id: node.id, title, desc });
+      await onEdit?.({ id: node.id, title, desc, ...(node.feature ? { expected } : {}) });
       editing = false;
     } catch (cause) {
       error = cause.message;
@@ -147,7 +168,7 @@
     }
   }
 
-  const BY = { crawl: 'خزش', tour: 'گشت', source: 'سورس', derived: 'ساختار' };
+  const BY = { crawl: 'خزش', tour: 'گشت', source: 'سورس', derived: 'ساختار', user: 'خودتان', model: 'حدسِ مدل' };
 
   /**
    * «کجا» به زبانِ آدم.
@@ -155,7 +176,11 @@
    * مسیرِ خام برای نما گمراه‌کننده است: `/contents` می‌گوید صفحه، در حالی
    * که این یک مودال **داخلِ** آن صفحه است.
    */
-  let where = $derived(node?.view ? `${node.route} ▸ ${node.view}` : node?.route || '');
+  let where = $derived(
+    (node?.view ? `${node.route} ▸ ${node.view}` : node?.route || '') +
+      /** هش جای دقیق‌ترِ یک فیچر است — `#notes` با `#search` دو جای متفاوتند. */
+      (node?.hash ? ` #${node.hash}` : '')
+  );
 
   /**
    * نمونهٔ واقعی، وقتی مسیر شناسه دارد.
@@ -222,6 +247,26 @@
 
     {#if editing}
       <Textarea bind:value={desc} rows="3" class="mb-2 text-xs" placeholder="این قابلیت چه کار می‌کند؟" maxlength="500" />
+      {#if node.feature}
+        <!--
+          «کارِ درستش چیست» — و چرا فقط روی فیچر.
+
+          روی یک صفحه این سوال جوابِ روشنی ندارد («صفحهٔ کتاب باید چه
+          بکند؟»). روی یک فیچر دارد: «وقتی متن را انتخاب کردم و هایلایت
+          زدم، باید رنگی بماند حتی بعد از رفرش». همان جمله‌ای است که
+          سناریو می‌تواند ادعایش را از رویش بسازد.
+        -->
+        <label class="mb-2 block">
+          <span class="mb-1 block text-[11px] font-semibold">کارِ درستش چیست؟</span>
+          <Textarea
+            bind:value={expected}
+            rows="3"
+            class="text-xs"
+            placeholder="وقتی … شد، باید … شود"
+            maxlength="500"
+          />
+        </label>
+      {/if}
       <div class="mb-4 flex gap-2">
         <Button size="sm" disabled={saving} onclick={save}>{saving ? 'ذخیره…' : 'ذخیره'}</Button>
         <Button size="sm" variant="ghost" disabled={saving} onclick={() => { editing = false; }}>انصراف</Button>
@@ -236,6 +281,31 @@
         {node.desc || 'توضیحی ثبت نشده.'}
         <button type="button" class="underline underline-offset-2" onclick={() => { editing = true; }}>ویرایش</button>
       </p>
+    {/if}
+
+    {#if node.feature && !editing}
+      {#if node.expected}
+        <div class="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
+          <p class="text-[11px] font-semibold">کارِ درستش</p>
+          <p class="mt-1 text-xs leading-6">{node.expected}</p>
+        </div>
+      {:else}
+        <p class="mb-4 rounded-lg border border-dashed p-2.5 text-[11px] leading-6 text-muted-foreground">
+          هنوز ننوشته‌اید کارِ درستِ این فیچر چیست. با آن، سناریو می‌تواند
+          ادعا هم داشته باشد، نه فقط کلیک.
+        </p>
+      {/if}
+
+      {#if node.actions?.length}
+        <div class="mb-4 border-t pt-3">
+          <p class="mb-1.5 text-[11px] text-muted-foreground">از این عناصر ساخته شده:</p>
+          <div class="flex flex-wrap gap-1">
+            {#each node.actions as one (one)}
+              <Badge variant="outline" class="text-[10px]">{one}</Badge>
+            {/each}
+          </div>
+        </div>
+      {/if}
     {/if}
 
     {#if error}<p class="mb-3 text-xs text-destructive">{error}</p>{/if}
@@ -255,7 +325,31 @@
       است که خزنده نداشت — پس هم شک را برمی‌دارد هم به سناریوی بعدی
       می‌گوید چطور برود.
     -->
-    {#if node.confidence === 'suspected'}
+    {#if node.feature && node.confidence === 'suspected'}
+      <!--
+        تأییدِ فیچرِ حدسی — همان قاعده، فرمِ کوتاه‌تر.
+
+        گرهِ مشکوک «از چه راهی می‌شود رسید» می‌خواهد، چون خزنده راه را
+        بلد نبوده. فیچر این را لازم ندارد: جایش از قبل معلوم است و
+        خزنده همان‌جا بوده. سوال فقط این است که آنچه مدل حدس زده
+        واقعاً یک کار است یا نه — و جوابش یک کلیک است.
+      -->
+      <div class="mb-4 rounded-lg border border-dashed p-2.5">
+        <p class="text-xs font-semibold">این را مدل حدس زده</p>
+        <p class="mt-1 text-[11px] leading-6 text-muted-foreground">
+          از روی کنش‌های این صفحه ساخته شده، نه از چیزی که کسی دیده باشد.
+          تا تأییدش نکنید، برایش سناریو خواسته نمی‌شود.
+        </p>
+        <Button
+          size="sm"
+          class="mt-2"
+          disabled={saving}
+          onclick={() => { saving = true; error = ''; Promise.resolve(onEdit?.({ id: node.id, title: node.title })).catch((cause) => { error = cause.message; }).finally(() => { saving = false; }); }}
+        >
+          بله، این کار هست
+        </Button>
+      </div>
+    {:else if !node.feature && node.confidence === 'suspected'}
       <div class="mb-4 rounded-lg border border-dashed p-2.5">
         <p class="text-xs font-semibold">هنوز کسی اینجا نرفته</p>
         <p class="mt-1 text-[11px] leading-5 text-muted-foreground">
@@ -294,7 +388,7 @@
           </div>
         {/if}
       </div>
-    {:else if node.confirmedBy === 'user'}
+    {:else if !node.feature && node.confirmedBy === 'user'}
       <div class="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
         <p class="text-xs">
           <strong>شما تأیید کرده‌اید که اینجا هست.</strong>
@@ -303,6 +397,15 @@
       </div>
     {/if}
 
+    <!--
+      شمارش و زاویه، فقط برای صفحه و نما.
+
+      فیچر هنوز هیچ‌کدام را ندارد: رخدادِ اجرا فیچر را نمی‌شناسد و
+      `anglesFor` کنش‌های کلِ صفحه را می‌خواند. نشان دادنِ هر دو زیرِ نامِ
+      یک فیچر، عددِ قرضی است — همان اشتباهی که یک بار روی نماها رخ داد و
+      مودالی که هرگز باز نشده بود «۳ سناریو · ۱۱ اجرا» می‌گفت.
+    -->
+    {#if !node.feature}
     <!--
       ── چرا نما و صفحه دو جدولِ متفاوت دارند ──
 
@@ -501,6 +604,8 @@
       {/if}
     </div>
 
+    {/if}
+
     <!--
       کارها — با دامنهٔ از پیش پر.
 
@@ -518,6 +623,34 @@
       >
         بگرد اینجا
       </Button>
+
+      <!--
+        «این صفحه چه کارهایی دارد؟» — لایهٔ سومِ درخت، با دکمه.
+
+        ── چرا اینجا و نه بالای صفحه ──
+
+        این تنها دکمهٔ پنل است که پول خرج می‌کند، و هزینه‌اش صفحه‌به‌صفحه
+        است. دکمه‌ای بالای درخت یعنی «برای هر صد صفحه یک فراخوانی» — که
+        هیچ‌کس نمی‌زندش. اینجا کاربر روی صفحه‌ای ایستاده که همین حالا
+        می‌داند فیچرِ پنهان دارد.
+      -->
+      {#if !node.feature && !node.shelf}
+        <Button
+          size="sm"
+          variant="outline"
+          class="w-full"
+          disabled={busy || !node.actions}
+          onclick={() => onFeats?.(node, hasFeats)}
+        >
+          {hasFeats ? 'دوباره دنبالِ فیچر بگرد' : 'این صفحه چه کارهایی دارد؟'}
+        </Button>
+        {#if !node.actions}
+          <p class="text-[11px] leading-6 text-muted-foreground">
+            نقشه برای اینجا کنشی ندارد؛ اول یک کشف رویش لازم است.
+          </p>
+        {/if}
+        {#if featNote}<p class="text-[11px] leading-6 text-muted-foreground">{featNote}</p>{/if}
+      {/if}
       <div class="grid grid-cols-2 gap-2">
         <!--
           ── چرا این دکمه دیگر «سناریو بساز» نیست ──
@@ -544,7 +677,25 @@
         دارد که هیچ‌کدام حذف شدن نیست. ولی وقتی **شما** می‌دانید فیچر رفته،
         باید راهی باشد که ابزار دیگر سراغش نرود و در «بی‌سناریو» نشمردش.
       -->
-      {#if node.status === 'gone'}
+      {#if node.feature}
+        <!--
+          فیچر «حذف شده» نمی‌گیرد، پاک می‌شود.
+
+          `gone` برای گره‌ای است که در فایلِ مشتق می‌ماند و هر استخراج
+          دوباره می‌سازدش، پس باید نشانه‌ای داشته باشد که سراغش نروند.
+          فیچر در فایلِ خودش است؛ نبودنش یعنی نبودن، و ردیفِ مردهٔ
+          نگه‌داشته‌شده فقط شلوغی است.
+        -->
+        <Button
+          size="sm"
+          variant="ghost"
+          class="w-full text-muted-foreground"
+          disabled={saving}
+          onclick={() => onReset?.(node.id)}
+        >
+          {node.confidence === 'suspected' ? 'نه، چنین کاری نداریم' : 'حذفِ این فیچر'}
+        </Button>
+      {:else if node.status === 'gone'}
         <Button size="sm" variant="ghost" class="w-full" disabled={saving} onclick={() => mark('active')}>
           برگردان — هنوز هست
         </Button>
@@ -556,8 +707,17 @@
     </div>
 
     <p class="mt-3 border-t pt-2 text-[10px] text-muted-foreground">
-      شناسه: <code class="font-mono">{node.id}</code> ·
-      از خط فرمان: <code class="font-mono" dir="ltr">userbug capabilities {target} --set {node.id} --title …</code>
+      شناسه: <code class="font-mono">{node.id}</code>
+      <!--
+        خطِ فرمان فقط برای گره‌ها.
+
+        `capabilities --set` روی `capabilities.edits.json` می‌نویسد و فیچر
+        آنجا نیست. دستوری که کپی شود و کار نکند، بدتر از نبودنش است.
+      -->
+      {#if !node.feature}
+        · از خط فرمان:
+        <code class="font-mono" dir="ltr">userbug capabilities {target} --set {node.id} --title …</code>
+      {/if}
     </p>
   </aside>
 {/if}

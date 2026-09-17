@@ -6,6 +6,7 @@ import { jsonError } from '$lib/server/http.js';
 import { assertMutationRequest } from '$lib/server/security.js';
 import { STATUS, buildTree, rebuild, setEdit } from '../../../../../src/knowledge/capabilities.js';
 import { anglesFor } from '../../../../../src/knowledge/angles.js';
+import { addFeature, setFeature } from '../../../../../src/knowledge/features.js';
 import { countsByRoute, refreshTouch } from '../../../../../src/runs/touch.js';
 
 /**
@@ -132,6 +133,84 @@ export async function POST(event) {
       });
 
       const stats = await nameCapabilities({ target, models, force: Boolean(body?.force) });
+      return json({
+        target,
+        stats,
+        model: models.model,
+        ...(await treeOf(target, await aggregateTriage(target).catch(() => []))),
+      });
+    }
+
+    /**
+     * فیچرِ دست‌ساز — «اینجا یک فیچر هست».
+     *
+     * ── چرا همان دری که ویرایشِ گره از آن می‌آید ──
+     *
+     * فیچر لایهٔ سومِ همان درخت است، نه چیزِ دیگری کنارش. دری که فیچر را
+     * جدا برگرداند یعنی رابط باید دو جواب را خودش بچسباند — و همان‌جاست
+     * که روزی یکی از دو طرف عقب می‌ماند.
+     */
+    if (action === 'feature') {
+      const where = body?.where || {};
+      addFeature(target, {
+        where,
+        title: body?.title,
+        desc: body?.desc,
+        expected: body?.expected,
+        by: 'user',
+      });
+      return json({ target, ...(await treeOf(target, await aggregateTriage(target).catch(() => []))) });
+    }
+
+    if (action === 'feature-edit') {
+      const id = String(body?.id ?? '').trim();
+      if (!id) throw new Error('شناسهٔ فیچر لازم است');
+
+      /** حذف هم از همین‌جا، چون «نه، چنین کاری نداریم» جوابِ همان سوال است. */
+      if (body?.remove) {
+        setFeature(target, id, null);
+        return json({ target, ...(await treeOf(target, await aggregateTriage(target).catch(() => []))) });
+      }
+
+      const patch = {};
+      if ('title' in body) patch.title = body.title;
+      if ('desc' in body) patch.desc = body.desc;
+      /** «کارِ درستش چیست» — تنها جایی که انتظار به زبانِ آدم نوشته می‌شود. */
+      if ('expected' in body) patch.expected = body.expected;
+      if (!Object.keys(patch).length) throw new Error('چیزی برای ذخیره نیست');
+
+      setFeature(target, id, patch);
+      return json({ target, ...(await treeOf(target, await aggregateTriage(target).catch(() => []))) });
+    }
+
+    /**
+     * حدسِ مدل دربارهٔ فیچرهای یک صفحه — دومین و آخرین کارِ پول‌خرج‌کنِ
+     * این مسیر، و با همان قاعده: با دکمه، و با آمارِ صریح.
+     */
+    if (action === 'feats') {
+      const id = String(body?.id ?? '').trim();
+      if (!id) throw new Error('شناسهٔ قابلیت لازم است');
+
+      const [{ findFeatures }, { loadGlobalConfig, resolveModel }, { loadTarget }] = await Promise.all([
+        import('../../../../../src/knowledge/find-feats.js'),
+        import('../../../../../src/models/config.js'),
+        import('../../../../../src/target.js'),
+      ]);
+
+      const config = await loadTarget(target).catch(() => ({}));
+      const models = resolveModel({
+        global: await loadGlobalConfig(),
+        target: config,
+        role: 'analyze',
+        model: String(body?.model || '').trim() || undefined,
+      });
+
+      const stats = await findFeatures({
+        target,
+        capability: id,
+        models,
+        force: Boolean(body?.force),
+      });
       return json({
         target,
         stats,

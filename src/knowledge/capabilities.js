@@ -46,6 +46,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { knowledgeDir } from './store.js';
 import { unifiedStates } from '../map/merge.js';
+import { featuresByPlace } from './features.js';
 
 export const CAPABILITIES_VERSION = 1;
 
@@ -644,6 +645,69 @@ export function readCapabilities(target) {
  * `counts` از بیرون می‌آید (شاخصِ لمس و تریاژ)، چون این ماژول نباید
  * `runs/` را بشناسد: شناخت دربارهٔ اپ است، اجرا دربارهٔ تاریخچه.
  */
+/**
+ * فیچرها، به‌عنوان فرزندِ گرهِ میزبانشان.
+ *
+ * ── چرا اینجا و نه در `extract` ──
+ *
+ * `extract` مشتق است: از نقشه و سورس ساخته می‌شود و هر بار دور ریخته
+ * می‌شود. فیچر نه — نیمی‌اش حرفِ خودِ کاربر است. پس در فایلِ خودش
+ * می‌ماند و فقط در لحظهٔ نمایش به درخت می‌چسبد، همان‌طور که نام و
+ * ویرایش می‌چسبند.
+ *
+ * ── چرا شمارشِ قرضی نمی‌گیرد ──
+ *
+ * همان درسِ نما: «افزودن کتاب جدید» عددِ `/contents` را نشان می‌داد و
+ * مودالی که هرگز باز نشده بود سبز بود. رخدادِ اجرا فیچر را نمی‌شناسد،
+ * پس این عدد برای فیچر **وجود ندارد** — و نداشتن با صفر بودن فرق دارد.
+ */
+function featureRows(target, visible) {
+  const grouped = featuresByPlace(target);
+  if (!grouped.size) return [];
+
+  const hosts = new Map(visible.map((one) => [`${one.route}|${one.view || ''}`, one]));
+  const NONE = { scenarios: [], planned: [], runs: 0, visits: 0, findings: 0, openFindings: 0, firstAt: '', lastAt: '' };
+  const out = [];
+
+  for (const [key, list] of grouped) {
+    /**
+     * فیچری که میزبانش در درخت نیست، آویزان نمی‌ماند.
+     *
+     * یا صفحه‌اش حذف شده یا هنوز کشف نشده. در هر دو حال ردیفی که به
+     * جایی وصل نیست، ریشهٔ بی‌معنا می‌سازد؛ فیچر با کشفِ بعدیِ همان
+     * صفحه دوباره پیدایش می‌شود چون شناسه‌اش از جا و نام می‌آید.
+     */
+    const host = hosts.get(key);
+    if (!host) continue;
+
+    for (const one of list) {
+      out.push({
+        id: one.id,
+        feature: true,
+        route: one.where.route,
+        view: '',
+        hash: one.where.hash,
+        parent: host.id,
+        title: one.title,
+        desc: one.desc,
+        expected: one.expected,
+        by: [one.by],
+        titleBy: one.by,
+        /** همان قاعدهٔ گره‌ها: حرفِ آدم قطعی است، حدسِ مدل مشکوک. */
+        confidence: one.by === 'user' ? 'confirmed' : 'suspected',
+        confirmedBy: one.by === 'user' ? 'user' : null,
+        status: 'active',
+        reach: '',
+        edited: one.by === 'user',
+        actions: one.actions || [],
+        counts: { ...NONE, hostRoute: one.where.route },
+      });
+    }
+  }
+
+  return out;
+}
+
 export function buildTree(target, { counts = {}, includeGone = false } = {}) {
   const edits = readEdits(target);
   const stored = readCapabilities(target);
@@ -688,6 +752,7 @@ export function buildTree(target, { counts = {}, includeGone = false } = {}) {
   });
 
   const visible = includeGone ? rows : rows.filter((one) => one.status !== 'gone');
+  visible.push(...featureRows(target, visible));
   const byId = new Map(visible.map((one) => [one.id, { ...one, children: [] }]));
 
   const roots = [];
@@ -706,7 +771,7 @@ export function buildTree(target, { counts = {}, includeGone = false } = {}) {
   const order = (list) => {
     list.sort(
       (a, b) =>
-        Number(Boolean(a.view)) - Number(Boolean(b.view)) ||
+        Number(Boolean(a.view || a.feature)) - Number(Boolean(b.view || b.feature)) ||
         a.title.localeCompare(b.title, 'fa')
     );
     for (const one of list) order(one.children);

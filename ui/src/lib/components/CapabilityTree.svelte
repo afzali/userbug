@@ -49,6 +49,13 @@
 
   function markOf(node) {
     if (node.shelf) return MARK.none;
+    /**
+     * فیچر هنوز شمارشِ خودش را ندارد — رخدادِ اجرا فیچر را نمی‌شناسد،
+     * همان‌طور که نما را نمی‌شناخت. تا آن روز، نشانِ «هنوز بررسی نشده»
+     * تنها چیزِ صادقانه است؛ تیکِ قرضیِ صفحهٔ میزبان همان سبزِ دروغینی
+     * است که یک بار دیده شد.
+     */
+    if (node.feature) return MARK.never;
     if (node.counts?.openFindings) return MARK.broken;
     if (node.counts?.runs) return MARK.ok;
     if (node.counts?.planned?.length) return MARK.planned;
@@ -75,6 +82,15 @@
   /** «چند سناریو» — و صفر یک خبر است، پس پنهان نمی‌شود. */
   function scenariosOf(node) {
     if (node.shelf) return '';
+    /**
+     * فیچرِ حدسی «بی‌سناریو»ی زرد نمی‌گیرد.
+     *
+     * زرد یعنی «اینجا کار هست، برو بساز». ولی فیچری که فقط مدل گفته،
+     * اول باید تأیید شود — سناریو ساختن برای چیزی که شاید اصلاً وجود
+     * نداشته باشد، کارِ اضافه است نه کارِ عقب‌افتاده.
+     */
+    /** نشانِ «مشکوک» همین را می‌گوید؛ دو بار گفتنش فقط ستون را پر می‌کند. */
+    if (node.feature) return node.confidence === 'suspected' ? '' : 'بی‌سناریو';
     if (node.view) return node.actions ? `${formatNumber(node.tried)}/${formatNumber(node.actions)} کنش` : '';
     const count = node.counts?.scenarios?.length || 0;
     const planned = node.counts?.planned?.length || 0;
@@ -136,7 +152,7 @@
             node.confidence === 'suspected' ? 'opacity-60' : ''
           }`}
         >
-          {node.view ? '· ' : ''}{node.title}
+          {node.view ? '· ' : ''}{node.feature ? '◇ ' : ''}{node.title}
         </span>
         {#if node.children.length && !isOpen}
           <span class="shrink-0 text-[10px] text-muted-foreground">({formatNumber(node.children.length)})</span>

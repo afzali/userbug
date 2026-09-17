@@ -76,6 +76,8 @@
     { key: 'all', label: 'همه' },
     { key: 'blind', label: 'بی‌سناریو', count: () => data.blind },
     { key: 'untried', label: 'هرگز باز نشده', count: () => data.untried },
+    /** فیچرِ حدسی سوالِ خودش را دارد: «واقعاً هست؟» — نه «چرا سناریو ندارد». */
+    { key: 'guessed', label: 'فیچرِ حدسی', count: () => guessed },
     { key: 'red', label: 'ایرادِ باز', count: () => data.open },
     { key: 'edited', label: 'ویرایش‌شده' },
   ];
@@ -87,7 +89,15 @@
       if (!hay.includes(needle)) return false;
     }
     if (filter === 'blind')
-      return !node.view && !node.shelf && !node.counts.scenarios.length && !node.counts.planned?.length;
+      return (
+        !node.view &&
+        !node.shelf &&
+        /** فیچر سطلِ خودش را دارد؛ اینجا شمردنش عددِ «کارِ عقب‌افتاده» را باد می‌کند. */
+        !node.feature &&
+        !node.counts.scenarios.length &&
+        !node.counts.planned?.length
+      );
+    if (filter === 'guessed') return Boolean(node.feature && node.confidence === 'suspected');
     if (filter === 'untried') return Boolean(node.view && node.actions && !node.tried);
     if (filter === 'red') return node.counts.openFindings > 0;
     if (filter === 'edited') return Boolean(node.edited);
@@ -189,6 +199,58 @@
           (stats.skipped ? ` · ${formatNumber(stats.skipped)} را مدل نتوانست` : '') +
           ` · ${formatNumber(stats.calls)} فراخوانی · ${payload.model || ''}`
         : 'همه از قبل نام داشتند — هیچ فراخوانی‌ای نشد.';
+    } catch (cause) {
+      error = cause.message;
+    } finally {
+      busy = '';
+    }
+  }
+
+  let featNote = $state('');
+
+  /**
+   * عددِ فیچرِ حدسی از درخت می‌آید، نه از لودر.
+   *
+   * ── چرا این یکی فرق دارد ──
+   *
+   * بقیهٔ عددهای بالای صفحه با هر تأیید تکان نمی‌خورند، ولی این یکی
+   * دقیقاً کاری است که کاربر همین حالا دارد می‌کند: شش فیچرِ حدسی را
+   * یکی‌یکی تأیید یا حذف می‌کند. اگر عدد سرِ جایش بماند، کاربر بعد از
+   * تأییدِ آخری هم «۶ تأیید می‌کنید؟» می‌بیند — همان بی‌بازخوردی که با
+   * پیش‌نویس‌ها یک بار دیدیم.
+   *
+   * و `send` درختِ تازه را برمی‌گرداند، پس این عدد همیشه درست است.
+   */
+  let guessed = $derived(
+    tree.flat.filter((one) => one.feature && one.confidence === 'suspected').length
+  );
+
+  /**
+   * «این صفحه چه کارهایی دارد؟» — دومین و آخرین دکمهٔ پول‌خرج‌کنِ این صفحه.
+   *
+   * ── چرا برای هر صفحه جدا، و نه یک دکمه برای کلِ اپ ──
+   *
+   * نام‌گذاری یک فراخوانی برای کلِ درخت است چون هم‌خوانی می‌خواهد. اینجا
+   * برعکس: ورودی فهرستِ کاملِ کنش‌های یک صفحه است و کلِ اپ یک‌جا یعنی
+   * prompt‌ای که یا بریده می‌شود یا مدل در آن گم می‌شود.
+   *
+   * و هزینه‌اش این‌طور هم منصفانه‌تر است: کاربر روی صفحه‌ای می‌زند که
+   * می‌داند فیچرِ پنهان دارد، نه روی صد صفحه‌ای که ندارد.
+   */
+  async function findFeats(one, force = false) {
+    busy = 'feats';
+    error = '';
+    featNote = '';
+    try {
+      const payload = await send({ action: 'feats', id: one.id, force });
+      const stats = payload.stats || {};
+      featNote = stats.cached
+        ? `این صفحه از قبل ${formatNumber(stats.kept)} فیچر داشت — هیچ فراخوانی‌ای نشد.`
+        : stats.actions
+          ? `${formatNumber(stats.kept)} فیچر از ${formatNumber(stats.actions)} کنش` +
+            (stats.skipped ? ` · ${formatNumber(stats.skipped)} دور ریخته شد` : '') +
+            ` · ${formatNumber(stats.calls)} فراخوانی · ${payload.model || ''}`
+          : 'این صفحه هیچ کنشی در نقشه ندارد — اول یک کشف رویش لازم است.';
     } catch (cause) {
       error = cause.message;
     } finally {
@@ -400,6 +462,18 @@
         <span class="text-lg font-bold text-amber-600 dark:text-amber-400">{formatNumber(data.untried)}</span>
       </div>
     {/if}
+    <!--
+      فیچرِ حدسی — سوالش «واقعاً هست؟» است، نه «چرا سناریو ندارد».
+
+      پس رنگش هشدار نیست: کارِ عقب‌افتاده نشان نمی‌دهد، یک تصمیمِ کوچکِ
+      آدمی می‌خواهد که چند ثانیه بیشتر طول نمی‌کشد.
+    -->
+    {#if guessed}
+      <div class="rounded-xl border border-dashed px-4 py-2">
+        <span class="block text-[11px] text-muted-foreground">فیچرِ حدسی</span>
+        <span class="text-lg font-bold">{formatNumber(guessed)}<span class="text-sm font-normal text-muted-foreground"> · تأیید می‌کنید؟</span></span>
+      </div>
+    {/if}
     {#if data.open}
       <div class="rounded-xl border border-destructive/40 px-4 py-2">
         <span class="block text-[11px] text-muted-foreground">ایرادِ باز</span>
@@ -506,8 +580,12 @@
           {node}
           {target}
           busy={Boolean(busy) || run.submitting}
-          onEdit={(patch) => send({ action: 'edit', ...patch })}
-          onReset={(id) => send({ action: 'reset', id })}
+          onEdit={(patch) => send({ action: node.feature ? 'feature-edit' : 'edit', ...patch })}
+          onReset={(id) =>
+            node.feature ? send({ action: 'feature-edit', id, remove: true }) : send({ action: 'reset', id })}
+          onFeats={findFeats}
+          featNote={featNote}
+          hasFeats={tree.flat.some((one) => one.feature && one.parent === node.id)}
           onClose={() => { selected = ''; }}
           onRun={runScenarios}
           onQuest={quest}

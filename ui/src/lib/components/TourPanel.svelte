@@ -57,6 +57,22 @@
       return url;
     }
   });
+  /**
+   * هش، جدا از مسیر — چون «کجاییم» گاهی فقط هش است.
+   *
+   * کاربر گفت: «حتی آدرس‌هایی که با `#` تغییر کرده‌اند». در یک اپِ
+   * تک‌صفحه‌ای ممکن است کاربر پنج جای متفاوت برود و `pathname` تکان
+   * نخورد؛ پنلی که فقط مسیر را نشان دهد، در آن پنج جا یک چیز می‌گوید.
+   */
+  let currentHash = $derived.by(() => {
+    if (!url) return '';
+    try {
+      return new URL(url).hash.replace(/^#/, '');
+    } catch {
+      return '';
+    }
+  });
+
   // svelte-ignore state_referenced_locally
   let recording = $state(data.tour.live?.recording ?? true);
 
@@ -240,6 +256,52 @@
       purpose = '';
       view = '';
       detected = '';
+    }
+  }
+
+  /**
+   * «اینجا یک فیچر هست» — پراعتمادترین راهِ ساختنِ لایهٔ سوم.
+   *
+   * ── چرا این دکمه در گشت است و نه در درخت ──
+   *
+   * مدل فیچر را از فهرستِ کنش‌ها حدس می‌زند و حدسش مشکوک می‌ماند تا
+   * کسی تأییدش کند. ولی کاربری که همین حالا متن را انتخاب کرده و
+   * هایلایت زده، **دیده** که این یک کار است. آن لحظه ارزان‌ترین و
+   * قطعی‌ترین جایی است که می‌شود پرسید — و پنج دقیقه بعد، پشتِ
+   * مرورگرِ بسته، دیگر نیست.
+   *
+   * جایش هم از خودِ گشت می‌آید: مسیر، نمای باز، و هش. هیچ‌کدام را
+   * کاربر تایپ نمی‌کند.
+   */
+  let featTitle = $state('');
+  let featExpected = $state('');
+  let featNote = $state('');
+
+  async function noteFeature() {
+    busy = 'feature';
+    error = '';
+    featNote = '';
+    try {
+      const response = await fetch('/api/capabilities', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({
+          target,
+          action: 'feature',
+          title: featTitle,
+          expected: featExpected,
+          where: { route: currentPath, view, hash: currentHash },
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'ثبت نشد');
+      featNote = `«${featTitle.trim()}» ثبت شد — در «اپِ من» زیرِ ${currentPath} می‌بینیدش.`;
+      featTitle = '';
+      featExpected = '';
+    } catch (cause) {
+      error = cause.message;
+    } finally {
+      busy = '';
     }
   }
 
@@ -436,7 +498,9 @@
     -->
     <h2 class="mb-1 flex flex-wrap items-baseline gap-2 text-sm font-bold">
       <span>این صفحه برای چیست؟</span>
-      <code dir="ltr" class="rounded bg-muted px-1.5 py-0.5 text-[11px] font-normal">{currentPath || '—'}</code>
+      <code dir="ltr" class="rounded bg-muted px-1.5 py-0.5 text-[11px] font-normal">
+        {currentPath || '—'}{currentHash ? `#${currentHash}` : ''}
+      </code>
     </h2>
     <p class="mb-3 text-xs leading-6 text-muted-foreground">
       یادداشت به همان صفحه‌ای می‌چسبد که <strong>همین حالا</strong> در پنجرهٔ گشت باز است. در آن
@@ -479,6 +543,48 @@
       <Button variant="outline" disabled={Boolean(busy)} onclick={notePage}>
         {view ? 'ثبت این نما' : 'ثبت این صفحه'}
       </Button>
+    </div>
+
+    <!--
+      فیچر — همان‌جا که دیده می‌شود.
+
+      «هایلایت» مودال نیست و آدرس هم ندارد؛ یک کنش است روی متنِ
+      انتخاب‌شده. خزنده آن را یک دکمه می‌بیند کنارِ صد دکمهٔ دیگر، و
+      تنها کسی که می‌داند این یک **کار** است، شمایید — همین حالا.
+    -->
+    <div class="mt-3 space-y-2 rounded-lg border border-dashed p-3">
+      <p class="text-xs font-medium">اینجا یک فیچر هست</p>
+      <div class="flex flex-wrap gap-2">
+        <Input
+          bind:value={featTitle}
+          class="min-w-0 flex-1"
+          placeholder="نامِ کار. مثلاً: هایلایت کردنِ متن"
+          maxlength="80"
+          disabled={Boolean(busy)}
+        />
+        <Button
+          variant="outline"
+          disabled={Boolean(busy) || !featTitle.trim() || !currentPath}
+          onclick={noteFeature}
+        >
+          ثبتِ فیچر
+        </Button>
+      </div>
+      <Input
+        bind:value={featExpected}
+        class="text-xs"
+        placeholder="کارِ درستش چیست؟ «وقتی … شد، باید … شود» — اختیاری"
+        maxlength="500"
+        disabled={Boolean(busy)}
+      />
+      <p class="text-[11px] leading-5 text-muted-foreground">
+        {#if featNote}
+          {featNote}
+        {:else}
+          جایش از همین‌جا برداشته می‌شود: <code dir="ltr">{currentPath || '—'}{currentHash ? `#${currentHash}` : ''}</code>{view ? ` ▸ «${view}»` : ''}.
+          اگر مودالی باز است، اول بالا نامش را بگذارید.
+        {/if}
+      </p>
     </div>
 
     <div class="mt-3 flex flex-wrap gap-2">

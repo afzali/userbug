@@ -13,7 +13,7 @@ import { listAccounts } from '../../../../../../../src/knowledge/credentials.js'
 import { readMap } from '../../../../../../../src/map/store.js';
 import { unifiedStates } from '../../../../../../../src/map/merge.js';
 import { proposalsFor } from '../../../../../../../src/knowledge/propose.js';
-import { extraRoutes, stuckAtLogin, unreachedRoutes } from '../../../../../../../src/map/plan.js';
+import { extraRoutes, stuckAtLogin, unreachedRoutes } from '../../../../../../../src/map/render.js';
 import { mispredictions } from '../../../../../../../src/map/classify.js';
 import { loadScenario, scenarioDir } from '../../../../../../../src/scenario/load.js';
 import { unsupportedVerbs } from '../../../../../../../src/map/replay.js';

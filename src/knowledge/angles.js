@@ -74,7 +74,7 @@ function idOf(capability, angle) {
  * بماند. زاویه به **نقش**شان نیاز دارد: پنج `textbox` حرفِ کاملاً دیگری از
  * پنج `button` می‌زند.
  */
-function actionsOf(target, node) {
+export function actionsOf(target, node) {
   const map = readMap(target);
   const mine = [];
   const inherited = new Set();

@@ -155,7 +155,7 @@ function summary(tree, findings) {
    * «بی‌سناریو» حساب می‌شدند و عدد را باد می‌کردند تا جایی که بی‌معنا شود.
    * آنچه دربارهٔ یک نما می‌دانیم `tried/actions` است و جای خودش را دارد.
    */
-  const pages = tree.flat.filter((one) => !one.view && !one.shelf);
+  const pages = tree.flat.filter((one) => !one.view && !one.shelf && !one.feature);
   const views = tree.flat.filter((one) => one.view);
 
   return {
@@ -173,6 +173,16 @@ function summary(tree, findings) {
     planned: pages.filter((one) => !one.counts.scenarios.length && one.counts.planned.length).length,
     /** نمایی که خزش هیچ‌یک از کنش‌هایش را نزده: در عمل هرگز باز نشده. */
     untried: views.filter((one) => one.actions && !one.tried).length,
+    /**
+     * فیچر شمرده می‌شود، ولی نه اینجا.
+     *
+     * ── چرا عددش در لودر نیست ──
+     *
+     * «چند فیچرِ حدسی مانده» دقیقاً همان چیزی است که کاربر با هر کلیک
+     * عوضش می‌کند. عددی که از لودر بیاید تا رفرشِ بعدی سرِ جایش می‌ماند
+     * و بعد از تأییدِ آخری هم «۶ تأیید می‌کنید؟» می‌گوید. پس از درختِ
+     * زنده حساب می‌شود، در خودِ صفحه.
+     */
     open: findings.filter((one) => (one.triage?.status || 'open') === 'open').length,
   };
 }
