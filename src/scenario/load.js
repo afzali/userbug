@@ -92,6 +92,22 @@ export function resolveScenarioRef(targetName, ref) {
   const asPath = path.resolve(raw);
   if (fs.existsSync(asPath) && fs.statSync(asPath).isFile()) return asPath;
 
+  /**
+   * و نسبت به ریشهٔ مخزن.
+   *
+   * ── چرا این پله لازم شد ──
+   *
+   * `map.entry.scenario` مسیر را **نسبت به ریشه** ذخیره می‌کند
+   * (`scenarios/nepi6/ورود.yml`) — که درست است، چون باید قابلِ حمل باشد.
+   *
+   * ولی رابط از `ui/` اجرا می‌شود، پس `path.resolve` همان رشته را به
+   * `ui/scenarios/…` می‌برد و پیدا نمی‌کند. از خط فرمان کار می‌کرد و در
+   * رابط نه — بدترین نوعِ اختلاف، چون با آزمودن از ترمینال هرگز دیده
+   * نمی‌شود.
+   */
+  const fromRoot = path.resolve(rootDir(), raw);
+  if (fs.existsSync(fromRoot) && fs.statSync(fromRoot).isFile()) return fromRoot;
+
   const dir = scenarioDir(targetName);
 
   /** مسیرِ نسبی به پوشهٔ همان هدف — همان شکلی که رابط در فهرست نشان می‌دهد. */

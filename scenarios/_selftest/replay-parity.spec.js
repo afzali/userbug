@@ -104,3 +104,31 @@ test('پیامِ شکستِ مسیرِ ورود می‌گوید کجا ایست�
    */
   expect(read('src/map/replay.js')).toContain('الان اینجاییم');
 });
+
+test('مسیرِ ذخیره‌شده در نقشه، از هر پوشه‌ای پیدا می‌شود', async () => {
+  /**
+   * ── اختلافی که فقط در رابط دیده می‌شد ──
+   *
+   * `map.entry.scenario` مسیر را نسبت به **ریشهٔ مخزن** ذخیره می‌کند تا
+   * قابلِ حمل باشد. ولی رابط از `ui/` اجرا می‌شود، پس `path.resolve` همان
+   * رشته را به `ui/scenarios/…` می‌برد.
+   *
+   * نتیجه: مقدمهٔ ورود از خط فرمان چسبانده می‌شد و در رابط نه — و چون
+   * `catch` بی‌صدا رد می‌شد، سناریوهای ساختهٔ رابط بی ورود درمی‌آمدند.
+   */
+  const { resolveScenarioRef } = await import('../../src/scenario/load.js');
+  const source = fs.readFileSync(path.join(process.cwd(), 'src/scenario/load.js'), 'utf8');
+  expect(source).toContain('path.resolve(rootDir(), raw)');
+  expect(typeof resolveScenarioRef).toBe('function');
+});
+
+test('`--from` هم نام می‌گیرد هم مسیر', async () => {
+  /**
+   * کشویی رابط **نام** می‌دهد و خط فرمان مسیر. پیش‌تر فقط مسیر پذیرفته
+   * می‌شد، پس انتخابِ کاربر یک ثانیه بعد بی‌صدا می‌مرد.
+   */
+  const cli = fs.readFileSync(path.join(process.cwd(), 'bin/userbug.js'), 'utf8');
+  const uses = cli.split('resolveScenarioRef(').length - 1;
+  expect(uses).toBeGreaterThanOrEqual(3);
+  expect(cli).not.toContain("const file = path.resolve(String(flags.from));");
+});

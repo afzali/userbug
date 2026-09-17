@@ -103,6 +103,38 @@ export async function POST(event) {
       if (found?.preamble?.length) preamble = found.preamble;
     }
 
+    /**
+     * اپی که ورود دارد، سناریویش باید اول وارد شود.
+     *
+     * ── چه چیزی بی این ساخته می‌شد ──
+     *
+     * روی نپی، سناریوی «یک پوشه بساز» با `go: /contents` شروع می‌شد —
+     * آدرسی که برای کاربرِ واردنشده به صفحهٔ ورود می‌رود. یعنی هر سناریویی
+     * که این مسیر می‌ساخت، روی اپِ ورود‌دار **قطعاً** شکست می‌خورد، و
+     * کاربر باید هر بار دستی قدم‌های ورود را بالایش می‌چسباند.
+     *
+     * و ابزار از قبل می‌دانست: `map.entry.scenario` می‌گوید خزش با کدام
+     * سناریو وارد شده. همان را مقدمه می‌کنیم.
+     *
+     * ── چرا چسباندنِ قطعی و نه گفتن به مدل ──
+     *
+     * مدل قدم‌ها را «تقریباً» کپی می‌کند و هر تفاوتِ کوچک در برچسبِ فیلد
+     * یعنی یک سناریوی شکسته. مقدمه از دیسک می‌آید و دست‌نخورده می‌ماند —
+     * همان قاعده‌ای که مقدمهٔ پیشنهادها رویش بنا شده.
+     */
+    if (!preamble.length) {
+      try {
+        const { readMap } = await import('../../../../../../src/map/store.js');
+        const entry = readMap(target)?.entry?.scenario;
+        if (entry) {
+          const { loadScenario, resolveScenarioRef } = await import('../../../../../../src/scenario/load.js');
+          preamble = loadScenario(resolveScenarioRef(target, entry)).steps || [];
+        }
+      } catch {
+        /** نبودِ مسیرِ ورود سناریو را نمی‌کشد؛ فقط مقدمه ندارد. */
+      }
+    }
+
     const draft = await scenarioFromText({
       text: body?.text,
       models,
