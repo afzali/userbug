@@ -1,162 +1,162 @@
 <script>
   /**
-   * «کشف» — سه راه، یک هدف.
+   * «کشف» — صندوقِ جلسه‌ها.
    *
-   * ── چرا سه صفحه یکی شد ──
+   * ── چرا صندوق ──
    *
-   * کاربر پرسید «آیا گشت خودش یک نوع نقشه نیست؟» و بعد گفت «اگر لازم است
-   * ادغامشان کن، چون UX مهم است که ساده و بدردبخور باشد».
+   * کاربر گفت: «باید به این شکل باشه که بشه یه نیو زد که چطور کشف کنم…
+   * بعد نتیجه این‌ها لیست بشه، و وقتی در یک گشتی وارد شدیم و در جریانه
+   * دکمه‌های اضافه دیده نشه — مثل یک این‌باکس که وقتی نیو رو می‌زنیم داخل
+   * اون ایمیل می‌ریم.»
    *
-   * جملهٔ خودش بهترین توضیح بود: «بگرد و سورس را ببین و کشف کن و بخز طبق
-   * دستور من». این یک کار است با سه راه، نه سه کارِ جدا — و خروجیِ هر سه یک
-   * چیز: «این اپ چه دارد و چقدرش را لمس کرده‌ایم».
+   * و این دقیقاً شکلِ «بررسی» است. دو صفحهٔ هم‌شکل — فهرست، «تازه»، و رفتن
+   * داخلِ یکی — یعنی یاد گرفتنِ یکی، یاد گرفتنِ آن یکی.
    *
-   * ── چرا این فایل نازک است ──
+   * ── چرا انتخابِ روش در مودال است و نه روی صفحه ──
    *
-   * سه صفحهٔ قبلی روی هم ۲۵۰۰ خط بودند. ریختنشان در یک فایل یعنی همان
-   * هیولایی که داشتیم تمیزش می‌کردیم. پس هر راه یک کامپوننت است و این صفحه
-   * فقط انتخابگر — و **چه پیدا شد** که همیشه پایین می‌ماند، چون جوابِ
-   * مشترکِ هر سه است.
+   * رادیوی قبلی **حالت** بود: همیشه روی صفحه می‌ماند، حتی وقتی گشتی در
+   * جریان بود، و یک کلیکِ اشتباهی کار را خراب می‌کرد. مودال یک **تصمیم**
+   * است: باز می‌شود، انتخاب می‌کنی، بسته می‌شود. بعدش دیگر وجود ندارد که
+   * دستت به آن بخورد.
    */
+  import { goto } from '$app/navigation';
+  import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
-  import * as Card from '$lib/components/ui/card/index.js';
+  import { Input } from '$lib/components/ui/input/index.js';
   import PageHeader from '$lib/components/PageHeader.svelte';
-  import CrawlPanel from '$lib/components/CrawlPanel.svelte';
-  import FoundPanel from '$lib/components/FoundPanel.svelte';
-  import TourPanel from '$lib/components/TourPanel.svelte';
-  import { formatNumber } from '$lib/format.js';
+  import NewDiscovery from '$lib/components/NewDiscovery.svelte';
+  import { formatDate, formatNumber } from '$lib/format.js';
 
   let { data } = $props();
 
   let target = $derived(data.target);
   let base = $derived(`/projects/${encodeURIComponent(target)}`);
+  let sessions = $derived(data.sessions || []);
+  let live = $derived(data.live?.running ? data.live : null);
+
+  let picking = $state(false);
+
+  const TONE = {
+    tour: 'bg-primary/10 text-primary',
+    map: 'bg-secondary text-secondary-foreground',
+    quest: 'bg-secondary text-secondary-foreground',
+    source: 'bg-muted text-muted-foreground',
+  };
 
   /**
-   * کدام راه — و پیش‌فرض از **وضعیتِ پروژه** می‌آید، نه از یک ثابت.
+   * عددهای هر ردیف به **روش** بستگی دارند.
    *
-   * پروژه‌ای که هنوز گشت نرفته باید گشت را باز ببیند؛ پروژه‌ای که گشته و
-   * نقشه دارد، سراغِ خزش می‌رود. فرمی که همیشه روی گزینهٔ اول باز شود، به
-   * کسی که کارش را بلد است هر بار یک کلیکِ اضافه می‌دهد.
+   * «۷ صفحه» دربارهٔ یک گشت معنا دارد و «۲۸ حالت» دربارهٔ یک خزش. نشان
+   * دادنِ هر دو ستون برای هر دو، همان ستون‌های همیشه‌خالی است که فهرست را
+   * بی‌معنا می‌کند.
    */
-  let how = $state(
-    /**
-     * انتخابِ صریحِ آدرس بر هر پیش‌فرضی می‌چربد.
-     *
-     * کسی که از قدمِ دومِ ساختِ پروژه با «گشت» آمده، نباید همان پرسش را
-     * دوباره ببیند.
-     */
-    ['tour', 'crawl', 'source'].includes(data.how)
-      ? data.how
-      : data.tour.live?.running
-        ? 'tour'
-        : data.found.pages.length
-          ? 'crawl'
-          : 'tour'
-  );
-
-  const WAYS = [
-    {
-      key: 'tour',
-      title: 'خودم نشانت می‌دهم',
-      hint: 'گشتِ زنده — مرورگر باز می‌شود و تو مثل کاربر کار می‌کنی. هرچه کردی ضبط می‌شود.',
-    },
-    {
-      key: 'crawl',
-      title: 'خودت بگرد',
-      hint: 'خزش — هر دکمهٔ امنی را می‌زند. همه‌جا، یا فقط جایی که می‌گویی.',
-    },
-    {
-      key: 'source',
-      title: 'سورس را بخوان',
-      hint: 'بی مرورگر و بی مدل: روت، endpoint و قاعده‌های schema از خودِ کد.',
-    },
-  ];
+  function facts(one) {
+    if (one.kind === 'source') {
+      return [
+        `${formatNumber(one.facts.files)} فایل`,
+        `${formatNumber(one.facts.endpoints)} endpoint`,
+        `${formatNumber(one.facts.routes)} روت`,
+      ];
+    }
+    const out = [];
+    if (one.steps) out.push(`${formatNumber(one.steps)} قدم`);
+    if (one.findings) out.push(`${formatNumber(one.findings)} یافته`);
+    if (one.bench) out.push(one.bench);
+    return out;
+  }
 </script>
 
-<svelte:head><title>کشف — {data.target}</title></svelte:head>
+<svelte:head><title>کشف — {data.project?.name || target}</title></svelte:head>
+
+{#snippet actions()}
+  <Button variant="outline" size="sm" href={`${base}/knowledge`}>دانسته‌ها</Button>
+  <Button size="sm" onclick={() => { picking = true; }}>＋ کشفِ تازه</Button>
+{/snippet}
 
 <PageHeader
-  eyebrow="پروژهٔ {data.project?.name || data.target}"
+  eyebrow={data.project?.name || target}
   title="کشف"
-  description="اپ را به ابزار بشناسان — خودت بگردانش، بگذار خودش بگردد، یا سورس را بخوان. هرچه پیدا شود، در «اپِ من» به‌شکلِ درخت دیده می‌شود."
+  description="چطور فهمیدیم این اپ چه دارد — و هر بار چه پیدا شد. آنچه پیدا شده، در «اپِ من» به‌شکلِ درخت دیده می‌شود."
+  {actions}
 />
 
-<div class="space-y-6">
-  <!--
-    یک پرسش، سه جواب.
+{#if picking}
+  <NewDiscovery
+    {target}
+    project={data.project}
+    onClose={() => { picking = false; }}
+    onStarted={(id) => goto(`${base}/discover/${encodeURIComponent(id)}`)}
+  />
+{/if}
 
-    همان الگویی که در صفحهٔ نقشه جواب داد: کاربر اول می‌گوید **چه کار کنم**،
-    بعد فرمِ همان کار را می‌بیند — نه اینکه از میانِ هشت کنترل حدس بزند کدام
-    مالِ کدام است.
-  -->
-  <Card.Root>
-    <Card.Header class="pb-3">
-      <Card.Title class="text-sm">چطور کشفش کنم؟</Card.Title>
-    </Card.Header>
-    <Card.Content class="space-y-2">
-      {#each WAYS as way (way.key)}
-        <label
-          class="flex items-start gap-2 rounded-lg border p-2.5 text-xs {how === way.key
-            ? 'border-primary bg-accent/40'
-            : ''}"
-        >
-          <input type="radio" bind:group={how} value={way.key} class="mt-0.5" />
-          <span>
-            <strong>{way.title}</strong>
-            <span class="block text-[11px] leading-5 text-muted-foreground">{way.hint}</span>
-          </span>
-        </label>
-      {/each}
+<!--
+  کارِ در جریان، بالای همه.
 
-      <div class="border-t pt-3">
-        {#if how === 'tour'}
-          <TourPanel {data} {target} />
-        {:else if how === 'crawl'}
-          <CrawlPanel {data} {target} />
-        {:else}
-          <!--
-            سورس دکمهٔ خودش را در «چه پیدا شد» دارد، چون نتیجه‌اش همان‌جاست
-            و اینجا فقط باید بگوییم کجا را نگاه کند.
-          -->
-          <div class="space-y-2 text-xs leading-6">
-            {#if data.found.hasSource}
-              <p>
-                سورسِ این پروژه: <code dir="ltr" class="font-mono">{data.found.sourceRoot}</code>
-              </p>
-              <p class="text-muted-foreground">
-                خواندنش نه مرورگر می‌خواهد نه مدل: مسیرِ فایل، رشتهٔ
-                <code>case 'GET /x'</code> و <code>UNIQUE(...)</code> در schema.
-                دکمه‌اش پایین، کنارِ نتیجه‌اش است.
-              </p>
-            {:else}
-              <p class="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2 leading-6">
-                این پروژه <code>source.root</code> ندارد، پس هیچ‌چیز از کد خوانده
-                نمی‌شود. در پیکربندی پروژه بگذاریدش.
-              </p>
-              <Button href={`${base}/files?kind=target`} variant="outline" size="sm">پیکربندی پروژه</Button>
-            {/if}
-          </div>
-        {/if}
-      </div>
-    </Card.Content>
-  </Card.Root>
+  ── چرا جدا از فهرست ──
 
-  <!--
-    قدمِ بعد از کشف.
-
-    کشف در خودش تمام نمی‌شود: هر جایی که پیدا شد و هیچ سفری سراغش نمی‌رود،
-    یک پیشنهاد است. عدد می‌گوید واقعاً چه تولید شده — و صفر هم یک خبر است.
-  -->
-  <div class="flex flex-wrap items-center gap-2">
-    <Button href={base} size="sm">
-      {data.found.proposals
-        ? `آنچه پیدا شد، در «اپِ من» — با ${formatNumber(data.found.proposals)} سناریوی پیشنهادی`
-        : 'آنچه پیدا شد، در «اپِ من»'}
-    </Button>
-    <span class="text-[11px] text-muted-foreground">
-      هر بخش با شمارِ سناریو و اجرا و ایرادش، و پیشنهادِ اینکه چه باید آزمود.
+  گشتِ زنده در **همین پروسه** است و تا تمام نشود `run.json` ندارد، پس در
+  فهرستِ `runs/` نیست. صندوقی که کارِ در جریان را نشان ندهد، دقیقاً در
+  لحظه‌ای بی‌فایده است که کاربر بیشترین شک را دارد که آیا چیزی شروع شد.
+-->
+{#if live}
+  <a
+    href={`${base}/discover/live`}
+    class="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 p-4 transition-colors hover:bg-primary/10"
+  >
+    <span class="size-2 shrink-0 animate-pulse rounded-full bg-primary"></span>
+    <span class="min-w-0 flex-1">
+      <strong class="text-sm">گشتِ زنده در جریان است</strong>
+      <span class="block text-xs text-muted-foreground">
+        {live.pages ? `${formatNumber(live.pages)} صفحه ثبت شد · ` : ''}پنجرهٔ مرورگر باز است
+      </span>
     </span>
+    <span class="text-sm font-medium text-primary">برو داخل ←</span>
+  </a>
+{/if}
+
+{#if !sessions.length && !live}
+  <section class="rounded-xl border bg-muted/30 p-6">
+    <h2 class="text-base font-semibold">هنوز نگشته‌ایم</h2>
+    <p class="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground">
+      ابزار هنوز نمی‌داند این اپ چه دارد. سه راه هست و هر سه یک جواب
+      می‌دهند — درختِ بخش‌ها و قابلیت‌ها در «اپِ من». خودتان نشان بدهید،
+      بگذارید خودش بگردد، یا سورس را بخوانید.
+    </p>
+    <Button class="mt-4" size="sm" onclick={() => { picking = true; }}>＋ کشفِ تازه</Button>
+  </section>
+{:else if sessions.length}
+  <div class="space-y-2">
+    {#each sessions as one (one.id)}
+      {@const rows = facts(one)}
+      <a
+        href={`${base}/discover/${encodeURIComponent(one.id)}`}
+        class="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-accent/40"
+      >
+        <span class={`shrink-0 rounded-md px-2 py-1 text-[11px] font-medium ${TONE[one.kind] || ''}`}>
+          {one.way.label}
+        </span>
+
+        <span class="min-w-0 flex-1">
+          <span class="block text-sm font-medium">{one.way.hint}</span>
+          <span class="block text-[11px] text-muted-foreground">
+            {formatDate(one.at)}{rows.length ? ` · ${rows.join(' · ')}` : ''}
+          </span>
+        </span>
+
+        {#if !one.done}
+          <Badge variant="outline" class="shrink-0 text-[10px]">ناتمام</Badge>
+        {/if}
+        {#if one.findings}
+          <Badge variant="destructive" class="shrink-0 text-[10px]">{formatNumber(one.findings)}</Badge>
+        {/if}
+      </a>
+    {/each}
   </div>
 
-  <FoundPanel {data} {target} />
-</div>
+  <p class="mt-4 text-[11px] leading-6 text-muted-foreground">
+    هرچه در این جلسه‌ها پیدا شد، در
+    <a class="underline underline-offset-2" href={base}>اپِ من</a>
+    جمع می‌شود — و آنچه دربارهٔ خودِ پروژه یاد گرفتیم، در
+    <a class="underline underline-offset-2" href={`${base}/knowledge`}>دانسته‌ها</a>.
+  </p>
+{/if}

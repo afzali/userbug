@@ -236,7 +236,7 @@
     {
       key: 'later',
       title: 'فعلاً هیچ‌کدام',
-      hint: 'مستقیم به پروژه بروید؛ هر سه راه از صفحهٔ «کشف» هم هست.',
+      hint: 'مستقیم به پروژه بروید؛ هر سه راه بعداً از «کشف» هم هست.',
     },
   ];
 
@@ -261,8 +261,27 @@
         }).catch(() => null);
       }
 
-      if (how === 'tour') return void (location.href = `${base}/discover?how=tour`);
+      /**
+       * ── چرا دیگر به **فهرستِ** کشف نمی‌رود ──
+       *
+       * کاربر گفت: «می‌گیم سایتتو معرفی کن و یهویی می‌پریم تو صفحهٔ کشف».
+       * حق داشت — «شروع» می‌زدی و به صفحه‌ای می‌رسیدی که **دوباره همان
+       * پرسش** را با سه رادیو می‌پرسید.
+       *
+       * حالا کارِ همان‌جا شروع می‌شود و مقصد، داخلِ همان جلسه است.
+       */
       if (how === 'later') return void (location.href = base);
+
+      if (how === 'tour') {
+        const response = await fetch('/api/tour', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+          body: JSON.stringify({ target: created, action: 'start' }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'گشت شروع نشد');
+        return void (location.href = `${base}/discover/live`);
+      }
 
       /**
        * خزش و کاوش از همان درِ همیشگی می‌روند.
@@ -278,7 +297,8 @@
           : { kind: 'map' }
       );
       if (!job) throw new Error(run.error || 'شروع نشد');
-      location.href = base;
+      /** داخلِ همان جلسه، نه فهرست — همان دلیلِ بالا. */
+      location.href = `${base}/discover/live`;
     } catch (cause) {
       error = cause.message;
       starting = '';
