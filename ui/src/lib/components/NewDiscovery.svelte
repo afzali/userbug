@@ -22,10 +22,46 @@
   import { Input } from '$lib/components/ui/input/index.js';
   import { run, startJob } from '$lib/run-store.svelte.js';
 
-  let { target, project = null, onClose, onStarted } = $props();
+  let { target, project = null, scope = null, onClose, onStarted } = $props();
+
+  /**
+   * دامنه، وقتی از درخت آمده‌ایم.
+   *
+   * ── چرا حالت را هم عوض می‌کند ──
+   *
+   * کسی که روی «افزودن کتاب» زده و گفته «اینجا را کشف کن»، منظورش خزشِ
+   * کلِ اپ نیست. پس وقتی دامنه هست، پیش‌فرض «فقط فلان‌جا» می‌شود و متنش
+   * هم از قبل پر است — همان کاری که خودش می‌خواست بنویسد.
+   */
+  let scoped = $derived(scope && scope.kind !== 'all' ? scope.nodes || [] : []);
 
   let how = $state('tour');
-  let scope = $state('');
+  let where = $state('');
+
+  /**
+   * دامنه با `$effect` پر می‌شود، نه با مقدارِ اولیهٔ `$state`.
+   *
+   * ── چرا، و چطور پیدا شد ──
+   *
+   * `scoped` خودش `$derived` است و وقتی `$state` مقداردهیِ اولیه می‌شود
+   * هنوز خالی است. نتیجه: حالت درست انتخاب می‌شد («فقط فلان‌جا») ولی
+   * کادرِ متن خالی می‌ماند — یعنی کاربر باید همان چیزی را تایپ می‌کرد که
+   * با کلیک روی همان ردیف گفته بود.
+   *
+   * با `$effect` هم بارِ اول پر می‌شود هم وقتی دامنه عوض شود (مثلاً از
+   * دیالوگِ بررسی که به اینجا تحویل می‌دهد).
+   */
+  let seeded = $state('');
+  $effect(() => {
+    const key = scoped.map((one) => one.id).join(',');
+    if (!scoped.length || seeded === key) return;
+    seeded = key;
+    how = 'scoped';
+    where =
+      scoped.length === 1
+        ? `${scoped[0].route}${scoped[0].view ? ` و نمای «${scoped[0].view}»` : ''} را کامل بررسی کن`
+        : `این بخش‌ها را بررسی کن: ${[...new Set(scoped.map((one) => one.route))].join('، ')}`;
+  });
   let busy = $state(false);
   let error = $state('');
 
@@ -99,7 +135,7 @@
       const job = await startJob(
         target,
         how === 'scoped'
-          ? { kind: 'quest', goal: scope.trim() || 'همه‌جای اپ را بررسی کن' }
+          ? { kind: 'quest', goal: where.trim() || 'همه‌جای اپ را بررسی کن' }
           : { kind: 'map' }
       );
       if (!job) throw new Error(run.error || 'شروع نشد');
@@ -155,7 +191,7 @@
 
             {#if way.key === 'scoped' && how === 'scoped'}
               <Input
-                bind:value={scope}
+                bind:value={where}
                 class="mt-2 h-9"
                 placeholder="مثلاً: برو در تنظیمات و همهٔ گزینه‌هایش را امتحان کن"
                 disabled={busy}

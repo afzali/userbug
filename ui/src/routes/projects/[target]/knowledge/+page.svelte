@@ -31,7 +31,6 @@
 <svelte:head><title>دانسته‌ها — {data.project?.name || target}</title></svelte:head>
 
 {#snippet actions()}
-  <Button variant="outline" size="sm" href={`${base}/discover`}>کشفِ تازه</Button>
   <Button variant="outline" size="sm" href={base}>اپِ من</Button>
 {/snippet}
 

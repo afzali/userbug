@@ -253,7 +253,7 @@
             پروژه‌ها می‌آید یا می‌خواهد ببیند اپ چه دارد، یا می‌خواهد
             بیازمایدش. میان‌بر باید همان دومی باشد.
           -->
-          <Button href={`${workspace(project.key)}/rounds`} variant="outline">بررسی</Button>
+          <Button href={`${workspace(project.key)}/runs`} variant="outline">بررسی</Button>
           <!--
             حذف کم‌رنگ و آخر از همه. کارِ روزمره نیست و نباید هم‌وزنِ
             «ورود به پروژه» دیده شود.

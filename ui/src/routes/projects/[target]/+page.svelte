@@ -22,6 +22,9 @@
   import PageHeader from '$lib/components/PageHeader.svelte';
   import CapabilityTree from '$lib/components/CapabilityTree.svelte';
   import CapabilityPanel from '$lib/components/CapabilityPanel.svelte';
+  import NewDiscovery from '$lib/components/NewDiscovery.svelte';
+  import ReviewDialog from '$lib/components/ReviewDialog.svelte';
+  import { goto } from '$app/navigation';
   import { formatNumber } from '$lib/format.js';
   import { onFinished, run, startJob } from '$lib/run-store.svelte.js';
 
@@ -166,87 +169,6 @@
   );
   let nameNote = $state('');
 
-  /**
-   * راهِ بررسیِ یک پروژه — پنج قدم، و هر کدام عددِ خودش.
-   *
-   * ── چرا `done` سخت‌گیر نیست ──
-   *
-   * «یک بار انجام شده» را می‌گوید، نه «کامل است». ادعای کامل بودن همان
-   * چیزی است که این ابزار همه‌جا از آن پرهیز می‌کند — و عددِ کنارش خودش
-   * می‌گوید چقدر مانده.
-   *
-   * ── چرا قدمِ ناتمام برجسته است، نه قدمِ تمام ──
-   *
-   * تیکِ سبز پاداش است و کارِ بعدی را نشان نمی‌دهد. حاشیهٔ رنگی روی چیزی
-   * می‌نشیند که هنوز مانده — همان که آدم دنبالش است.
-   */
-  const PATH = [
-    {
-      key: 'discover',
-      label: 'کشف',
-      href: `${base}/discover`,
-      done: () => data.total > 0,
-      state: () => (data.total ? `${formatNumber(data.total)} قابلیت شناخته شد` : 'هنوز نگشته‌ایم'),
-    },
-    {
-      key: 'name',
-      label: 'شناختن',
-      href: base,
-      done: () => data.pages > 0 && !unnamed,
-      state: () => (unnamed ? `${formatNumber(unnamed)} بخش بی‌نامِ خوانا` : 'همه نام دارند'),
-    },
-    {
-      key: 'scenario',
-      label: 'سناریو',
-      href: `${base}/missions`,
-      done: () => data.pages > 0 && !data.blind,
-      state: () =>
-        data.blind
-          ? `${formatNumber(data.blind)} بخش بی‌سناریو`
-          : data.planned
-            ? `${formatNumber(data.planned)} نوشته، هنوز نیازموده`
-            : 'همه سناریو دارند',
-    },
-    {
-      key: 'review',
-      label: 'بررسی',
-      href: `${base}/rounds`,
-      /**
-       * ── چرا خزش اینجا تیک نمی‌گیرد ──
-       *
-       * `counts.runs` حالا فقط اجرای سناریوست. پیش از این خزش هم شمرده
-       * می‌شد، پس روی `nepi4` که تنها یک خزشِ شکست‌خورده داشت، این قدم
-       * سبز بود و می‌گفت «۱ اجرا تا امروز». تیکی که با کارِ خودِ ابزار
-       * سبز شود، هیچ چیزی دربارهٔ اپ نمی‌گوید.
-       */
-      done: () => tree.flat.some((one) => one.counts.runs),
-      state: () => {
-        const runs = tree.flat.reduce((sum, one) => sum + (one.counts.runs || 0), 0);
-        if (runs) return `${formatNumber(runs)} اجرا تا امروز`;
-        const visits = tree.flat.reduce((sum, one) => sum + (one.counts.visits || 0), 0);
-        return visits ? 'فقط کشف شده، هنوز آزموده نشده' : 'هنوز اجرایی نبوده';
-      },
-    },
-    {
-      key: 'triage',
-      label: 'یافته‌ها',
-      href: `${base}/triage`,
-      /**
-       * ── چرا «صفر یافته» تیک نمی‌گیرد ──
-       *
-       * روی پروژه‌ای که هنوز هیچ اجرایی نداشته، «همه قضاوت شده ✓» یک
-       * جملهٔ درست دربارهٔ مجموعهٔ تهی است و یک ادعای غلط دربارهٔ اپ.
-       * ندانستن با نداشتن فرق دارد.
-       */
-      done: () => tree.flat.some((one) => one.counts.runs) && !data.open,
-      state: () =>
-        data.open
-          ? `${formatNumber(data.open)} بازِ بی‌قضاوت`
-          : tree.flat.some((one) => one.counts.runs)
-            ? 'همه قضاوت شده'
-            : 'هنوز چیزی آزموده نشده',
-    },
-  ];
 
   /**
    * نام‌گذاری — و چرا نتیجه‌اش با عدد گزارش می‌شود.
@@ -347,102 +269,56 @@
 
   /* ─────────────────── دورِ بررسی — دکمهٔ مادر ─────────────────── */
 
-  let roundOpen = $state(false);
-  let roundName = $state('');
-  let roundNote = $state('');
-  let roundScenarios = $state(true);
-  let roundCrawl = $state(false);
-
   /**
-   * یک دور: نامش ثبت می‌شود، بعد کارهایش پشتِ سرِ هم می‌روند.
+   * دو دیالوگ، با دامنه به‌عنوان ورودی.
    *
-   * ── چرا اول ثبت و بعد اجرا ──
-   *
-   * دامنه و توضیح در `run.json` نیستند و هیچ‌جای دیگری هم نمی‌روند. اگر
-   * بعد از اجرا ثبت شوند، اجرایی که وسطِ راه بشکند دوری بی‌دامنه به‌جا
-   * می‌گذارد — و همان دور است که بعداً باید بگوید «قرار بود کجا را ببینم».
-   *
-   * ── چرا پشتِ سرِ هم و نه با هم ──
-   *
-   * لایهٔ کار عمداً فقط یک اجرای هم‌زمان می‌پذیرد: هر دو مرورگر باز
-   * می‌کنند. پس دومی به پایانِ اولی گره می‌خورد، نه به یک `Promise.all` که
-   * بی‌صدا `JOB_ACTIVE` می‌گیرد.
+   * `null` یعنی بسته. هر جایی که دامنه دارد — دکمهٔ بالا، تیک‌های درخت،
+   * آیکونِ یک ردیف — فقط همین را پر می‌کند و دیالوگ خودش بقیه را می‌فهمد.
    */
-  async function startRound() {
-    const name = roundName.trim();
-    busy = 'round';
-    error = '';
+  let reviewing = $state(null);
+  let discovering = $state(null);
 
-    try {
-      const response = await fetch('/api/rounds', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-        body: JSON.stringify({ target, name, note: roundNote, scope: [...picked] }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'دور ثبت نشد');
-
-      /** ترتیب عمدی: سناریوها سریع‌ترند، پس نتیجه‌شان زودتر دیده می‌شود. */
-      const queue = [];
-      if (roundScenarios && pickedScenarios.length) {
-        queue.push({ kind: 'run', only: pickedScenarios, bench: name });
-      }
-      if (roundCrawl) {
-        queue.push({
-          kind: 'map',
-          bench: name,
-          /**
-           * دامنهٔ خزش از خودِ انتخاب می‌آید.
-           *
-           * `--scope` مسیر می‌خواهد نه شناسه، و مسیرهای تکراری (ده نما روی
-           * یک صفحه) باید یکی شوند — وگرنه یک رشتهٔ بلندِ تکراری ساخته
-           * می‌شود که خودِ خزنده باید دوباره تمیزش کند.
-           */
-          scope: picked.size
-            ? [...new Set(tree.flat.filter((one) => picked.has(one.id)).map((one) => one.route))].join(',')
-            : '',
-        });
-      }
-
-      if (!queue.length) throw new Error('هیچ کاری برای این دور انتخاب نشده');
-
-      const first = await startJob(target, queue[0]);
-      if (!first) throw new Error(run.error || 'شروع نشد');
-
-      /**
-       * کارِ دوم منتظرِ پایانِ اولی می‌ماند.
-       *
-       * `onFinished` همان‌جایی است که پلیر هم از آن می‌خواند، پس اگر کاربر
-       * وسطِ کار لغو کند، این هم صدا زده می‌شود — و لغو یعنی لغو، پس دومی
-       * شروع نمی‌شود.
-       */
-      if (queue[1]) {
-        const stop = onFinished((job) => {
-          stop();
-          if (job?.status === 'cancelled') return;
-          startJob(target, queue[1]);
-        });
-      }
-
-      roundOpen = false;
-      roundName = '';
-      roundNote = '';
-    } catch (cause) {
-      error = cause.message;
-    } finally {
-      busy = '';
-    }
-  }
 </script>
 
 <svelte:head><title>اپِ من — {data.project?.name || target}</title></svelte:head>
 
+<!--
+  دو فعل، دو دکمه — و هیچ‌کدام دیگر یک صفحه نیستند.
+
+  ── چرا ──
+
+  «کشف» و «بررسی» تا امروز ردیفِ منو بودند، پس کاربر باید اول به یک صفحه
+  می‌رفت و بعد تازه کار را شروع می‌کرد. ولی هیچ‌کدام مقصد نیستند: کارند، و
+  کار جایش کنارِ چیزی است که رویش انجام می‌شود.
+
+  ترتیبشان هم عمدی است: اول باید بدانی اپ چه دارد، بعد بیازمایی‌اش.
+-->
 {#snippet actions()}
-  <Button variant="outline" size="sm" href={`${base}/discover`}>کشف</Button>
-  <Button variant="outline" size="sm" disabled={!!busy} onclick={refresh}>
-    {busy === 'rebuild' ? 'در حال ساختن…' : 'تازه‌سازی'}
+  <!--
+    ⚙ — هرچه مرجع است، پشتِ یک دکمه.
+
+    ── چرا سه ردیفِ منو اینجا جمع شدند ──
+
+    «دانسته‌ها»، «دادهٔ آزمون» و «پیکربندی» هیچ‌کدام کارِ روزانه نیستند:
+    سراغشان می‌روی با یک سؤالِ مشخص، شاید ماهی یک بار. ردیفِ منو بودنشان
+    منو را به همان فهرستِ امکانات برمی‌گرداند که سه بار از آن فرار کردیم.
+  -->
+  <details class="relative">
+    <summary class="flex h-8 cursor-pointer items-center rounded-md border px-2.5 text-sm hover:bg-accent">⚙</summary>
+    <div class="absolute end-0 z-40 mt-1 w-56 rounded-lg border bg-card p-1 shadow-lg">
+      {#each [['دانسته‌ها', `${base}/knowledge`, 'چه می‌دانیم و از کجا'], ['دادهٔ آزمون', `${base}/config`, 'حساب و فایلِ نمونه'], ['فایل‌ها و پیکربندی', `${base}/files`, 'سناریوها و کانفیگِ اپ']] as [label, href, hint] (href)}
+        <a {href} class="block rounded-md px-2.5 py-1.5 text-sm hover:bg-accent">
+          {label}
+          <span class="block text-[11px] text-muted-foreground">{hint}</span>
+        </a>
+      {/each}
+    </div>
+  </details>
+  <Button variant="ghost" size="sm" disabled={!!busy} onclick={refresh} title="درخت را از شناختِ روی دیسک دوباره بساز">
+    {busy === 'rebuild' ? 'در حال ساختن…' : '↻'}
   </Button>
-  <Button size="sm" href={`${base}/rounds`}>بررسی کن</Button>
+  <Button variant="outline" size="sm" onclick={() => { discovering = { kind: 'all' }; }}>＋ کشف</Button>
+  <Button size="sm" onclick={() => { reviewing = { kind: 'all', nodes: tree.flat }; }}>▶ بررسی</Button>
 {/snippet}
 
 <PageHeader
@@ -452,54 +328,33 @@
   {actions}
 />
 
-{#if error}<p class="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>{/if}
-
-<!--
-  راهِ بررسی — همیشه دیده می‌شود، نه فقط روی پروژهٔ خالی.
-
-  ── چرا این نوار لازم شد ──
-
-  همهٔ قطعه‌ها ساخته شده بودند و ترتیبشان هم روشن بود، ولی آن ترتیب فقط در
-  ذهنِ سازنده بود. کارتِ «از کجا شروع کنیم» وجود داشت و دو ایراد داشت: در
-  صفحهٔ اجرا دفن شده بود، و فقط روی پروژهٔ **خالی** دیده می‌شد — یعنی دقیقاً
-  وقتی ناپدید می‌شد که کار تازه جدی شده بود.
-
-  پرسشِ «حالا چه کار کنم؟» با یک اجرا از بین نمی‌رود. پس نوار می‌ماند، و
-  هر قدم عددِ خودش را می‌گوید: عدد هم می‌گوید کجاییم، هم می‌گوید هنوز چقدر
-  مانده.
-
-  ── چرا حلقه است و نه خطِ صاف ──
-
-  بعد از تریاژ برنمی‌گردی خانه؛ برمی‌گردی سرِ کشف، چون یافته‌ها معمولاً
-  می‌گویند جایی را ندیده‌ای. فلشِ آخر عمداً به اول برمی‌گردد.
--->
-{#if tree.flat.length}
-  <ol class="mb-5 flex flex-wrap items-stretch gap-2 text-xs">
-    {#each PATH as step, index (step.key)}
-      <li class="flex items-center gap-2">
-        <a
-          href={step.href}
-          class="flex min-w-36 flex-col rounded-lg border px-3 py-2 transition-colors hover:bg-accent/50 {step.done()
-            ? ''
-            : 'border-primary bg-accent/30'}"
-        >
-          <span class="flex items-center gap-1.5 font-medium">
-            <span class="text-muted-foreground">{formatNumber(index + 1)}</span>
-            {step.label}
-            {#if step.done()}<span class="text-emerald-600 dark:text-emerald-400">✓</span>{/if}
-          </span>
-          <span class="text-[11px] text-muted-foreground">{step.state()}</span>
-        </a>
-        {#if index < PATH.length - 1}
-          <span class="text-muted-foreground/50" aria-hidden="true">←</span>
-        {/if}
-      </li>
-    {/each}
-    <li class="flex items-center text-[11px] text-muted-foreground">
-      <span class="me-1" aria-hidden="true">↺</span> و دوباره از اول
-    </li>
-  </ol>
+{#if discovering}
+  <NewDiscovery
+    {target}
+    project={data.project}
+    scope={discovering}
+    onClose={() => { discovering = null; }}
+    onStarted={(id) => goto(`${base}/discover/${encodeURIComponent(id)}`)}
+  />
 {/if}
+
+{#if reviewing}
+  <!--
+    یک دیالوگ، سه در.
+
+    دکمهٔ بالای صفحه، تیک‌های درخت، و آیکونِ هر ردیف — هر سه همین را باز
+    می‌کنند و فقط `scope` را عوض می‌کنند. کاربر یک شکل یاد می‌گیرد.
+  -->
+  <ReviewDialog
+    {target}
+    scope={reviewing}
+    onClose={() => { reviewing = null; }}
+    onStarted={() => { reviewing = null; }}
+    onDiscover={(scope) => { reviewing = null; discovering = scope; }}
+  />
+{/if}
+
+{#if error}<p class="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>{/if}
 
 {#if !tree.flat.length}
   <!--
@@ -516,8 +371,7 @@
       می‌شود. هر کدام را که بروید، بخش‌ها و قابلیت‌ها همین‌جا ظاهر می‌شوند.
     </p>
     <div class="mt-4 flex flex-wrap gap-2">
-      <Button href={`${base}/discover`} size="sm">کشف — گشت، خزش، یا سورس</Button>
-      <Button href={`${base}/rounds`} variant="outline" size="sm">مستقیم بررسی کن</Button>
+      <Button size="sm" onclick={() => { discovering = { kind: 'all' }; }}>＋ کشف — گشت، خزش، یا سورس</Button>
     </div>
   </section>
 {:else}
@@ -600,115 +454,48 @@
             onPick={togglePick}
             onOpen={(one) => { selected = one.id; }}
             onToggle={toggleOpen}
+            onReview={(one) => { reviewing = { kind: 'one', nodes: [one] }; }}
           />
         {/if}
       </div>
 
       <!--
-        نوارِ انتخاب — جنینِ «دکمهٔ مادر».
+        نوارِ انتخاب — فقط دامنه، نه فرم.
 
-        ── چرا همین حالا و نه در گامِ «دور» ──
+        ── چرا فرمِ داخلی رفت ──
 
-        انتخابِ چند شاخه و اجرای همان‌ها، همین امروز کارِ واقعی‌ای است که
-        هیچ صفحه‌ای نمی‌کرد: فهرستِ اجرا بر اساسِ **فایلِ سناریو** بود، نه
-        بر اساسِ بخشی از اپ که می‌خواهی بررسی کنی.
+        اینجا یک فرمِ چهارتکه بود: اسم، توضیح، دو تیکِ روش. یعنی سومین
+        جایی که «بررسی» شروع می‌شد، با شکلی متفاوت از دو تای دیگر.
+
+        حالا همان دیالوگی باز می‌شود که دکمهٔ بالای صفحه و آیکونِ هر ردیف
+        باز می‌کنند. یک شکل، سه در — نه سه شکل.
       -->
-      {#if picked.size || roundOpen}
-        <div class="sticky bottom-4 mt-3 rounded-xl border bg-card p-3 shadow-lg">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-sm font-medium">
-              {picked.size ? `${formatNumber(picked.size)} قابلیت انتخاب شده` : 'کلِ اپ'}
-            </span>
-            <span class="text-[11px] text-muted-foreground">
-              {pickedScenarios.length
-                ? `${formatNumber(pickedScenarios.length)} سناریو رویشان`
-                : picked.size
-                  ? 'هیچ سناریویی رویشان نیست'
-                  : ''}
-            </span>
-            <div class="ms-auto flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant={roundOpen ? 'secondary' : 'default'}
-                disabled={!!busy}
-                onclick={() => { roundOpen = !roundOpen; }}
-              >
-                بررسیِ این‌ها
-              </Button>
-              {#if pickedScenarios.length}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!!busy}
-                  onclick={() => runScenarios(pickedScenarios)}
-                >
-                  {busy === 'run' ? 'شروع…' : 'فقط سناریوها را بگیر'}
-                </Button>
-              {/if}
-              {#if picked.size}
-                <Button size="sm" variant="ghost" onclick={() => { picked = new Set(); }}>برداشتنِ تیک‌ها</Button>
-              {/if}
-            </div>
+      {#if picked.size}
+        <div class="sticky bottom-4 mt-3 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 shadow-lg">
+          <span class="text-sm font-medium">{formatNumber(picked.size)} بخش انتخاب شده</span>
+          <span class="text-[11px] text-muted-foreground">
+            {pickedScenarios.length
+              ? `${formatNumber(pickedScenarios.length)} سناریو رویشان`
+              : 'هیچ سناریویی رویشان نیست'}
+          </span>
+          <div class="ms-auto flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!!busy}
+              onclick={() => { discovering = { kind: 'some', nodes: tree.flat.filter((one) => picked.has(one.id)) }; }}
+            >
+              ＋ کشفِ این‌ها
+            </Button>
+            <Button
+              size="sm"
+              disabled={!!busy}
+              onclick={() => { reviewing = { kind: 'some', nodes: tree.flat.filter((one) => picked.has(one.id)) }; }}
+            >
+              ▶ بررسیِ این‌ها
+            </Button>
+            <Button size="sm" variant="ghost" onclick={() => { picked = new Set(); }}>برداشتنِ تیک‌ها</Button>
           </div>
-
-          <!--
-            دکمهٔ مادر.
-
-            ── چرا اسم و روش می‌پرسد، و نه فقط «بزن» ──
-
-            دوری که اسم نداشته باشد، همان `bench`ِ خالیِ دیروز است: یک اجرای
-            دیگر در فهرست که هفتهٔ بعد از بقیه جدا نمی‌شود. و انتخابِ روش،
-            چون کاری که آدم می‌خواهد معمولاً ترکیبی است — «سناریوها را بگیر
-            **و** دوباره بگرد ببین چیزی تازه هست».
-          -->
-          {#if roundOpen}
-            <div class="mt-3 space-y-2 border-t pt-3">
-              <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <Input bind:value={roundName} class="h-9" maxlength="60" placeholder="اسمِ این بررسی — مثلاً: پیش از انتشار ۴.۲" />
-                <Input bind:value={roundNote} class="h-9" maxlength="300" placeholder="چرا این بررسی؟ (اختیاری)" />
-              </div>
-
-              <div class="flex flex-wrap gap-3 text-xs">
-                <label class="flex items-center gap-1.5">
-                  <input type="checkbox" bind:checked={roundScenarios} disabled={!pickedScenarios.length && picked.size > 0} />
-                  سناریوها را بگیر
-                  {#if picked.size}({formatNumber(pickedScenarios.length)}){/if}
-                </label>
-                <label class="flex items-center gap-1.5">
-                  <input type="checkbox" bind:checked={roundCrawl} />
-                  دوباره بگرد، ببین چیزی تازه هست
-                </label>
-              </div>
-
-              <!--
-                ── چرا این جمله اینجاست ──
-
-                کارها **پشتِ سر هم** اجرا می‌شوند، نه با هم: هر دو مرورگر باز
-                می‌کنند و لایهٔ کار عمداً فقط یک اجرای هم‌زمان می‌پذیرد. کاربری
-                که هر دو را تیک بزند و ببیند فقط یکی شروع شد، فکر می‌کند خراب
-                است.
-              -->
-              <p class="text-[11px] leading-5 text-muted-foreground">
-                {#if roundScenarios && roundCrawl}
-                  اول سناریوها، بعد خزش — پشتِ سرِ هم، چون هر دو مرورگر باز می‌کنند.
-                  دومی وقتی اولی تمام شد خودش شروع می‌شود.
-                {:else}
-                  هر دو زیرِ همین اسم ثبت می‌شوند و در «بررسی» و کنارِ هر یافته دیده می‌شوند.
-                {/if}
-              </p>
-
-              <div class="flex flex-wrap items-center gap-2">
-                <Button
-                  size="sm"
-                  disabled={!!busy || !roundName.trim() || (!roundScenarios && !roundCrawl)}
-                  onclick={startRound}
-                >
-                  {busy === 'round' ? 'در حال شروع…' : 'شروعِ بررسی'}
-                </Button>
-                <Button size="sm" variant="ghost" href={`${base}/rounds`}>بررسی‌های قبلی</Button>
-              </div>
-            </div>
-          {/if}
         </div>
       {/if}
     </section>

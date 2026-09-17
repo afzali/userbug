@@ -35,7 +35,7 @@
 <svelte:head><title>{session.way.label} — {data.project?.name || target}</title></svelte:head>
 
 {#snippet actions()}
-  <Button variant="ghost" size="sm" href={`${base}/discover`}>← همهٔ کشف‌ها</Button>
+  <Button variant="ghost" size="sm" href={`${base}/runs`}>← همهٔ کشف‌ها</Button>
   <Button variant="outline" size="sm" href={base}>اپِ من</Button>
 {/snippet}
 

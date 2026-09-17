@@ -459,8 +459,8 @@
   {#if !data.found.places.length}
     <p class="mt-2 text-xs leading-6 text-muted-foreground">
       هنوز هیچ‌جایی شناخته نشده. یک
-      <a class="underline underline-offset-2" href={`${base}/discover`}>گشت</a> بروید یا
-      <a class="underline underline-offset-2" href={`${base}/discover`}>خزش</a> کنید.
+      <a class="underline underline-offset-2" href={base}>گشت</a> بروید یا
+      <a class="underline underline-offset-2" href={base}>خزش</a> کنید.
     </p>
   {:else}
     <div class="scroll-thin mt-3 max-h-96 overflow-auto">

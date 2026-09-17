@@ -137,7 +137,7 @@
       {/if}
     </p>
     <div class="mt-4 flex flex-wrap gap-2">
-      <Button href={`${base}/discover`} size="sm">کشف — گشت یا خزش</Button>
+      <Button href={base} size="sm">کشف — گشت یا خزش</Button>
       <Button href={`${base}/files`} variant="outline" size="sm">خودم می‌نویسم</Button>
     </div>
   </section>
@@ -317,7 +317,7 @@
   </details>
 
   <div class="flex flex-wrap gap-2">
-    <Button href={`${base}/discover`} variant="outline" size="sm">کشف</Button>
+    <Button href={base} variant="outline" size="sm">کشف</Button>
     <Button href={`${base}/files`} variant="outline" size="sm">
       فایل‌های پروژه{data.others ? ` (${formatNumber(data.others)} پیش‌نویس و اسکریپت)` : ''}
     </Button>

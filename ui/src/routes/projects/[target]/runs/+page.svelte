@@ -23,7 +23,6 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import RunCard from '$lib/components/RunCard.svelte';
-  import StartReview from '$lib/components/StartReview.svelte';
   import { formatDate, formatNumber } from '$lib/format.js';
 
   let { data } = $props();
@@ -31,6 +30,14 @@
   let target = $derived(data.target);
   let base = $derived(`/projects/${encodeURIComponent(target)}`);
   let rounds = $derived(data.rounds || []);
+  let discoveries = $derived(data.discoveries || []);
+
+  const WAY_TONE = {
+    tour: 'bg-primary/10 text-primary',
+    map: 'bg-secondary text-secondary-foreground',
+    quest: 'bg-secondary text-secondary-foreground',
+    source: 'bg-muted text-muted-foreground',
+  };
   let total = $derived(rounds.reduce((sum, one) => sum + one.runs.length, 0));
 
   /** کدام دور باز است — اجراها و یافته‌هایش همان‌جا زیرِ ردیف می‌آیند. */
@@ -59,11 +66,10 @@
   }
 </script>
 
-<svelte:head><title>بررسی — {data.project?.name || target}</title></svelte:head>
+<svelte:head><title>اجراها — {data.project?.name || target}</title></svelte:head>
 
 {#snippet actions()}
-  <Button variant="outline" size="sm" href={base}>اپِ من</Button>
-  <Button variant="outline" size="sm" href={`${base}/triage`}>یافته‌ها</Button>
+  <Button size="sm" href={base}>اپِ من — شروعِ کارِ تازه</Button>
 {/snippet}
 
 <!--
@@ -75,33 +81,65 @@
 -->
 <PageHeader
   eyebrow={`${data.project?.name || target} · ${data.project?.environment || ''}`}
-  title="بررسی"
-  description="اینجا اپ را می‌آزمایید — و می‌بینید بارِ گذشته چه دید و این بار چه فرق کرد."
+  title="اجراها"
+  description="هر بار که چیزی اجرا شد — کشف یا بررسی. کشف می‌فهمد اپ چه دارد، بررسی می‌آزمایدش."
   {actions}
 />
 
-<div class="grid gap-6 xl:grid-cols-[23rem_minmax(0,1fr)]">
-  <div class="xl:sticky xl:top-20 xl:h-fit">
-    <StartReview {target} project={data.project} schedules={data.schedules} />
+<!--
+  دو دسته، یک صفحه.
 
-    <!--
-      میان‌برِ دامنه‌دار — نه یک درِ دوم.
+  ── چرا فرمِ شروع از اینجا رفت ──
 
-      اینجا نمی‌شود گفت «فقط بخشِ کتاب را»، چون دامنه در درخت انتخاب
-      می‌شود. به‌جای ساختنِ فرمی که مسیرها را دستی بپرسد (همان کاری که کلِ
-      درخت برای حذفش ساخته شد)، می‌گوییم کجا برود.
-    -->
-    <p class="mt-3 rounded-xl border border-dashed p-3 text-[11px] leading-6 text-muted-foreground">
-      می‌خواهید فقط بخشی از اپ بررسی شود؟ در
-      <a class="underline underline-offset-2" href={base}>اپِ من</a>
-      همان بخش‌ها را تیک بزنید و «بررسیِ این‌ها» را بزنید — دامنه خودش پر می‌شود.
-    </p>
-  </div>
+  «بررسی» دیگر یک صفحه نیست؛ دکمه‌ای است روی «اپِ من» که دامنه‌اش را از
+  همان درخت می‌گیرد. فرمی که اینجا بماند، دری دوم می‌شود بی دامنه — و
+  کاربر باید حدس بزند کدام را بزند.
+
+  اینجا فقط **تاریخچه** است: چه کارهایی اجرا شد و هرکدام چه داد.
+-->
+<div class="space-y-6">
+  <!--
+    کشف‌ها اول، بررسی‌ها بعد — به ترتیبی که کار انجام می‌شود.
+
+    اول می‌فهمی اپ چه دارد، بعد می‌آزمایی‌اش. ترتیبِ صفحه خودش یک جملهٔ
+    آموزشی است.
+  -->
+  {#if discoveries.length}
+    <section>
+      <h2 class="mb-1 text-xl font-bold">کشف‌ها</h2>
+      <p class="mb-3 text-sm text-muted-foreground">
+        هر بار که رفتیم ببینیم اپ چه دارد. نتیجه‌شان در
+        <a class="underline underline-offset-2" href={base}>اپِ من</a> جمع می‌شود.
+      </p>
+      <div class="space-y-2">
+        {#each discoveries as one (one.id)}
+          <a
+            href={`${base}/discover/${encodeURIComponent(one.id)}`}
+            class="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:bg-accent/40"
+          >
+            <span class={`shrink-0 rounded-md px-2 py-1 text-[11px] font-medium ${WAY_TONE[one.kind] || ''}`}>
+              {one.way.label}
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block text-sm">{one.way.hint}</span>
+              <span class="block text-[11px] text-muted-foreground">
+                {formatDate(one.at)}{one.steps ? ` · ${formatNumber(one.steps)} قدم` : ''}
+              </span>
+            </span>
+            {#if !one.done}<Badge variant="outline" class="shrink-0 text-[10px]">ناتمام</Badge>{/if}
+            {#if one.findings}
+              <Badge variant="destructive" class="shrink-0 text-[10px]">{formatNumber(one.findings)}</Badge>
+            {/if}
+          </a>
+        {/each}
+      </div>
+    </section>
+  {/if}
 
   <section class="min-w-0">
     <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h2 class="text-xl font-bold">بررسی‌های گذشته</h2>
+        <h2 class="text-xl font-bold">بررسی‌ها</h2>
         <p class="mt-1 text-sm text-muted-foreground">
           هر بار زیرِ اسمِ خودش، با اینکه کجا را دید و نسبت به بارِ قبل چه فرق کرد.
         </p>

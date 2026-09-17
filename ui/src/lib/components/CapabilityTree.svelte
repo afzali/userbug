@@ -17,7 +17,7 @@
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { formatNumber } from '$lib/format.js';
 
-  let { roots = [], selected = '', picked = new Set(), open = new Set(), onPick, onOpen, onToggle } = $props();
+  let { roots = [], selected = '', picked = new Set(), open = new Set(), onPick, onOpen, onToggle, onReview } = $props();
 
   /**
    * ── چرا نما و صفحه دو ستونِ متفاوت دارند ──
@@ -27,58 +27,65 @@
    * شده. و «۰ از ۲۸» صادق‌ترین چیزی است که می‌شود گفت — یعنی هرگز باز
    * نشده.
    */
-  function numbersOf(node) {
-    if (node.view) {
-      if (!node.actions) return { text: '—', tone: 'text-muted-foreground' };
-      return {
-        text: `${formatNumber(node.tried)}/${formatNumber(node.actions)} کنش`,
-        tone: node.tried ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-400',
-      };
-    }
-    if (node.shelf) return { text: '', tone: '' };
+  /**
+   * قاعدهٔ یک ردیف: **نام · یک نشان · کی · چند سناریو**. و بس.
+   *
+   * ── چرا قاعده لازم بود ──
+   *
+   * کاربر گفت «نه خیلی پرجزئیات». آن جمله خودبه‌خود رعایت نمی‌شود: هر بار
+   * که عددِ تازه‌ای پیدا می‌شود (کنش، بازدید، قرارداد، پیش‌نویس) وسوسه
+   * هست که یک ستونِ دیگر اضافه شود، و شش ماه بعد همان جدولِ شلوغ را
+   * داریم.
+   *
+   * پس سقف: چهار چیز روی ردیف، بقیه در پنلِ کناری.
+   */
+  const MARK = {
+    broken: { glyph: '✗', tone: 'text-destructive', title: 'ایرادِ باز دارد' },
+    ok: { glyph: '✓', tone: 'text-emerald-600 dark:text-emerald-400', title: 'آخرین بررسی سالم بود' },
+    planned: { glyph: '◔', tone: 'text-sky-600 dark:text-sky-400', title: 'سناریو دارد ولی هنوز اجرا نشده' },
+    never: { glyph: '?', tone: 'text-amber-600 dark:text-amber-400', title: 'هنوز بررسی نشده' },
+    none: { glyph: '·', tone: 'text-muted-foreground/50', title: '' },
+  };
 
-    const count = node.counts.scenarios.length;
-    if (count) {
-      return {
-        text: `${formatNumber(count)} سناریو · ${formatNumber(node.counts.runs)} اجرا`,
-        tone: 'text-muted-foreground',
-      };
-    }
-
+  function markOf(node) {
+    if (node.shelf) return MARK.none;
+    if (node.counts?.openFindings) return MARK.broken;
+    if (node.counts?.runs) return MARK.ok;
+    if (node.counts?.planned?.length) return MARK.planned;
     /**
-     * سناریوی نوشته‌شده‌ای که هنوز اجرا نشده.
-     *
-     * ── چرا حالتِ سومی لازم شد ──
-     *
-     * دو حالت داشتیم: «سناریو دارد» و «بی‌سناریو». کاربری که همین حالا از
-     * یک زاویه سناریو ساخته، در هیچ‌کدام نمی‌گنجد — و چون شمارش از
-     * **اجراها** می‌آمد، در «بی‌سناریو» می‌ماند. یعنی کارش را می‌کرد و
-     * صفحه همان عدد را می‌گفت.
-     *
-     * «نوشته، نیازموده» هم صادق است هم قدمِ بعدی را نشان می‌دهد.
+     * نما شمارشِ اجرا ندارد (رخدادِ اجرا نما را نمی‌شناسد)، پس آنچه
+     * دربارهٔ آن می‌دانیم از خزش می‌آید: کنشی که امتحان شده یا نشده.
      */
-    const planned = node.counts.planned?.length || 0;
-    if (planned) {
-      const draft = node.counts.planned.some((one) => one.draft);
-      return {
-        text: draft ? `${formatNumber(planned)} پیش‌نویس` : `${formatNumber(planned)} نیازموده`,
-        tone: 'text-sky-600 dark:text-sky-400',
-      };
-    }
-
-    /**
-     * «رفته‌ایم و نیازموده‌ایم» از «اصلاً نرفته‌ایم» بدتر نیست — ولی یکی
-     * نیست. خزش که رویش رفته یعنی می‌دانیم واقعاً وجود دارد.
-     */
-    return {
-      text: node.counts.visits ? 'کشف شده · بی‌سناریو' : 'بی‌سناریو',
-      tone: 'text-amber-600 dark:text-amber-400',
-    };
+    if (node.view && node.tried) return MARK.ok;
+    return MARK.never;
   }
+
+  /** «کی» — کوتاه‌ترین شکلِ ممکن، چون فقط یک ستون جا دارد. */
+  function whenOf(node) {
+    const at = node.counts?.lastAt;
+    if (!at) return '';
+    const days = Math.floor((Date.now() - Date.parse(at)) / 86_400_000);
+    if (Number.isNaN(days)) return '';
+    if (days <= 0) return 'امروز';
+    if (days === 1) return 'دیروز';
+    if (days < 30) return `${formatNumber(days)} روز پیش`;
+    return `${formatNumber(Math.floor(days / 30))} ماه پیش`;
+  }
+
+  /** «چند سناریو» — و صفر یک خبر است، پس پنهان نمی‌شود. */
+  function scenariosOf(node) {
+    if (node.shelf) return '';
+    if (node.view) return node.actions ? `${formatNumber(node.tried)}/${formatNumber(node.actions)} کنش` : '';
+    const count = node.counts?.scenarios?.length || 0;
+    const planned = node.counts?.planned?.length || 0;
+    if (count) return `${formatNumber(count)} سناریو`;
+    if (planned) return `${formatNumber(planned)} نیازموده`;
+    return 'بی‌سناریو';
+  }
+
 </script>
 
 {#snippet row(node, depth)}
-  {@const numbers = numbersOf(node)}
   {@const isOpen = open.has(node.id)}
   <li>
     <div
@@ -120,6 +127,10 @@
         class="flex min-w-0 flex-1 items-baseline gap-2 text-start"
         onclick={() => onOpen?.(node)}
       >
+        {#if !node.shelf}
+          {@const mark = markOf(node)}
+          <span class={`shrink-0 text-xs ${mark.tone}`} title={mark.title}>{mark.glyph}</span>
+        {/if}
         <span
           class={`truncate ${node.shelf ? 'text-muted-foreground' : 'font-medium'} ${
             node.confidence === 'suspected' ? 'opacity-60' : ''
@@ -158,22 +169,37 @@
         {/if}
       </button>
 
+      <!-- «کی» — یک ستونِ باریک، خالی وقتی هرگز بررسی نشده -->
+      <span class="hidden w-20 shrink-0 text-start text-[11px] text-muted-foreground sm:block">
+        {whenOf(node)}
+      </span>
+
+      <!-- «چند سناریو» — و «بی‌سناریو» زرد است، چون کار می‌سازد -->
       <span
-        dir="ltr"
-        class="hidden shrink-0 text-start font-mono text-[10px] text-muted-foreground/70 sm:block"
+        class={`w-24 shrink-0 text-start text-[11px] ${
+          scenariosOf(node) === 'بی‌سناریو' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'
+        }`}
       >
-        {node.view ? '' : node.route}
+        {scenariosOf(node)}
       </span>
 
-      <span class={`w-32 shrink-0 text-start text-[11px] ${numbers.tone}`}>{numbers.text}</span>
+      <!--
+        آیکونِ بررسی روی هر ردیف.
 
-      <span class="w-10 shrink-0 text-start text-[11px]">
-        {#if node.counts.openFindings}
-          <Badge variant="destructive" class="px-1.5 py-0 text-[10px]">
-            {formatNumber(node.counts.openFindings)}
-          </Badge>
-        {/if}
-      </span>
+        کاربر گفت: «حتی می‌تواند دکمهٔ بررسی روی روت‌ها و فیچرهایی که داخلِ
+        همان صفحه هستند به‌صورت آیکون باشد که سریع رویش کلیک کند».
+
+        دامنه از خودِ ردیف می‌آید، پس هیچ فرمی لازم نیست تا بپرسد «کجا».
+      -->
+      <button
+        type="button"
+        class="grid size-6 shrink-0 place-items-center rounded-md text-[11px] text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+        title={`بررسیِ «${node.title}»`}
+        aria-label={`بررسیِ ${node.title}`}
+        onclick={(event) => { event.stopPropagation(); onReview?.(node); }}
+      >
+        ▶
+      </button>
     </div>
 
     {#if node.children.length && isOpen}

@@ -1,6 +1,7 @@
 import { aggregateTriage, listRuns } from '$lib/server/artifacts.js';
 import { listSchedules } from '../../../../../../src/schedule.js';
 import { groupRounds, printsByRound, readRounds } from '../../../../../../src/runs/rounds.js';
+import { discoverySessions } from '../../../../../../src/knowledge/sessions.js';
 import { readCapabilities } from '../../../../../../src/knowledge/capabilities.js';
 
 /**
@@ -48,6 +49,8 @@ export async function load({ params }) {
    * شکستشان صفحه را نمی‌خواباند: روی سیستمی که `schtasks` ندارد، بقیهٔ
    * صفحه باید کار کند.
    */
+  const discoveries = safely(() => discoverySessions(target, runs), []);
+
   const schedules = await listSchedules()
     .then((all) => all.filter((row) => row.target === target))
     .catch(() => []);
@@ -101,6 +104,19 @@ export async function load({ params }) {
 
   return {
     schedules,
+    /**
+     * کشف‌ها، کنارِ بررسی‌ها — دو دستهٔ یک صفحه.
+     *
+     * ── چرا صندوقِ کشف اینجا حل شد ──
+     *
+     * کاربر گفت «اینکه چگونه رفتیم کشف کردیم و چند بار، به ذات مهم نیست».
+     * پس یک صفحهٔ مستقل برایش، همان مقصدی است که نباید باشد. ولی حذف هم
+     * نمی‌شود: گاهی می‌خواهی برگردی ببینی آن خزش چه گرفت.
+     *
+     * جایش همین‌جاست، کنارِ بررسی‌ها — چون هر دو یک جنس‌اند: کاری که یک
+     * بار اجرا شد و نتیجه‌ای داد.
+     */
+    discoveries,
     rounds: withDetail.map((round) => ({
       ...round,
       scopeLabels: (round.scope || []).map(
