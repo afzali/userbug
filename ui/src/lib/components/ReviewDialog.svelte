@@ -35,10 +35,46 @@
    */
   let nodes = $derived(scope?.nodes || []);
 
-  /** سناریوهای دامنه، بی تکرار. */
-  let scenarios = $derived([
-    ...new Set(nodes.flatMap((one) => one.counts?.scenarios || [])),
-  ]);
+  /**
+   * سناریوهای دامنه، بی تکرار — از **دو** منبع، و این تفاوت حلقه را باز کرد.
+   *
+   * ── باگی که با رفتنِ کلِ مسیر روی یک پروژهٔ تازه پیدا شد ──
+   *
+   * `counts.scenarios` از شاخصِ لمس می‌آید، و شاخصِ لمس از **اجراها**
+   * ساخته می‌شود. یعنی فقط سناریویی را می‌شناسد که قبلاً اجرا شده.
+   *
+   * نتیجه‌اش یک حلقهٔ بسته بود: کاربر از زاویه سناریو می‌ساخت، درخت
+   * می‌گفت «۱ نیازموده»، و همین دیالوگ می‌گفت **«هیچ سناریویی روی این
+   * دامنه نیست — برو کشف کن»**. برای اجرا شدن باید از قبل اجرا شده
+   * می‌بود. هیچ راهی از «ساختم» به «اجرا کن» وجود نداشت.
+   *
+   * `counts.planned` همان سناریوهای نوشته‌شده‌اند که هنوز اجرا نشده‌اند —
+   * و دقیقاً همان چیزی‌اند که کاربر می‌خواهد اجرا کند.
+   */
+  let ran = $derived([...new Set(nodes.flatMap((one) => one.counts?.scenarios || []))]);
+
+  /** نوشته‌شده ولی هنوز اجرانشده. پیش‌نویس‌ها جدا نگه داشته می‌شوند. */
+  let planned = $derived.by(() => {
+    const seen = new Map();
+    for (const node of nodes) {
+      for (const one of node.counts?.planned || []) {
+        if (!seen.has(one.name)) seen.set(one.name, one);
+      }
+    }
+    return [...seen.values()].filter((one) => !ran.includes(one.name));
+  });
+
+  /**
+   * پیش‌نویس اجرا **می‌شود**، ولی معیارِ سلامت نیست.
+   *
+   * `yaml.spec.js` پیش‌نویس را اجرا می‌کند و فقط در عنوان علامتش می‌زند.
+   * آنچه پیش‌نویس را واقعاً اجرانشدنی می‌کند، نشستنش در `_drafts/` است —
+   * که `loadScenarios` بازگشتی نمی‌خواند. پس همان‌ها را باید اول رسمی
+   * کرد، و این دیالوگ می‌تواند خودش انجامش دهد.
+   */
+  let drafts = $derived(planned.filter((one) => one.draft || String(one.path || '').startsWith('_drafts/')));
+
+  let scenarios = $derived([...ran, ...planned.map((one) => one.name)]);
 
   /**
    * نامِ پیش‌فرض از **دامنه** می‌آید.
@@ -99,6 +135,19 @@
         }),
       });
       if (!response.ok) throw new Error((await response.json()).error || 'ثبت نشد');
+
+      /**
+       * پیش‌نویس‌ها اول از `_drafts/` بیرون می‌آیند، وگرنه اجرا با «۰ تست»
+       * سبز تمام می‌شود — بدترین نوعِ شکست.
+       */
+      for (const one of drafts) {
+        if (!one.path) continue;
+        await fetch('/api/scenarios/promote', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+          body: JSON.stringify({ target, relative: one.path }),
+        }).catch(() => null);
+      }
 
       const job = await startJob(target, {
         kind: 'run',
@@ -166,10 +215,28 @@
           {formatNumber(scenarios.length)} سناریو اجرا می‌شود
         </p>
         <ul class="scroll-thin mt-1 max-h-28 space-y-0.5 overflow-y-auto">
-          {#each scenarios as one (one)}
+          {#each ran as one (one)}
             <li class="truncate text-[11px] text-muted-foreground">{one}</li>
           {/each}
+          {#each planned as one (one.name)}
+            <li class="flex items-baseline gap-1.5 text-[11px] text-muted-foreground">
+              <span class="truncate">{one.name}</span>
+              <!--
+                «نخستین بار» خبر است: اگر این اجرا بشکند، لزوماً اپ خراب
+                نشده — شاید سناریو هنوز درست نبوده.
+              -->
+              <Badge variant="outline" class="shrink-0 text-[9px]">نخستین بار</Badge>
+            </li>
+          {/each}
         </ul>
+
+        {#if drafts.length}
+          <p class="mt-2 rounded-lg border border-dashed p-2 text-[11px] leading-6">
+            {formatNumber(drafts.length)} تای اینها پیش‌نویس‌اند و در
+            <code class="font-mono">_drafts/</code> نشسته‌اند، جایی که اجراگر
+            نمی‌بیندشان. با شروعِ بررسی خودشان رسمی می‌شوند.
+          </p>
+        {/if}
       </div>
 
       <label class="mt-3 block space-y-1.5 text-sm font-medium">

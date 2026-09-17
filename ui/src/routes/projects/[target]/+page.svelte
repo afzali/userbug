@@ -243,6 +243,16 @@
    *
    * و `send` درختِ تازه را برمی‌گرداند، پس این عدد همیشه درست است.
    */
+  /**
+   * چند بخش واقعاً آزموده شده — پایهٔ هر ادعای «سالم است».
+   *
+   * «اجرا شده» است، نه «سناریو دارد»: سناریویی که هنوز اجرا نشده هیچ
+   * شهادتی دربارهٔ سلامت نمی‌دهد.
+   */
+  let tested = $derived(
+    tree.flat.filter((one) => !one.view && !one.shelf && !one.feature && one.counts?.runs).length
+  );
+
   let guessed = $derived(
     tree.flat.filter((one) => one.feature && one.confidence === 'suspected').length
   );
@@ -504,6 +514,37 @@
       </div>
     {/if}
   </div>
+
+  <!--
+    «سالم است» — و چرا باید صریح گفته شود.
+
+    ── چه چیزی کم بود ──
+
+    عددهای بالای صفحه فقط وقتی دیده می‌شوند که صفر نباشند. یعنی روی
+    پروژه‌ای که همه‌چیزش درست است، این صفحه دربارهٔ سلامت **هیچ نمی‌گفت**
+    — و سکوت را آدم «چیزی بررسی نشده» می‌خواند، نه «چیزی خراب نیست».
+    کاربر صریح خواستش: «اگر نیست، چیزی بگه سالمه».
+
+    ── و چرا کنارش می‌گوید چقدر آزموده نشده ──
+
+    «سالم است» به‌تنهایی دروغِ خطرناکی است: روی پروژه‌ای با ۱۱ بخشِ
+    بی‌سناریو، نبودِ ایراد یعنی چیزی را ندیده‌ایم، نه اینکه چیزی نیست.
+    پس ادعا هرگز از شاهدش بزرگ‌تر نمی‌شود.
+  -->
+  {#if tested && !data.open}
+    <p class="mb-4 rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-3 text-sm leading-7">
+      <strong class="text-emerald-700 dark:text-emerald-400">
+        هیچ ایرادِ بازی نیست
+      </strong>
+      — {formatNumber(tested)} بخش آزموده شده و آخرین بررسی‌شان سالم بود.
+      {#if data.blind}
+        <span class="block text-muted-foreground">
+          ولی این فقط دربارهٔ همان‌هاست: {formatNumber(data.blind)} بخش هنوز
+          هیچ سناریویی ندارد، پس دربارهٔ سلامتشان چیزی نمی‌دانیم.
+        </span>
+      {/if}
+    </p>
+  {/if}
 
   {#if data.blind}
     <p class="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 text-sm leading-7">

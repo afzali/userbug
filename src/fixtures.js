@@ -29,6 +29,22 @@ import { countHits, readChecksConfig } from './checks/config.js';
 import { hardFailureMessage, runContractCheck, runUniversalChecks } from './checks/run.js';
 import { listPages, writePage } from './knowledge/store.js';
 
+/**
+ * پیامِ خطای Playwright، به شکلی که آدم بخواند.
+ *
+ * کدهای رنگِ ترمینال در متنِ خام هستند و اگر پاک نشوند، در تریاژ و در
+ * اثرانگشتِ یافته می‌نشینند — یعنی دو اجرای یک شکست، دو ردیفِ متفاوت.
+ */
+const ANSI = /\u001b\[[0-9;]*m/g;
+
+function plainMessage(raw) {
+  return String(raw || 'سناریو بی‌پیام شکست').replace(ANSI, '');
+}
+
+function firstLine(text) {
+  return String(text).split('\n')[0];
+}
+
 export const test = base.extend({
   target: [
     async ({}, use) => {
@@ -415,9 +431,54 @@ export const test = base.extend({
     // کند، و شمارنده‌ای که بعداً اضافه شود از صفر شروع می‌کند.
     if (!probe && checkHits.size) countHits(target.key || process.env.UB_TARGET || '', [...checkHits]);
 
-    // داورِ پایانی: هر یافتهٔ واقعی تست را نرم می‌شکند. خودآزمایی‌ها را فقط
-    // گزارش می‌کنیم، نمی‌شکنیم — چون هدفشان اثباتِ کارکرد رصدگر بود.
+    /**
+     * سناریویی که شکست، خودش یک یافته است.
+     *
+     * ── باگی که با رفتنِ کلِ حلقه روی یک پروژهٔ تازه پیدا شد ──
+     *
+     * از زاویه سناریو ساخته شد، بررسی اجرا شد، سناریو **قرمز** شد
+     * (`locator.click: Timeout`). و بعد:
+     *
+     *   تریاژ  «یافته‌ای با این فیلتر نیست»
+     *   درخت   ✓ «آخرین بررسی سالم بود»
+     *
+     * یعنی بدترین حالتِ ممکن — سبزِ دروغین، روی همان صفحه‌ای که کلِ این
+     * ابزار برای جلوگیری از آن ساخته شده.
+     *
+     * علتش این بود که تریاژ و درخت فقط `findings.ndjson` را می‌خوانند، و
+     * شکستِ یک قدم (کلیکی که نخورد، `expect`ی که نگرفت) هرگز یافته
+     * نمی‌شد: قرمزیِ تست فقط در `run.json` می‌ماند.
+     *
+     * ── چرا اینجا و نه در گزارش‌گیر ──
+     *
+     * اینجا `page` هنوز زنده است، پس مسیرِ واقعی و قدمِ جاری در دست است.
+     * یافته‌ای که نداند کجا افتاده، در تریاژ قابلِ گروه‌بندی نیست و در
+     * درخت به هیچ گره‌ای نمی‌چسبد.
+     *
+     * ── و چرا فقط وقتی یافتهٔ دیگری نیست ──
+     *
+     * اگر رصدگر از قبل خطای کنسول یا سرور دیده، همان دقیق‌تر است و
+     * تستْ به‌خاطرِ همان قرمز شده. افزودنِ یک ردیفِ کلی کنارش فقط تریاژ
+     * را دوبرابر می‌کند.
+     */
     const realFindings = findings.filter((f) => !f.synthetic);
+
+    const broke = !probe && ['failed', 'timedOut'].includes(testInfo.status) && !realFindings.length;
+    if (broke) {
+      /**
+       * پیامِ Playwright چند خطی و پر از کدِ رنگ است. خطِ اول همان چیزی
+       * است که آدم می‌خواند؛ بقیه در `detail` می‌ماند تا بازتولید ممکن
+       * بماند.
+       */
+      const raw = plainMessage(testInfo.error?.message);
+      await ub.note({
+        source: 'scenario',
+        severity: 'error',
+        message: `قدم انجام نشد: ${firstLine(raw).slice(0, 200)}`,
+        detail: raw.slice(0, 4000),
+      });
+      realFindings.push(...findings.filter((f) => !f.synthetic && !realFindings.includes(f)));
+    }
     expect
       .soft(realFindings.map((f) => `[${f.source}] ${f.step} — ${f.message}`), 'خطاهای رصدشده حین اجرا')
       .toEqual([]);
