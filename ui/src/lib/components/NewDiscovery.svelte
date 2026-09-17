@@ -14,15 +14,23 @@
    *
    * ── چرا انتخاب و شروع در یک گام است ──
    *
-   * گزینه‌ها گزینه‌های متفاوتِ یک چیزند و هیچ‌کدام تنظیمِ اضافه‌ای لازم
-   * ندارند جز «کجا» برای حالتِ محدود. تنظیماتِ ریز (سقف‌ها، دستگاه،
-   * پروفایل) داخلِ خودِ جلسه‌اند، جایی که معنا دارند.
+   * گزینه‌ها گزینه‌های متفاوتِ یک چیزند و انتخابِ راه، خودش تصمیم است.
+   * تنظیمِ ریز هست ولی زیرِ «پیشرفته» — و همان جعبه‌ای است که بررسی هم
+   * دارد، نه نسخهٔ دومی با واژه‌های دیگر.
+   *
+   * ── چرا هر راه ردیف‌های خودش را دارد ──
+   *
+   * کاربر گفت «هر کدام از این انتخاب‌ها تنظیماتِ خاصِ خودش را دارد». و
+   * صادقانه‌ترین شکلش این است که ردیف‌ها **همان پرچم‌های خط فرمانِ همان
+   * کار** باشند: خزش `--profile` و `--fresh` دارد، کاوشِ محدود ندارد.
+   * نشان دادنِ کنترلی که به جایی وصل نیست، بدتر از نبودنش است.
    */
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
+  import Advanced from '$lib/components/Advanced.svelte';
   import { run, startJob } from '$lib/run-store.svelte.js';
 
-  let { target, project = null, scope = null, onClose, onStarted } = $props();
+  let { target, project = null, scope = null, scenarios = [], onClose, onStarted } = $props();
 
   /**
    * دامنه، وقتی از درخت آمده‌ایم.
@@ -101,6 +109,40 @@
 
   let noSource = $derived(how === 'source' && !project?.sourceRoot);
 
+  /**
+   * تنظیمات — یک شیء، و ردیف‌هایش تابعِ راهِ انتخاب‌شده.
+   *
+   * `source` هیچ ردیفی ندارد چون نه مرورگر باز می‌کند نه مدل صدا می‌زند؛
+   * جعبهٔ خالی خودش پنهان می‌شود.
+   *
+   * `tour` هم ندارد: گشت تنظیمش را داخلِ خودش دارد، همان‌جا که کاربر
+   * وسطِ کار است و می‌داند چه می‌خواهد.
+   */
+  let settings = $state({
+    from: '',
+    profile: false,
+    fresh: false,
+    states: '',
+    minutes: '',
+    depth: '',
+    model: '',
+    headed: false,
+  });
+
+  const ROWS = {
+    crawl: ['from', 'profile', 'fresh', 'states', 'minutes', 'headed'],
+    scoped: ['from', 'depth', 'model', 'headed'],
+    tour: [],
+    source: [],
+  };
+
+  let rows = $derived(ROWS[how] || []);
+
+  /** فقط ردیف‌هایی که این راه دارد — تا تنظیمی که دیده نمی‌شود، فرستاده هم نشود. */
+  let payload = $derived(
+    Object.fromEntries(rows.map((key) => [key, settings[key]]).filter(([, one]) => one !== '' && one !== false))
+  );
+
   async function start() {
     busy = true;
     error = '';
@@ -135,8 +177,8 @@
       const job = await startJob(
         target,
         how === 'scoped'
-          ? { kind: 'quest', goal: where.trim() || 'همه‌جای اپ را بررسی کن' }
-          : { kind: 'map' }
+          ? { kind: 'quest', goal: where.trim() || 'همه‌جای اپ را بررسی کن', ...payload }
+          : { kind: 'map', ...payload }
       );
       if (!job) throw new Error(run.error || 'شروع نشد');
       /**
@@ -201,6 +243,14 @@
         </label>
       {/each}
     </div>
+
+    <!--
+      همان جعبهٔ بررسی، با ردیف‌های این راه.
+
+      و چون جعبه سرِ خودش می‌گوید چند تنظیم دست‌کاری شده، کاربری که
+      «پیشرفته» را باز نمی‌کند هم می‌فهمد چیزی داخلش هست.
+    -->
+    <Advanced bind:value={settings} {rows} {scenarios} disabled={busy} />
 
     {#if noSource}
       <!--

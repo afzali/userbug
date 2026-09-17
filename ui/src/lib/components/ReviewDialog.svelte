@@ -21,7 +21,7 @@
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
-  import ModelPicker from '$lib/components/ModelPicker.svelte';
+  import Advanced from '$lib/components/Advanced.svelte';
   import { formatNumber } from '$lib/format.js';
   import { run, startJob } from '$lib/run-store.svelte.js';
 
@@ -63,12 +63,16 @@
     if (!touched) label = suggested;
   });
 
-  let advanced = $state(false);
-  let device = $state('');
-  let persona = $state('');
-  let model = $state('');
-  let repeat = $state(1);
-  let headed = $state(false);
+  /**
+   * تنظیماتِ پیشرفته، در یک شیء — همان شیئی که کشف هم می‌گیرد.
+   *
+   * ── چرا شیء و نه پنج `$state` ──
+   *
+   * چون جعبه‌اش مشترک است. پنج متغیرِ جدا یعنی هر دیالوگ نسخهٔ خودش را
+   * دارد، و افزودنِ یک ردیف به جعبه باید در هر دو جا تکرار شود — که
+   * دقیقاً همان‌طور شروع می‌شود که دو واژه‌نامه.
+   */
+  let settings = $state({ device: '', persona: '', model: '', repeat: 1, headed: false });
 
   let busy = $state(false);
   let error = $state('');
@@ -100,11 +104,7 @@
         kind: 'run',
         only: scenarios,
         bench: label.trim(),
-        device,
-        persona,
-        model,
-        repeat,
-        headed,
+        ...settings,
       });
       if (!job) throw new Error(run.error || 'شروع نشد');
       onStarted?.();
@@ -188,42 +188,13 @@
       </label>
 
       <!--
-        پیشرفته، بسته.
-
-        کاربر گفت این تنظیمات «بهتر است در پیشرفته باشد که همان اول دمِ
-        چشمش نباشد». کسی که لازم دارد پیدایش می‌کند؛ بقیه هرگز نمی‌بینندش.
+        همان جعبه‌ای که کشف هم می‌گذارد — یک واژه‌نامه، نه دو تا.
       -->
-      <details class="mt-3 rounded-lg border p-2.5" bind:open={advanced}>
-        <summary class="cursor-pointer text-xs font-medium">پیشرفته</summary>
-        <div class="mt-3 space-y-3">
-          <div class="grid grid-cols-2 gap-3">
-            <label class="block space-y-1 text-xs">
-              <span class="text-muted-foreground">دستگاه</span>
-              <Input bind:value={device} dir="ltr" placeholder="desktop" class="h-8" disabled={busy} />
-            </label>
-            <label class="block space-y-1 text-xs">
-              <span class="text-muted-foreground">تکرار</span>
-              <Input type="number" min="1" max="10" bind:value={repeat} class="h-8" disabled={busy} />
-            </label>
-          </div>
-          <label class="block space-y-1 text-xs">
-            <span class="text-muted-foreground">رفتار کاربر</span>
-            <select class="app-select" bind:value={persona} disabled={busy}>
-              <option value="">پیش‌فرض سناریو</option>
-              <option value="novice">تازه‌کار</option>
-              <option value="pro">حرفه‌ای</option>
-            </select>
-          </label>
-          <ModelPicker bind:value={model} disabled={busy} />
-          <label class="flex items-center gap-2 text-xs">
-            <input type="checkbox" bind:checked={headed} disabled={busy} /> مرورگر دیده شود
-          </label>
-          <p class="text-[11px] leading-5 text-muted-foreground">
-            حساب و فایلِ نمونه از «دادهٔ آزمون» می‌آیند و همان‌جا تنظیم می‌شوند —
-            سناریو خودش می‌گوید کدام را می‌خواهد.
-          </p>
-        </div>
-      </details>
+      <Advanced
+        bind:value={settings}
+        rows={['device', 'repeat', 'persona', 'model', 'headed']}
+        disabled={busy}
+      />
 
       {#if error}
         <p class="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive">

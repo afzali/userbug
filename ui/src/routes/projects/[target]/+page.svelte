@@ -395,6 +395,7 @@
     {target}
     project={data.project}
     scope={discovering}
+    scenarios={data.scenarios.map((one) => one.name)}
     onClose={() => { discovering = null; }}
     onStarted={(id) => goto(`${base}/discover/${encodeURIComponent(id)}`)}
   />
