@@ -39,6 +39,8 @@ import { listPages } from '../knowledge/store.js';
 import { readMap } from '../map/store.js';
 import { describeTarget } from '../checks/contract.js';
 import { askJson, Budget } from '../models/provider.js';
+import { insertAssertions } from '../emit/insert.js';
+import { stepNames } from '../emit/spec.js';
 import { redactDeep } from '../models/redact.js';
 import { accountSecrets } from '../knowledge/credentials.js';
 
@@ -193,30 +195,30 @@ const NEWLINE = String.fromCharCode(10);
 /**
  * چند بندِ سنجش دارد؟
  *
- * ── چرا بازگشتی، و چرا این عدد مهم است ──
+ * ── چرا این عدد مهم است ──
  *
- * سناریوی بی‌انتظار اجرا می‌شود، سبز تمام می‌شود، و **هیچ‌چیز را نسنجیده**:
- * فقط می‌گوید «چیزی نشکست». صفحهٔ مأموریت‌ها همین عدد را نشان می‌دهد، پس
- * شمارشِ کم یعنی سناریویی که واقعاً انتظار دارد، «بی‌انتظار» علامت بخورد —
- * و آدم برود انتظاری اضافه کند که از قبل هست.
+ * تستِ بی‌ادعا اجرا می‌شود، سبز تمام می‌شود، و **هیچ‌چیز را نسنجیده**: فقط
+ * می‌گوید «چیزی نشکست». گزارش همین عدد را نشان می‌دهد، پس شمارشِ کم یعنی
+ * تستی که واقعاً ادعا دارد «بی‌ادعا» علامت بخورد — و آدم برود ادعایی اضافه
+ * کند که از قبل هست.
  *
- * و بازگشتی، چون سناریوی ورودی که همین ابزار ساخت **همهٔ** کارش زیرِ `when`
- * بود: شمارشِ سطحی روی آن صفر می‌داد حتی بعد از افزودنِ انتظار.
+ * ── چرا بازگشتی نیست، و چرا مهم بود که باشد ──
+ *
+ * وقتی هدف آرایهٔ YAML بود، شمارش باید بازگشتی می‌شد: سناریوی ورودی که همین
+ * ابزار ساخت **همهٔ** کارش زیرِ `when` بود و شمارشِ سطحی صفر می‌داد. حالا
+ * هدف متنِ کد است و `if` و `for` عمقی نمی‌سازند که شمارش از آن جا بماند —
+ * `expect(` هرجای فایل باشد، همان‌جا دیده می‌شود.
+ *
+ * ادعای نرم و سخت هر دو شمرده می‌شوند: هر دو سنجش‌اند، تفاوتشان در شدتِ
+ * شکستن است نه در اینکه چیزی را می‌آزمایند یا نه.
+ *
+ * @param {string} source متنِ `.spec.js`
+ * @returns {number}
  */
-export function countExpects(steps) {
-  let total = 0;
-  for (const step of Array.isArray(steps) ? steps : []) {
-    if (!step || typeof step !== 'object') continue;
-    if (step.expect !== undefined || step.assert !== undefined) total++;
-
-    // `then`/`else` هم در سطحِ قدم می‌آیند و هم داخلِ بدنهٔ `when`
-    for (const key of ['then', 'else']) {
-      if (Array.isArray(step[key])) total += countExpects(step[key]);
-      if (Array.isArray(step.when?.[key])) total += countExpects(step.when[key]);
-    }
-    if (Array.isArray(step.forEach?.steps)) total += countExpects(step.forEach.steps);
-  }
-  return total;
+export function countExpects(source) {
+  // `expect.soft(` خودش با `expect(` شروع نمی‌شود، پس جدا شمرده می‌شود.
+  const matches = String(source ?? '').match(/\bexpect(?:\.soft)?\s*\(/g);
+  return matches ? matches.length : 0;
 }
 
 export const SYSTEM = `تو یک مهندسِ آزمون هستی که به یک سناریوی موجود **انتظار** اضافه می‌کند.
@@ -224,10 +226,10 @@ export const SYSTEM = `تو یک مهندسِ آزمون هستی که به یک
 سناریو امروز فقط کار می‌کند و هیچ‌جا نمی‌گوید «حالا باید چه دیده شود». تو می‌گویی.
 
 خروجی فقط JSON، بی توضیح و بی حصار markdown:
-{"expectations":[{"after":<شمارهٔ قدم>,"ref":"e12","kind":"visible|hidden","why":"...","confidence":"high|medium|low"}]}
+{"expectations":[{"after":"<نامِ قدم>","ref":"e12","kind":"visible|hidden","why":"...","confidence":"high|medium|low"}]}
 
 معنی هر کلید:
-- after: بعد از کدام قدم سنجیده شود. شمارهٔ قدم‌ها از ۱ است؛ برای «در پایان» شمارهٔ آخرین قدم را بده.
+- after: بعد از کدام قدم سنجیده شود — **نامِ دقیقِ** یکی از قدم‌های فهرستِ زیر، کلمه‌به‌کلمه. برای «در پایانِ تست» مقدارش را null بگذار.
 - ref: شناسهٔ یکی از نامزدهای فهرستِ زیر. **فقط از همان فهرست.**
 - kind: "visible" یعنی باید دیده شود، "hidden" یعنی باید رفته باشد.
 - why: در یک جملهٔ کوتاهِ فارسی بگو چرا این نشانهٔ درست کار کردن است. همین جمله در گزارشِ شکست به کاربر نشان داده می‌شود.
@@ -235,27 +237,33 @@ export const SYSTEM = `تو یک مهندسِ آزمون هستی که به یک
 
 قواعد:
 - **هیچ عنصری اختراع نکن.** فقط \`ref\`های فهرستِ زیر.
-- **ارزشمندترین انتظار، نتیجهٔ کار است.** اگر سناریو ورود است، مهم این است که بعدش چه چیزی دیده می‌شود که پیش از ورود نبود — نه اینکه فرمِ ورود هنوز سرِ جایش است. دست‌کم یک انتظار باید بعد از **آخرین** قدم باشد.
+- **ارزشمندترین انتظار، نتیجهٔ کار است.** اگر سناریو ورود است، مهم این است که بعدش چه چیزی دیده می‌شود که پیش از ورود نبود — نه اینکه فرمِ ورود هنوز سرِ جایش است. دست‌کم یک انتظار باید after برابرِ null داشته باشد، یعنی در پایان.
 - انتظاری که فقط می‌گوید «صفحهٔ اول هنوز همان است»، تقریباً بی‌ارزش است.
 - کم و دقیق بهتر از زیاد و مشکوک: دو تا چهار انتظار برای یک سناریو کافی است.
 - انتظارِ تکراری نده؛ اگر دو نامزد یک چیز را می‌گویند، یکی را بردار.
 - انتظار را جایی بگذار که **نتیجه** معلوم می‌شود، نه وسطِ پر کردنِ فرم.
 - فارسی بنویس.`;
 
-/** ورودیِ مدل: قدم‌ها با شماره، و نامزدها با شناسه. */
-export function buildUser({ scenario, candidates, knowledge = '', seen = [] }) {
-  const steps = (scenario.steps || []).map((step, index) => {
-    const verb = Object.keys(step).find((key) => !['value', 'detail', 'finding', 'timeout', 'as'].includes(key));
-    const body = step[verb];
-    const short = typeof body === 'object' ? JSON.stringify(body).slice(0, 90) : String(body).slice(0, 90);
-    return `${index + 1}. ${verb} ${short}`;
-  });
-
+/**
+ * ورودیِ مدل: نامِ قدم‌ها، و نامزدها با شناسه.
+ *
+ * ── چرا نام و نه شماره ──
+ *
+ * شماره وقتی معنا داشت که خروجی آرایهٔ YAML بود. حالا خروجی فایلِ کد است و
+ * کاربر ویرایشش می‌کند؛ هر قدمی که اضافه کند شماره‌ها را جابه‌جا می‌کند و
+ * انتظار یک قدم دیرتر از جایی می‌نشیند که مدل گفته — خطایی که در بازبینی
+ * دیده نمی‌شود چون فایل هنوز معتبر است.
+ *
+ * @param {object} input
+ * @param {string} input.title عنوانِ تست
+ * @param {string[]} input.steps نامِ قدم‌ها، به ترتیبِ فایل
+ */
+export function buildUser({ title, steps = [], candidates, knowledge = '', seen = [] }) {
   const rows = candidates.map(
     (one) => `${one.ref}  ${one.route}${one.view ? ` ▸ ${one.view}` : ''}  ${one.label}`
   );
 
-  const lines = [`سناریو: ${scenario.name || '(بی‌نام)'}`, '', 'قدم‌ها:', ...steps];
+  const lines = [`تست: ${title || '(بی‌نام)'}`, '', 'قدم‌ها (نامشان را عیناً برگردان):', ...steps.map((s) => `- ${s}`)];
 
   /**
    * کجا واقعاً رسید — مشاهده، نه حدس.
@@ -285,7 +293,7 @@ export function buildUser({ scenario, candidates, knowledge = '', seen = [] }) {
  *
  * حذف **بی‌صدا** نیست: هرچه افتاد در `dropped` می‌آید.
  */
-export function assertProposals(json, { candidates = [], steps = 0 } = {}) {
+export function assertProposals(json, { candidates = [], steps = [] } = {}) {
   if (!json || typeof json !== 'object') throw new Error('پاسخ مدل شیء نبود');
 
   const byRef = new Map(candidates.map((one) => [one.ref, one]));
@@ -314,9 +322,11 @@ export function assertProposals(json, { candidates = [], steps = 0 } = {}) {
      * «کجا سنجیده شود» جزئیاتی است که آدم در یک نگاه اصلاحش می‌کند؛ ولی
      * انداختنِ کلِ انتظار یعنی آن حرفِ درست هم از دست برود.
      */
-    const after = Number(raw?.after);
-    const at = Number.isInteger(after) && after >= 1 && after <= steps ? after : steps;
-    if (at !== after) dropped.push(`جایِ «${candidate.label}» نامعتبر بود؛ به پایان رفت`);
+    const asked = raw?.after == null ? null : String(raw.after).trim();
+    const at = asked && steps.includes(asked) ? asked : null;
+    if (asked && at === null) {
+      dropped.push(`قدمی به نامِ «${asked}» نبود؛ «${candidate.label}» به پایان رفت`);
+    }
 
     out.push({
       after: at,
@@ -331,42 +341,38 @@ export function assertProposals(json, { candidates = [], steps = 0 } = {}) {
     });
   }
 
-  return { expectations: out.sort((a, b) => a.after - b.after), dropped };
+  // ترتیبِ فایل، و «در پایان» آخر از همه.
+  const order = (item) => (item.after === null ? steps.length : steps.indexOf(item.after));
+  return { expectations: out.sort((a, b) => order(a) - order(b)), dropped };
 }
 
 /**
- * انتظارها → قدم‌های سناریو.
+ * انتظارها → ادعا در متنِ فایل.
  *
- * ── چرا `assert` و نه `expect` ──
+ * ── چرا نرم و سخت ──
  *
- * `expect` سخت می‌شکند و اجرا را همان‌جا تمام می‌کند؛ `assert` یافته ثبت
- * می‌کند و ادامه می‌دهد. چیزی که **مدل** پیشنهاد داده هنوز حرفِ آدم نیست، و
- * حرفِ نیازموده نباید بتواند بقیهٔ سناریو را از اجرا بیندازد.
+ * `expect` سخت می‌شکند و اجرا را همان‌جا تمام می‌کند؛ `expect.soft` یافته
+ * ثبت می‌کند و ادامه می‌دهد. چیزی که **مدل** پیشنهاد داده هنوز حرفِ آدم
+ * نیست، و حرفِ نیازموده نباید بتواند بقیهٔ تست را از اجرا بیندازد.
  *
- * وقتی آدم تأیید کرد (`hard: true`)، همان بند `expect` می‌شود — و از آن به
- * بعد یک قاعده است.
+ * وقتی آدم تأیید کرد (`hard: true`)، همان بند سخت می‌شود — و از آن به بعد
+ * یک قاعده است.
  *
- * @param {object} scenario سناریوی خوانده‌شده
+ * همان تمایزی که این فایل برای YAML ساخته بود؛ در پلی‌رایت بومی است، پس
+ * نگاشت چیزی از دست نداد.
+ *
+ * ── چرا درج از اینجا بیرون رفت ──
+ *
+ * اسپلایسِ آرایه جایش را به دست‌کاریِ **متن** داد، و آن کارِ خودش را
+ * می‌خواهد: لنگر، شمارشِ آکولاد، و تأییدِ پارس پیش از بازگشت. همه در
+ * `src/emit/insert.js`. اینجا فقط می‌گوید «انتظارها را اعمال کن».
+ *
+ * @param {string} source متنِ `.spec.js`
  * @param {object[]} chosen انتظارهایی که آدم تیک زده
+ * @returns {string} متنِ تازه
  */
-export function applyExpectations(scenario, chosen = []) {
-  const steps = [...(scenario.steps || [])];
-
-  /**
-   * از آخر به اول درج می‌شود.
-   *
-   * وگرنه هر درج، شمارهٔ بندهای بعدی را یکی جلو می‌برد و انتظارِ دوم یک قدم
-   * دیرتر از جایی می‌نشیند که آدم انتخاب کرده — خطایی که در بازبینی دیده
-   * نمی‌شود چون سناریو هنوز معتبر است.
-   */
-  for (const item of [...chosen].sort((a, b) => b.after - a.after)) {
-    const condition = { [item.kind === 'hidden' ? 'hidden' : 'visible']: item.target };
-    const step = item.hard ? { expect: condition } : { assert: condition };
-    if (!item.hard) step.finding = item.why || `انتظار نخورد: ${item.label}`;
-    steps.splice(Math.min(item.after, steps.length), 0, step);
-  }
-
-  return { ...scenario, steps };
+export function applyExpectations(source, chosen = []) {
+  return insertAssertions(source, chosen);
 }
 
 /**
@@ -375,18 +381,29 @@ export function applyExpectations(scenario, chosen = []) {
  * نه JSON: آدم باید در یک نگاه بفهمد دارد چه چیزی را تأیید می‌کند.
  */
 export function describeExpectation(item) {
-  const where = item.after ? `بعد از قدم ${item.after}` : 'در پایان';
+  const where = item.after ? `بعد از «${item.after}»` : 'در پایان';
   const what = item.kind === 'hidden' ? 'نباید دیده شود' : 'باید دیده شود';
   return `${where}: ${item.label} ${what}`;
 }
 
 /**
- * جمله → پیشنهادِ انتظار. یک فراخوانی.
+ * فایلِ spec → پیشنهادِ انتظار. یک فراخوانی.
  *
  * رازها پیش از ارسال پاک می‌شوند: نامِ عناصر از خودِ اپ می‌آید و می‌تواند
  * ایمیلِ حسابِ ذخیره‌شده باشد — روی نپی یک گرهٔ نقشه نامش شد «منوی ub-…».
+ *
+ * ── چرا نامِ قدم‌ها از خودِ متن خوانده می‌شود ──
+ *
+ * نه از ساختاری که موقعِ ساختن داشتیم. فایل ممکن است از آن موقع ویرایش شده
+ * باشد، و مدل باید دربارهٔ چیزی حرف بزند که **امروز روی دیسک است** — وگرنه
+ * لنگری پیشنهاد می‌دهد که `insertAssertions` پیدایش نمی‌کند.
+ *
+ * @param {object} input
+ * @param {string} input.source متنِ `.spec.js`
+ * @param {string} input.title عنوانِ تست
  */
-export async function proposeExpectations({ scenario, target = '', models, knowledge = '' }) {
+export async function proposeExpectations({ source, title = '', target = '', models, knowledge = '' }) {
+  const steps = stepNames(source);
   const candidates = candidatesFor(target);
   if (!candidates.length) {
     throw new Error(
@@ -401,11 +418,11 @@ export async function proposeExpectations({ scenario, target = '', models, knowl
     models,
     {
       system: SYSTEM,
-      user: redactDeep(buildUser({ scenario, candidates, knowledge, seen: routesSeen(scenario.name) }), secrets),
+      user: redactDeep(buildUser({ title, steps, candidates, knowledge, seen: routesSeen(title) }), secrets),
     },
     budget
   );
 
-  const result = assertProposals(json, { candidates, steps: (scenario.steps || []).length });
+  const result = assertProposals(json, { candidates, steps });
   return { ...result, candidates, model: models.model, at: new Date().toISOString() };
 }

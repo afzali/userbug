@@ -1815,12 +1815,13 @@ async function cmdExpect({ flags, positional }) {
   const target = positional[0];
   if (!target) throw new Error('نام هدف لازم است: userbug expect <هدف> --from <سناریو>');
 
-  const YAML = (await import('yaml')).default;
   const { applyExpectations, candidatesFor, describeExpectation, proposeExpectations } = await import(
     '../src/scenario/expect.js'
   );
   const { knowledgeFor } = await import('../src/knowledge/select.js');
-  const { scenarioDir } = await import('../src/scenario/load.js');
+  const { stepNames, testTitle } = await import('../src/emit/spec.js');
+  const { workspaceRoot } = await import('../src/emit/workspace.js');
+  const { loadTarget } = await import('../src/target.js');
 
   /* ── فهرستِ نامزدها: رایگان، و بی سناریو هم معنا دارد ── */
   if (flags.list) {
@@ -1840,14 +1841,21 @@ async function cmdExpect({ flags, positional }) {
   }
 
   const from = flags.from && flags.from !== true ? String(flags.from) : '';
-  if (!from) throw new Error('سناریو لازم است: userbug expect <هدف> --from <سناریو>   (یا --list)');
+  if (!from) throw new Error('فایلِ تست لازم است: userbug expect <هدف> --from <فایل>   (یا --list)');
 
-  const file = path.isAbsolute(from) ? from : path.join(scenarioDir(target), from);
-  if (!fs.existsSync(file)) throw new Error(`سناریو پیدا نشد: ${file}`);
+  // مسیرِ نسبی از پوشهٔ userbug در خودِ پروژهٔ هدف خوانده می‌شود، چون تست‌ها
+  // از این مخزن رفته‌اند و در ریپوی همان اپ می‌نشینند.
+  const file = path.isAbsolute(from) ? from : path.join(workspaceRoot(await loadTarget(target)), from);
+  if (!fs.existsSync(file)) throw new Error(`فایلِ تست پیدا نشد: ${file}`);
 
   const before = fs.readFileSync(file, 'utf8');
-  const scenario = YAML.parse(before);
-  if (!scenario?.steps?.length) throw new Error('این سناریو قدمی ندارد');
+  const steps = stepNames(before);
+  if (!steps.length) {
+    throw new Error(
+      'این فایل هیچ `ub.step()`ی ندارد.\n' +
+        '  لنگرِ درجِ ادعا نامِ قدم است، پس بی قدم جایی برای گذاشتنش نیست.'
+    );
+  }
 
   const models = resolveModel({
     global: await loadGlobalConfig(),
@@ -1855,13 +1863,15 @@ async function cmdExpect({ flags, positional }) {
     model: flags.model && flags.model !== true ? assertModelSlug(flags.model) : undefined,
   });
 
-  console.log(`\n  انتظارها برای «${scenario.name || from}» با ${models.model}…`);
+  const title = testTitle(before) || from;
+  console.log(`\n  انتظارها برای «${title}» با ${models.model}…`);
 
   const result = await proposeExpectations({
-    scenario,
+    source: before,
+    title,
     target,
     models,
-    knowledge: knowledgeFor({ target, text: scenario.name || '', budget: 1200 }),
+    knowledge: knowledgeFor({ target, text: title, budget: 1200 }),
   });
 
   if (!result.expectations.length) {
@@ -1887,7 +1897,7 @@ async function cmdExpect({ flags, positional }) {
 
   if (!flags.apply) {
     console.log(`\n  چیزی نوشته نشد. برای افزودن: همین فرمان با --apply`);
-    console.log(`  (و --hard اگر می‌خواهید به‌جای assert، expect باشند — یعنی همان‌جا بشکنند)\n`);
+    console.log(`  (و --hard اگر می‌خواهید به‌جای expect.soft، expect باشند — یعنی همان‌جا بشکنند)\n`);
     return;
   }
 
@@ -1898,23 +1908,16 @@ async function cmdExpect({ flags, positional }) {
    * ثبت می‌کند و می‌گذرد. سخت‌شدنش تصمیمِ آدم است.
    */
   const hard = Boolean(flags.hard);
-  const next = applyExpectations(scenario, result.expectations.map((one) => ({ ...one, hard })));
 
-  const header = before.split(/\r?\n/);
-  const keep = [];
-  for (const line of header) {
-    if (line.trim().startsWith('#') || !line.trim()) keep.push(line);
-    else break;
-  }
-  while (keep.length && !keep.at(-1).trim()) keep.pop();
-
-  const note = [
-    '#',
-    `# ${result.expectations.length} انتظار با «userbug expect» اضافه شد (${hard ? 'expect' : 'assert'}).`,
-    '# هر کدام به عنصری اشاره می‌کند که در گشت یا خزش واقعاً دیده شده.',
-  ];
-
-  fs.writeFileSync(file, [...keep, ...note, YAML.stringify(next)].join('\n'), 'utf8');
+  /**
+   * حفظِ کامنت‌ها دیگر کاری نمی‌خواهد.
+   *
+   * در YAML باید هدرِ `#` را دستی جدا و دوباره سرِ جایش می‌گذاشتیم، چون
+   * `YAML.stringify` از ساختار می‌ساخت و هرچه نوشته بودی می‌رفت. درج در
+   * **متن** چنین مسئله‌ای ندارد: فایل همان است، فقط چند خط بیشتر دارد.
+   */
+  const next = applyExpectations(before, result.expectations.map((one) => ({ ...one, hard })));
+  fs.writeFileSync(file, next, 'utf8');
   console.log(`\n  ${result.expectations.length} انتظار اضافه شد: ${path.relative(ROOT, file).split(path.sep).join('/')}`);
   console.log('  یک بار اجرا کنید و ببینید کدامشان واقعاً می‌خورند.\n');
 }
