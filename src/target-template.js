@@ -344,7 +344,10 @@ export function renderTargetConfig(input) {
     lines.push('  ],');
   } else {
     lines.push("  logs: [");
-    lines.push("    // { type: 'file', name: 'php', path: 'D:/path/to/error.log' },");
+    lines.push("    // مسیر مطلق کار می‌کند، ولی این کانفیگ را به یک ماشین گره می‌زند.");
+    lines.push("    // `${VAR}` از `.env` خوانده می‌شود و `.env` در گیت نیست — پس");
+    lines.push("    // کانفیگ قابلِ حمل می‌ماند و تفاوتِ ماشین‌ها یک‌جا جمع می‌شود.");
+    lines.push("    // { type: 'file', name: 'php', path: '${APP_ROOT}/logs/error.log' },");
     lines.push("    // { type: 'command', name: 'docker', command: 'docker', args: ['logs', '-f', 'app'] },");
     lines.push("  ],");
   }

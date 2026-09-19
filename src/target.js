@@ -91,19 +91,59 @@ export async function loadTargetOrPlaceholder(name) {
   }
 }
 
+/**
+ * بسطِ `${VAR}` — تا کانفیگِ هدف به یک ماشین گره نخورد.
+ *
+ * ── چرا لازم شد ──
+ *
+ * مسیرِ لاگ و ریشهٔ سورس مطلق نوشته می‌شدند: `D:/Projects/nepi/...`. روی
+ * ماشینِ دوم، روی CI، یا در بسته‌ای که هم‌تیمی باز می‌کند، همان کانفیگ
+ * بی‌صدا به فایلی می‌رسد که نیست — و «لاگی نبود» شبیهِ «چیزی نشکست» است.
+ *
+ * مقدارها از `.env` می‌آیند که در گیت نیست و مالِ همان ماشین است. پس
+ * کانفیگِ هدف قابلِ حمل می‌ماند و تفاوتِ ماشین‌ها یک‌جا جمع می‌شود.
+ *
+ * مسیرِ مطلق هم کار می‌کند؛ این بسط اختیاری است نه اجباری.
+ */
+function expandVars(value, targetName) {
+  if (typeof value !== 'string') return value;
+
+  return value.replace(/\$\{([A-Za-z0-9_]+)\}/g, (whole, key) => {
+    const found = process.env[key];
+    if (found === undefined) {
+      throw new Error(
+        `هدف «${targetName}»: «${whole}» در محیط نیست.\n` +
+          `  یک خطِ «${key}=...» در .env بگذارید — آن فایل در گیت نیست و مالِ همین ماشین است.`,
+      );
+    }
+    return found;
+  });
+}
+
 /** کانفیگ یک هدف را بخوان و پیش‌فرض‌های نبود را پر کن. */
 export async function loadTarget(name) {
   const file = path.join(rootDir(), 'targets', `${name}.config.js`);
   const mod = await import(pathToFileURL(file).href);
   const t = mod.default;
 
+  // `.env` همین‌جا بار می‌شود چون مقدارهای زیر ممکن است `${VAR}` داشته
+  // باشند. ایمپورتِ پویا است تا حلقهٔ ایمپورت نسازد: `env.js` خودش `ROOT`
+  // را از همین فایل می‌گیرد.
+  const { loadEnv } = await import('./env.js');
+  loadEnv();
+
   if (!t.baseURL) throw new Error(`هدف «${name}»: baseURL ندارد`);
+
+  t.baseURL = expandVars(t.baseURL, name);
+  if (t.apiURL) t.apiURL = expandVars(t.apiURL, name);
+  if (t.source?.root) t.source = { ...t.source, root: expandVars(t.source.root, name) };
 
   // نبودِ environment یعنی نمی‌دانیم — پس محافظه‌کارانه تولیدی فرض می‌شود.
   t.environment ??= 'production';
   t.device ??= 'desktop';
   t.allowlist ??= [];
   t.logs ??= [];
+  t.logs = t.logs.map((log) => ({ ...log, path: expandVars(log.path, name) }));
   // نبودِ isolation یعنی «هیچ» — نه «ثبت‌نام تازه». این مقدار در `run.json`
   // می‌نشیند و گزارش می‌شود، پس ادعای جداسازی‌ای که وجود ندارد، خواننده را
   // گمراه می‌کند. هدفِ جعبه‌سیاه دقیقاً همین حالت است.

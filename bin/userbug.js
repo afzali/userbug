@@ -440,11 +440,15 @@ function cmdRun({ flags, positional }) {
     // که این ابزار قرار است پیدایش کند، در خودش.
     const args = [PLAYWRIGHT_CLI, 'test'];
 
-    // با --file فقط همان یک سناریو باید اجرا شود. بدون این خط، راه‌اندازِ
-    // YAML فایل را برمی‌داشت ولی specهای جاوااسکریپتی هم کنارش می‌رفتند و
-    // «بازتولیدِ یک یافته» عملاً کل مجموعه را اجرا می‌کرد.
-    if (flags.file) args.push('scenarios/yaml.spec.js');
-    else if (flags.scenario) args.push(String(flags.scenario));
+    // `--file` یک فایلِ YAML را به راه‌اندازِ YAML می‌سپرد. آن راه‌انداز
+    // برداشته شد، پس این پرچم دیگر چیزی برای سپردن ندارد. `--scenario` همان
+    // کار را روی یک فایلِ `.spec.js` می‌کند و باقی می‌ماند.
+    if (flags.file)
+      throw new Error(
+        '`--file` برای اجرای یک فایلِ YAML بود و اجرای YAML برداشته شد.\n' +
+          '  برای اجرای یک spec مشخص: userbug run <هدف> --scenario <مسیرِ فایل>',
+      );
+    if (flags.scenario) args.push(String(flags.scenario));
     // --scenario مسیر فایل را فیلتر می‌کند و --grep عنوان تست را. جدا نگه
     // داشته شدند چون یک بار «--scenario <عنوان>» بی‌صدا صفر تست اجرا کرد.
     /**
@@ -1679,6 +1683,23 @@ async function cmdQuest({ flags, positional }) {
   const goal = positional.slice(1).join(' ').trim() || (flags.goal && flags.goal !== true ? String(flags.goal) : '');
   if (!target) throw new Error('نام هدف لازم است: userbug quest <هدف> "<چه چیزی را بررسی کنم>"');
   if (goal.length < 5) throw new Error('هدف را بنویسید: userbug quest <هدف> "آپلودِ فایلِ تکراری چه می‌کند"');
+
+  /**
+   * کاوشِ هدف‌دار موقتاً بسته است.
+   *
+   * این دستور سناریوی YAML می‌ساخت و همان‌جا اجرایش می‌کرد. اجرای YAML
+   * برداشته شد، چون خروجیِ ابزار از این پس کدِ پلی‌رایت است نه فایلی که
+   * مفسّر بخواهد.
+   *
+   * آنچه اینجا ارزش داشت — پیدا کردنِ نزدیک‌ترین نما به هدف از روی نقشه —
+   * در `src/map/quest.js` دست‌نخورده مانده و همان‌جا منتظرِ `userbug author`
+   * است: همین کاوش، با خروجیِ `.spec.js` به‌جای `.yml`.
+   */
+  throw new Error(
+    '`userbug quest` فعلاً بسته است: اجرای YAML برداشته شد.\n' +
+      '  تا آمدنِ `userbug author`، سناریو را مستقیم `.spec.js` بنویسید.\n' +
+      '  نمونه: scenarios/nepi/ورود.spec.js',
+  );
 
   const YAML = (await import('yaml')).default;
   const { readMap } = await import('../src/map/store.js');
