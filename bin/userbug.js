@@ -25,6 +25,7 @@ import {
   scheduleArgs,
 } from '../src/schedule.js';
 import { renderJUnit } from '../src/report/junit.js';
+import { clip, pad } from '../src/terminal.js';
 import { knowledgeDir, readDossier, writeDossier } from '../src/knowledge/store.js';
 import { digestSource } from '../src/knowledge/digest.js';
 import { answerQuestion, mergeIntoDossier } from '../src/knowledge/merge.js';
@@ -44,6 +45,24 @@ const PLAYWRIGHT_CLI = path.join(ROOT, 'node_modules', '@playwright', 'test', 'c
 
 const HELP = `
 userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
+
+  خروجی، تستِ پلی‌رایت است و در ریپوی خودِ پروژهٔ شما می‌نشیند.
+  هزینهٔ مدل یک بار است: تألیف. اجرا رایگان و بی‌مدل.
+
+  ── شروعِ سریع ──────────────────────────────────────────────
+
+  userbug init <هدف> --base-url <آدرس>     تعریفِ پروژه
+  userbug init <هدف> --workspace           ساختِ پوشه در ریپوی پروژه
+  userbug tour <هدف>                       گشت بزنید، ابزار یاد بگیرد
+  userbug author <هدف> "<کاربر چه می‌کند>" → tests/userbug/*.spec.js
+  userbug expect <هدف> --from <فایل>       افزودنِ ادعا
+  npx playwright test                       اجرا — رایگان، هر تغییر
+
+  ────────────────────────────────────────────────────────────
+
+  userbug author <هدف> "<متن>"    متنِ فارسی → فایلِ .spec.js
+      --model <اسلاگ>             مدلِ تألیف؛ بر کانفیگ می‌چربد
+      --force                     بازنویسیِ فایلِ موجود (ادعاها می‌روند)
 
   userbug run [هدف] [گزینه‌ها]     اجرای سناریوها
       --scenario <مسیر>           فیلتر روی مسیر فایل سناریو
@@ -71,6 +90,11 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --locale <fa> --dir <rtl|ltr>
       --log <نام=مسیر>            لاگ سرور؛ تکرارشدنی
       --source <مسیر>             پوشهٔ سورس پروژه
+                                  مسیرها ${'${VAR}'} می‌پذیرند؛ مقدار از .env
+
+  userbug init <هدف> --workspace  ساختِ tests/userbug/ در ریپوی خودِ پروژه،
+                                  با .gitignoreای که راز و نشستِ مرورگر را
+                                  بیرون نگه می‌دارد
 
   userbug schedule list           زمان‌بندی‌های ثبت‌شده و وضعیتشان
   userbug schedule add <کلید> --target <هدف> --time HH:MM [گزینه‌ها]
@@ -191,18 +215,16 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --out <نام> --force
 
   userbug quest <هدف> "<چه را بررسی کنم>"
-                                  کاوشِ هدف‌دار: نقشه رایگان می‌بردت آنجا،
-                                  بعد مدل همان‌جا می‌گردد و پیش‌نویس می‌نویسد
-      --from <سناریو>             مسیرِ ورود
-      --depth <n>                 سقفِ قدمِ کاوش
-      --model <اسلاگ> --headed
+                                  ⚠ فعلاً بسته: خروجی‌اش YAML بود و اجرای
+                                  YAML برداشته شد. یافتنِ نزدیک‌ترین نما از
+                                  روی نقشه دست‌نخورده منتظرِ پورت است.
 
-  userbug expect <هدف> --from <سناریو>
-                                  «انتظار داشتیم چه ببینیم؟» — انتظارها را
+  userbug expect <هدف> --from <فایل .spec.js>
+                                  «انتظار داشتیم چه ببینیم؟» — ادعاها را
                                   پیشنهاد می‌دهد، از عنصرهای واقعیِ گشت و نقشه
       --list                      فقط فهرستِ عنصرهای واقعی (رایگان)
       --apply                     واقعاً در فایل بنویس
-      --hard                      expect به‌جای assert (همان‌جا بشکند)
+      --hard                      expect به‌جای expect.soft (همان‌جا بشکند)
       --model <اسلاگ>
 
   userbug plan <هدف> "<جمله>"     جمله → نقشهٔ کار (یک فراخوانی)، ذخیره در
@@ -705,7 +727,9 @@ async function cmdMissions({ flags, positional }) {
 
   for (const row of rows) {
     const when = row.at ? row.at.slice(0, 16).replace('T', ' ') : '—';
-    console.log(`  ${MARK[row.verdict] || '?'} ${row.name.slice(0, 44).padEnd(44)} ${WORD[row.verdict].padEnd(14)} ${when}`);
+    // `pad`/`clip` و نه `padEnd`/`slice`: نامِ سناریو و واژهٔ وضعیت هر دو
+    // فارسی‌اند و نیم‌فاصله واحدِ UTF-16 می‌گیرد ولی ستونی نمی‌گیرد.
+    console.log(`  ${MARK[row.verdict] || '?'} ${pad(clip(row.name, 44), 44)} ${pad(WORD[row.verdict], 14)} ${when}`);
 
     if (row.error) console.log(`      ${row.error.slice(0, 90)}`);
 
@@ -755,11 +779,11 @@ function cmdList({ flags }) {
       continue;
     }
     const row = [
-      id.padEnd(34),
-      String(r.target || '').padEnd(7),
-      String(r.device || '').padEnd(11),
-      String(r.steps ?? '—').padStart(4),
-      String(r.findings ?? '—').padStart(6),
+      pad(id, 34),
+      pad(r.target || '', 7),
+      pad(r.device || '', 11),
+      pad(String(r.steps ?? '—'), 4, 'start'),
+      pad(String(r.findings ?? '—'), 6, 'start'),
       r.status === 'running' ? 'ناتمام' : r.status,
     ];
     console.log('  ' + row.join(' '));
