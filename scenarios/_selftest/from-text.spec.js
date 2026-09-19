@@ -5,26 +5,22 @@
  * پاسخِ مدل غیرقطعی است، پس تنها تضمینِ واقعی این است که خروجیِ بی‌ربط ذخیره
  * نشود.
  *
- * سنجهٔ اول از همه مهم‌تر است: فهرست فعل‌ها در `verbs.js` نباید از `switch`
- * مفسر عقب بماند. آن روزی که عقب بماند، مدل فعلی می‌سازد که وسط اجرا
- * «فعل ناشناخته» می‌دهد — و کسی نمی‌فهمد تقصیر مدل نبوده.
+ * ── سنجه‌ای که اینجا بود و رفت ──
+ *
+ * مهم‌ترین بندِ این فایل می‌گفت «فهرست فعل‌ها در `verbs.js` نباید از `switch`
+ * مفسر عقب بماند» و متنِ `src/scenario/run.js` را می‌خواند. آن مفسر با
+ * برداشتنِ اجرای YAML رفت، پس سنجه طرفِ مقابلش را از دست داد.
+ *
+ * تضمین از بین نرفت، جا عوض کرد: `replay-parity.spec.js` همچنان می‌سنجد که
+ * هر فعلی که `map/replay.js` می‌شناسد در `KNOWN_VERBS` باشد — و بازپخش
+ * اکنون تنها جایی است که این فعل‌ها اجرا می‌شوند.
+ *
+ * خودِ `KNOWN_VERBS` هم گذراست: وقتی `userbug author` به‌جای YAML کدِ
+ * پلی‌رایت بنویسد، واژگانِ فعل جایش را به فراخوانیِ خودِ پلی‌رایت می‌دهد.
  */
-import fs from 'node:fs';
-import path from 'node:path';
 import { test, expect } from '@playwright/test';
-import { KNOWN_VERBS, stepVerb } from '../../src/scenario/verbs.js';
+import { stepVerb } from '../../src/scenario/verbs.js';
 import { assertScenarioShape, toYaml, slugify } from '../../src/scenario/from-text.js';
-
-test('فهرست فعل‌ها با switch مفسر یکی است', () => {
-  const source = fs.readFileSync(
-    path.join(import.meta.dirname, '..', '..', 'src', 'scenario', 'run.js'),
-    'utf8'
-  );
-  const cases = [...source.matchAll(/^\s+case '(\w+)':/gm)].map((match) => match[1]);
-
-  expect(cases.length).toBeGreaterThan(20);
-  expect([...new Set(cases)].sort()).toEqual([...KNOWN_VERBS].sort());
-});
 
 test('فعل قدم، از میان کلیدهای وابسته پیدا می‌شود', () => {
   expect(stepVerb({ click: 'x' })).toBe('click');
