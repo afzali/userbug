@@ -2,7 +2,6 @@
   "name": "userbug",
   "version": "0.0.1",
   "description": "شبیه‌ساز کاربر برای تست خودکار اپ‌های وب",
-  "main": "index.js",
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",

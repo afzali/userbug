@@ -1079,6 +1079,8 @@ async function cmdTour({ flags, positional }) {
   console.log('  مرورگر باز است. کار کنید؛ هرچه می‌کنید ضبط می‌شود.\n');
   console.log('  فرمان‌ها (در همین ترمینال):');
   console.log('    <متن>   توضیحِ صفحهٔ فعلی را ثبت کن');
+  console.log('    v <نام> نامِ لایهٔ فعلی (مودال/کشویی) — بر تشخیصِ خودکار می‌چربد');
+  console.log('            با توضیح هم می‌شود:  v نامِ لایه | این پنجره چه می‌کند');
   console.log('    p       صفحهٔ فعلی را بی‌توضیح ثبت کن');
   console.log('    n <متن> یادداشت/ایراد ثبت کن');
   console.log('    r       ضبطِ قدم‌ها را روشن/خاموش کن');
@@ -1109,7 +1111,21 @@ async function cmdTour({ flags, positional }) {
         if (text === 'p') await session.notePage({});
         else if (text === 'r') session.setRecording(!session.recording);
         else if (text.startsWith('n ')) await session.note(text.slice(2));
-        else if (text) await session.notePage({ purpose: text });
+        /**
+         * نام‌گذاریِ دستیِ لایه.
+         *
+         * `notePage` از روزِ اول `view` را می‌گرفت و `detectView` هم بود،
+         * ولی تنها راهِ رسیدن به آن رابط گرافیکی بود. با رفتنِ رابط،
+         * قابلیت بی‌صدا از دسترس خارج شد در حالی که موتور و خودآزماهایش
+         * سرِ جایشان بودند — «نامِ دستی بر تشخیصِ خودکار می‌چربد».
+         *
+         * لازم است چون تشخیصِ خودکار هر لایه‌ای را نمی‌شناسد: مودالی که
+         * `role="dialog"` ندارد، یا کشویی‌ای که فقط یک `div` است.
+         */
+        else if (text.startsWith('v ')) {
+          const [view, ...rest] = text.slice(2).split('|');
+          await session.notePage({ view: view.trim(), purpose: rest.join('|').trim() });
+        } else if (text) await session.notePage({ purpose: text });
       } catch (cause) {
         console.error(`  خطا: ${cause.message}`);
       }
