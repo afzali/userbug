@@ -3169,8 +3169,22 @@ try {
     case 'diff':
       cmdDiff(parsed);
       break;
+    /**
+     * خواستنِ راهنما خطا نیست.
+     *
+     * تا امروز `help` به شاخهٔ `default` می‌افتاد و چون دستوری داده شده بود،
+     * با کدِ ۱ بیرون می‌رفت. متن درست چاپ می‌شد، پس کسی نمی‌فهمید — تا
+     * روزی که یک اسکریپت یا CI به آن کدِ خروج نگاه کند.
+     */
+    case 'help':
+    case '--help':
+    case '-h':
+      console.log(HELP);
+      break;
+
     default:
       console.log(HELP);
+      // دستورِ ناشناس خطاست؛ نبودِ دستور نه.
       process.exit(cmd ? 1 : 0);
   }
 } catch (e) {
