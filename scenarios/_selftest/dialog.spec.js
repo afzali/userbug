@@ -9,6 +9,9 @@
  * این تست هر دو حالت را می‌سنجد: پیش‌فرضِ بستن، و جوابِ سناریو.
  */
 import { test, expect } from '../../src/fixtures.js';
+import { skipWithoutApp } from './_app.js';
+
+skipWithoutApp(test);
 
 test.use({ probe: true });
 

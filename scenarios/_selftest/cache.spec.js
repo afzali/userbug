@@ -18,6 +18,9 @@ import { test, expect } from '../../src/fixtures.js';
 import { SIGNATURE_FN, hashSignature } from '../../src/steps/signature.js';
 import { redact } from '../../src/models/redact.js';
 import { resolveModel, DEFAULTS } from '../../src/models/config.js';
+import { skipWithoutApp } from './_app.js';
+
+skipWithoutApp(test);
 
 test.use({ probe: true });
 

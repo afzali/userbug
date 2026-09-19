@@ -32,8 +32,6 @@ import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
-import { loadScenarios } from '../scenario/load.js';
-import { routesTouchedBy } from './propose.js';
 import { readDossier } from './store.js';
 
 const run = promisify(execFile);
@@ -135,7 +133,7 @@ function routesForFile(file, routes) {
  * @param {string} target کلید پروژه
  * @param {{root: string, base?: string}} options ریشهٔ سورس و مرجع مقایسه
  */
-export async function impactOf(target, { root, roots, base = 'HEAD' } = {}) {
+export async function impactOf(target, { root, roots, base = 'HEAD', specs = [] } = {}) {
   /**
    * هر ریشه مخزنِ خودش را دارد.
    *
@@ -162,13 +160,16 @@ export async function impactOf(target, { root, roots, base = 'HEAD' } = {}) {
   const dossier = readDossier(target);
   const routes = dossier.routes || [];
 
-  let scenarios = [];
-  try {
-    scenarios = loadScenarios(target).filter((item) => item.status !== 'draft');
-  } catch {
-    scenarios = [];
-  }
-  const touchedBy = new Map(scenarios.map((item) => [item.id, routesTouchedBy(item)]));
+  /**
+   * تست‌ها از پوشهٔ خودِ پروژه می‌آیند، نه از YAMLِ این مخزن.
+   *
+   * تا دیروز `loadScenarios` بود و هر سناریو ساختاری داشت که
+   * `routesTouchedBy` در آن دنبالِ فعلِ `go` می‌گشت. حالا `listSpecs`
+   * مسیرها را از `page.goto(…)` درمی‌آورد و همان شکل را می‌دهد، پس منطقِ
+   * زیر دست نخورد.
+   */
+  const scenarios = Array.isArray(specs) ? specs : [];
+  const touchedBy = new Map(scenarios.map((item) => [item.id, item.routes ?? new Set()]));
 
   const mapped = [];
   const unmapped = [];

@@ -11,6 +11,9 @@
  * پس عمداً خطا می‌سازیم و می‌سنجیم که گرفته شده باشد.
  */
 import { test, expect } from '../../src/fixtures.js';
+import { skipWithoutApp } from './_app.js';
+
+skipWithoutApp(test);
 
 test.use({ probe: true });
 

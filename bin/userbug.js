@@ -64,6 +64,15 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --model <اسلاگ>             مدلِ تألیف؛ بر کانفیگ می‌چربد
       --force                     بازنویسیِ فایلِ موجود (ادعاها می‌روند)
 
+  userbug fixtures <هدف>          فایل‌های نمونه — تستِ آپلود از این‌جا
+      --add <مسیر> [--note <چرا>] افزودن
+      --remove <نام>              حذف
+      --note <نام> --as <متن>     یادداشت
+
+  userbug impact <هدف>            «کد عوض شد — کدام تست‌ها باید دوباره فکر
+                                  شوند؟» گیت + پرونده + تست‌ها
+      --base <مرجع>               مرجعِ مقایسه؛ پیش‌فرض HEAD
+
   userbug run [هدف] [گزینه‌ها]     اجرای سناریوها
       --scenario <مسیر>           فیلتر روی مسیر فایل سناریو
       --grep <عنوان>              فیلتر روی عنوان تست
@@ -2690,6 +2699,149 @@ function cmdDiff({ positional }) {
 }
 
 /**
+ * فایل‌های نمونه — آنچه تستِ آپلود بی آن کار نمی‌کند.
+ *
+ * ── چرا از CLI نمی‌شد ──
+ *
+ * `knowledge/fixtures.js` کامل بود: ذخیره، حذف، یادداشت، و `resolveFixture`
+ * که دروازهٔ امن است — فعلِ `upload` فقط از این پوشه می‌خوانَد، پس رشتهٔ آزاد
+ * نمی‌تواند هر فایلی از دیسک را بفرستد. ولی گذاشتنِ فایل در آن پوشه تنها از
+ * رابط گرافیکی ممکن بود.
+ *
+ * یعنی بعد از رفتنِ رابط، `.gitignore` پوشه‌ای را کنار می‌گذاشت که هیچ راهی
+ * برای پر کردنش نبود.
+ */
+async function cmdFixtures({ flags, positional }) {
+  const target = positional[0];
+  if (!target) {
+    throw new Error(
+      'نام هدف لازم است:\n' +
+        '  userbug fixtures <هدف>                      فهرست\n' +
+        '  userbug fixtures <هدف> --add <مسیر> [--note <چرا>]\n' +
+        '  userbug fixtures <هدف> --remove <نام>\n' +
+        '  userbug fixtures <هدف> --note <نام> --as <متن>'
+    );
+  }
+
+  const { listFixtures, saveFixture, removeFixture, setFixtureNote, readFixtureNotes, fixturesDir } =
+    await import('../src/knowledge/fixtures.js');
+
+  if (flags.add && flags.add !== true) {
+    const from = path.resolve(String(flags.add));
+    if (!fs.existsSync(from)) throw new Error(`فایل پیدا نشد: ${from}`);
+
+    const saved = await saveFixture(target, {
+      name: path.basename(from),
+      bytes: await fs.promises.readFile(from),
+      note: flags.note && flags.note !== true ? String(flags.note) : '',
+    });
+    console.log(`\n  اضافه شد: ${saved.relative}\n`);
+    console.log('  در سناریو: { upload: { to: <ورودی>, file: ' + JSON.stringify(path.basename(from)) + ' } }\n');
+    return;
+  }
+
+  if (flags.remove && flags.remove !== true) {
+    const gone = await removeFixture(target, String(flags.remove));
+    console.log(`\n  حذف شد: ${gone.relative}\n`);
+    return;
+  }
+
+  if (flags.note && flags.note !== true) {
+    const as = flags.as && flags.as !== true ? String(flags.as) : '';
+    await setFixtureNote(target, String(flags.note), as);
+    console.log(`\n  یادداشت ثبت شد.\n`);
+    return;
+  }
+
+  const rows = await listFixtures(target);
+  const notes = readFixtureNotes(target);
+
+  if (!rows.length) {
+    console.log(`\n  فایلِ نمونه‌ای نیست: ${fixturesDir(target)}`);
+    console.log('  افزودن: userbug fixtures ' + target + ' --add <مسیر> --note "<چرا>"\n');
+    return;
+  }
+
+  console.log(`\n  ${rows.length} فایلِ نمونه در «${target}»:\n`);
+  for (const row of rows) {
+    const key = String(row.relative || row.name || '').replace(/^fixtures\//, '');
+    console.log(`  ${pad(clip(key, 34), 34)} ${pad(String(row.bytes ?? '—'), 9, 'start')} بایت`);
+    if (notes[key]) console.log(`      ${notes[key]}`);
+  }
+  console.log('');
+}
+
+/**
+ * «کد عوض شد — کدام تست‌ها باید دوباره فکر شوند؟»
+ *
+ * ── چرا این فرمان تا امروز نبود ──
+ *
+ * `src/knowledge/impact.js` از روزِ اول بود و مقدمه‌اش خودش را «ارزشمندترین
+ * اتصالِ پروژه» می‌نامد: گیت می‌گوید چه عوض شد، پرونده می‌گوید هر فایل کدام
+ * صفحه را می‌سازد، و تست‌ها می‌گویند کدام صفحه را لمس می‌کنند. زنجیره کامل
+ * بود و هیچ فرمانی صدایش نمی‌زد — تنها مصرف‌کننده‌اش رابط گرافیکی بود.
+ *
+ * چهارمین قابلیتی است که با رفتنِ رابط بی‌صدا از دسترس خارج شده بود.
+ */
+async function cmdImpact({ flags, positional }) {
+  const target = positional[0];
+  if (!target) throw new Error('نام هدف لازم است: userbug impact <هدف> [--base <مرجع گیت>]');
+
+  const { impactOf } = await import('../src/knowledge/impact.js');
+  const { resolveSourceRoots } = await import('../src/source-access.js');
+  const { listSpecs } = await import('../src/emit/specs.js');
+  const { workspaceRoot } = await import('../src/emit/workspace.js');
+
+  const loaded = await loadTarget(target);
+  const roots = await resolveSourceRoots(loaded);
+  const specs = listSpecs(workspaceRoot(loaded));
+  const base = flags.base && flags.base !== true ? String(flags.base) : 'HEAD';
+
+  const report = await impactOf(target, { roots, base, specs });
+
+  console.log(`\n  ${report.changed} فایل از «${report.base}» تا حالا عوض شده.`);
+  console.log(`  ${specs.length} تست در پوشهٔ پروژه.\n`);
+
+  if (!report.changed) {
+    console.log('  چیزی عوض نشده.\n');
+    return;
+  }
+
+  if (report.scenarios.length) {
+    console.log('  تست‌هایی که باید دوباره فکر شوند:\n');
+    for (const item of report.scenarios) {
+      // شاهدِ ضعیف علامت می‌خورد، نه حذف: صفحهٔ گذرگاه واقعاً لمس شده،
+      // ولی به‌عنوان شاهد چیزی نمی‌گوید چون همه‌جا هست.
+      const mark = item.weak ? '?' : '·';
+      console.log(`  ${mark} ${pad(clip(item.name, 40), 40)} ${item.because.join('، ')}`);
+    }
+    console.log('');
+  } else {
+    console.log('  هیچ تستی به صفحه‌های عوض‌شده نمی‌خورد.\n');
+  }
+
+  /**
+   * `unmapped` هم‌ارزِ بقیه چاپ می‌شود، نه به‌عنوان زیرنویس.
+   *
+   * فایلی که به هیچ صفحه‌ای نگاشت نشود خطرناک‌ترین حالت است: عوض شده، به
+   * همه‌جا اثر دارد، و اگر بی‌صدا رد شود گزارش می‌گوید «چیزی لازم نیست» —
+   * که دروغِ آرام است.
+   */
+  if (report.unmapped.length) {
+    console.log(`  ${report.unmapped.length} فایل به هیچ صفحه‌ای نگاشت نشد:\n`);
+    for (const file of report.unmapped.slice(0, 12)) console.log(`  ! ${file}`);
+    if (report.unmapped.length > 12) console.log(`  … و ${report.unmapped.length - 12} تای دیگر`);
+    console.log('\n  این‌ها ممکن است به همه‌جا اثر داشته باشند؛ خودتان قضاوت کنید.\n');
+  }
+
+  if (report.uncovered.length) {
+    console.log('  صفحه‌هایی که عوض شدند و هیچ تستی ندارند:\n');
+    for (const item of report.uncovered) console.log(`  ✗ ${item.path}`);
+    console.log('');
+  }
+}
+
+/**
  * متنِ فارسی → فایلِ `.spec.js`.
  *
  * ── قابلیتی که از رابط جا مانده بود ──
@@ -2932,6 +3084,12 @@ try {
       break;
     case 'models':
       await cmdModels(parsed);
+      break;
+    case 'fixtures':
+      await cmdFixtures(parsed);
+      break;
+    case 'impact':
+      await cmdImpact(parsed);
       break;
     case 'author':
       await cmdAuthor(parsed);
