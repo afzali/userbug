@@ -154,7 +154,11 @@
 
             <div class="mt-3 flex flex-wrap gap-2">
               {#if !busy && run.findings.length}
-                <Button href={`${base}/triage`} size="sm">تریاژِ {formatNumber(run.findings.length)} یافته</Button>
+                <!--
+                  «تریاژ» نامِ قدیمیِ آن صفحه است و در منو «یافته‌ها» نوشته.
+                  دو نام برای یک جا، یعنی کاربر باید خودش بفهمد یکی‌اند.
+                -->
+                <Button href={`${base}/triage`} size="sm">{formatNumber(run.findings.length)} یافته را ببین</Button>
               {/if}
               {#if activeRun}
                 <Button href={`/runs/${encodeURIComponent(activeRun)}`} size="sm" variant="outline">صفحهٔ اجرا</Button>

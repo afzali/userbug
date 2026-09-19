@@ -21,8 +21,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import TourPanel from '$lib/components/TourPanel.svelte';
-  import CrawlPanel from '$lib/components/CrawlPanel.svelte';
-  import MapReport from '$lib/components/MapReport.svelte';
+  import LivePanel from '$lib/components/LivePanel.svelte';
   import Harvest from '$lib/components/Harvest.svelte';
   import { formatDate, formatNumber } from '$lib/format.js';
 
@@ -41,7 +40,7 @@
 {/snippet}
 
 <PageHeader
-  eyebrow={session.live ? 'در جریان' : session.at ? formatDate(session.at) : ''}
+  eyebrow={session.live ? (session.running ? 'در جریان' : 'چیزی در جریان نیست') : session.at ? formatDate(session.at) : ''}
   title={session.way.label}
   description={session.way.hint}
   {actions}
@@ -49,22 +48,44 @@
 
 {#if session.live}
   <!--
-    کارِ در جریان — پنلِ خودش، بی هیچ سوئیچی دورش.
+    کارِ در جریان — و **فقط** کارِ در جریان.
 
-    `TourPanel` و `CrawlPanel` دست‌نخورده‌اند: محتوایشان درست بود، جایشان
-    غلط. فقط دیگر کنارِ هم و کنارِ رادیو نیستند.
+    ── چه بود و چرا عوض شد ──
+
+    اینجا `CrawlPanel` رندر می‌شد، که یک فرمِ شروعِ خزش است. و چون
+    کاوشِ هدف‌دار پنلِ خودش را نداشت، به همین شاخه می‌افتاد: کاربر
+    «شروع» می‌زد، کاوش راه می‌افتاد، و صفحهٔ بعدی یک فرم نشانش می‌داد با
+    همان سه گزینه‌ای که تازه انتخاب کرده بود — و یک دکمهٔ «شروع» دیگر.
+    پرسشِ درستش این بود: «اگر شروع شده، پس این چیه؟»
+
+    فرم رفت به `discover/new`، و اینجا هر سه روش پنلِ خودشان را دارند.
   -->
   {#if session.kind === 'tour'}
     <TourPanel {data} {target} />
+  {:else if session.running}
+    <LivePanel {session} {target} />
   {:else}
-    <CrawlPanel {data} {target} />
     <!--
-      گزارشِ نقشه زیرِ فرمِ خزش، نه تهِ صفحهٔ کشف.
+      هیچ کاری در جریان نیست — و صفحه همین را می‌گوید.
 
-      «۲۸ حالت، ۳۵۵ کنش، ۹۱ در صف» جوابِ «این بار چه گرفت» است — و آن
-      پرسش دقیقاً همین‌جا پرسیده می‌شود، نه زیرِ سیزده بخشِ بی‌ربط.
+      پیش‌تر سرصفحه بی‌قید «در جریان» می‌گفت و زیرش فرمِ خزش می‌آمد، پس
+      این حالت اصلاً دیده نمی‌شد. آدرسِ `live` نشانک‌شدنی است و بعد از
+      پایانِ کار هم باز می‌شود؛ آن لحظه باید بگوید تمام شد، نه اینکه
+      وانمود کند چیزی در جریان است.
     -->
-    <div class="mt-6"><MapReport {data} {target} /></div>
+    <section class="rounded-xl border bg-muted/30 p-6">
+      <h2 class="text-base font-semibold">الان چیزی در جریان نیست</h2>
+      <p class="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground">
+        این آدرس کارِ همین لحظه را نشان می‌دهد. اگر کشفی داشتید و تمام شده،
+        نتیجه‌اش در «اپِ من» نشسته و خودِ جلسه در فهرستِ اجراها ردیفِ خودش
+        را گرفته.
+      </p>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <Button size="sm" href={base}>اپِ من — و شروعِ کشفِ تازه</Button>
+        <Button size="sm" variant="outline" href={`${base}/runs`}>همهٔ کشف‌ها</Button>
+        <Button size="sm" variant="ghost" href={`${base}/discover/new`}>خزشِ دقیق</Button>
+      </div>
+    </section>
   {/if}
 {:else if session.kind === 'source'}
   <div class="space-y-4">

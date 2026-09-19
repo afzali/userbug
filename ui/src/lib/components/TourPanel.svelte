@@ -82,14 +82,6 @@
   /** «دربارهٔ چه بود» — در سرصفحهٔ سناریو می‌نشیند، نه در نام. */
   let scenarioPurpose = $state('');
   let busy = $state('');
-  /**
-   * نشست بماند؟
-   *
-   * پیش‌فرض روشن است: کاری که آدم در گشت می‌کند — ساختنِ حساب و تنظیمِ خودِ
-   * اپ — دقیقاً همان چیزی است که خزشِ بعدی لازم دارد. ریختنش دور، همان
-   * کاری بود که کاربر را وادار می‌کرد هر بار از صفر شروع کند.
-   */
-  let keepProfile = $state(true);
   let error = $state('');
   let result = $state(null);
   let warning = $state('');
@@ -203,18 +195,17 @@
     }
   }
 
-  async function start() {
-    result = null;
-    const payload = await send({ action: 'start', profile: keepProfile });
-    if (!payload) return;
-    running = true;
-    url = payload.url || '';
-    steps = payload.steps || [];
-    pages = payload.pages || [];
-    findings = payload.findings || [];
-    recording = payload.recording ?? true;
-    listen();
-  }
+  /**
+   * ── شروعِ گشت از اینجا رفت ──
+   *
+   * این پنل دکمهٔ «شروع گشت» و تیکِ «نشست بماند» داشت. ولی این صفحه فقط
+   * وقتی رندر می‌شود که گشتی **در جریان** باشد، پس آن دو در عمل هرگز
+   * دیده نمی‌شدند — و تیکی که دیده نشود، تنظیمی است که اعمال نمی‌شود.
+   *
+   * هر دو به مودالِ «چطور کشفش کنم؟» رفتند، همان‌جا که کارِ کشف شروع
+   * می‌شود. دو جای شروع یعنی روزی یکی‌شان `profile` را بفرستد و آن یکی
+   * نه — که دقیقاً همان چیزی بود که اتفاق افتاد.
+   */
 
   /**
    * نمای باز — خودکار، با امکانِ دست بردن.
@@ -338,22 +329,6 @@
   </Button>
   <Button disabled={Boolean(busy)} onclick={() => stop(false)}>پایان و ذخیره</Button>
   <Button variant="outline" disabled={Boolean(busy)} onclick={() => stop(true)}>پایان بدون ذخیره</Button>
-{:else}
-  <!--
-    نگه داشتنِ نشست.
-
-    ── چرا این گزینه آمد ──
-
-    کارِ طبیعیِ آدم این است: در همین گشت حساب بسازد و تنظیماتِ خودِ اپ را
-    انجام بدهد، و بعد بگوید «از همان نشست استفاده کن» — چون داده در
-    `localStorage` همان مرورگر است. تا امروز نمی‌شد: پوشهٔ پروفایلِ گشت
-    موقت بود و در پایان پاک می‌شد.
-  -->
-  <label class="flex items-center gap-2 text-xs text-muted-foreground" title="پوشهٔ مرورگر در knowledge/<هدف>/profile می‌ماند — همان که خزش با «همان مرورگرِ خزشِ قبلی» باز می‌کند.">
-    <input type="checkbox" bind:checked={keepProfile} disabled={Boolean(busy)} />
-    نشست بماند
-  </label>
-  <Button disabled={Boolean(busy)} onclick={start}>{busy === 'start' ? 'در حال باز کردن…' : 'شروع گشت'}</Button>
 {/if}
   </div>
 

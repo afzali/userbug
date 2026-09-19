@@ -106,6 +106,16 @@ export function routesOfSource(target) {
  *
  * بینِ «گاهی سخت‌گیرِ کمتر» و «منبعِ دومِ حقیقت»، اولی را برمی‌داریم.
  */
+/**
+ * مسیرِ یک سناریو نسبت به پوشهٔ سناریوهای همان هدف.
+ *
+ * جداکننده همیشه `/` است: این رشته در آدرسِ وب می‌نشیند، نه در مسیرِ
+ * فایل‌سیستم — و روی ویندوز `path.relative` بک‌اسلش می‌دهد.
+ */
+function relativeTo(target, file) {
+  return path.relative(scenarioDir(target), file).split(path.sep).join('/');
+}
+
 function madeAt(file) {
   try {
     return fs.statSync(file).mtime.toISOString();
@@ -205,6 +215,21 @@ export function yieldOf({ session, runDir, target, scenarios, counts = {} }) {
       id: one.id,
       name: one.name,
       status: one.status,
+      /**
+       * مسیرِ نسبی — تا بشود به خودِ فایل لینک داد.
+       *
+       * ── چرا لازم شد ──
+       *
+       * پنلِ «این کشف N سناریو ساخت» نامِ هر سناریو را به
+       * `files?open=<id>` لینک می‌داد، و `open` پارامتری است که آن صفحه
+       * **نمی‌شناسد**. نتیجه‌اش این بود: روی نامِ سناریو می‌زدی و
+       * `<target>.config.js` باز می‌شد. هیچ خطایی هم نمی‌داد.
+       *
+       * ویرایشگر `relative` می‌خواهد، و تنها جایی که آن را می‌داند همین
+       * است — `id` نامِ فایل بی پسوند است و زیرپوشه (`_drafts/`) را
+       * نمی‌گوید.
+       */
+      path: relativeTo(target, one.file),
       at,
     });
   }

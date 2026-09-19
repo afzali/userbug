@@ -39,6 +39,12 @@
     // بازنویسیِ فایلِ قبلی نباید روی فایلِ تازه بنشیند — همان اشتباهی که
     // یک بار با خودِ `content` رخ داد و متنِ فایلِ قبلی را جای دیگری نوشت
     revision = null;
+    /**
+     * با تعویضِ فایل، خواستهٔ آمده از آدرس هم می‌رود.
+     *
+     * جملهٔ یک یافته مالِ همان سناریوست؛ ماندنش روی فایلِ بعدی یعنی کاربر
+     * ناخواسته سناریوی دیگری را با متنِ اشتباه بازنویسی کند.
+     */
     wish = '';
     showRevise = false;
   });
@@ -55,7 +61,8 @@
   let mode = $state('ai');
   /** پنل سناریوی تازه؛ از دکمهٔ بالای فهرست باز می‌شود. */
   // svelte-ignore state_referenced_locally
-  let adding = $state(Boolean(data.compose));
+  // svelte-ignore state_referenced_locally
+  let adding = $state(Boolean(data.compose) || Boolean(data.startNew));
   let creating = $state(false);
   // svelte-ignore state_referenced_locally
   let intent = $state(data.compose || '');
@@ -82,9 +89,11 @@
    */
   let revising = $state(false);
   let revision = $state(null);
-  let wish = $state('');
+  // svelte-ignore state_referenced_locally
+  let wish = $state(data.revise || '');
   let entryPick = $state('');
-  let showRevise = $state(false);
+  // svelte-ignore state_referenced_locally
+  let showRevise = $state(Boolean(data.revise));
   /**
    * «انتظار» جدا از «بازنویسی».
    *
@@ -276,12 +285,24 @@
   }
 </script>
 
+<!--
+  ── چرا این صفحه دیگر «سناریوهای …» صدا نمی‌شود ──
+
+  منو یک ردیف به نامِ «سناریوها» دارد که به `/missions` می‌رود. این صفحه هم
+  خودش را «سناریوهای نپی» صدا می‌زد، پس دو جای متفاوت یک نام داشتند و
+  هیچ‌کدام نمی‌گفت با آن یکی چه فرقی دارد.
+
+  فرقشان روشن است و نام باید همان را بگوید: آنجا فهرست است، اینجا ویرایشگرِ
+  **یک** فایل.
+-->
 <PageHeader
   eyebrow="فایل، نه دیتابیس"
-  title={data.kind === 'target' ? `تنظیمات ${project.name}` : `سناریوهای ${project.name}`}
-  description={data.kind === 'target'
-    ? 'آدرس فرانت و API، محیط، دستگاه، مسیر لاگ‌ها و پوشهٔ سورس — همه در همین فایل.'
-    : 'ویرایش روی فایل واقعی انجام می‌شود؛ YAML و JavaScript پیش از rename اعتبارسنجی می‌شوند.'}>
+  title={data.startNew && !data.file ? 'سناریوی تازه' : data.kind === 'target' ? `پیکربندیِ ${project.name}` : 'ویرایشگرِ سناریو'}
+  description={data.startNew && !data.file
+    ? 'با جمله بگویید کاربر چه می‌کند و چه باید ببیند، یا از فایلِ خالی شروع کنید. تا ذخیره نکنید چیزی روی دیسک نوشته نمی‌شود.'
+    : data.kind === 'target'
+      ? 'آدرس فرانت و API، محیط، دستگاه، مسیر لاگ‌ها و پوشهٔ سورس — همه در همین فایل.'
+      : 'ویرایش روی فایل واقعی انجام می‌شود؛ YAML و JavaScript پیش از rename اعتبارسنجی می‌شوند.'}>
   <!--
     سناریو که نوشته شد، قدمِ بعد اجرای آن است — نه «بازگشت».
 
@@ -289,8 +310,14 @@
     خودِ پروژه این است: پیش‌نویسی که یک بار اجرا نشده، سناریو نیست.
   -->
   {#snippet actions()}
-    <Button href={`/projects/${encodeURIComponent(data.target)}/runs`}>اجرایش کن</Button>
-    <Button href={`/projects/${encodeURIComponent(data.target)}/missions`} variant="ghost">چه باید آزمود</Button>
+    <!--
+      «اجرایش کن» به فهرستِ اجراهای گذشته می‌رفت، که چیزی را اجرا نمی‌کند.
+      دکمهٔ «اجرا»ی هر سناریو در «سناریوها»ست.
+    -->
+    <Button href={`/projects/${encodeURIComponent(data.target)}/missions`}>اجرایش کن</Button>
+    <Button href={`/projects/${encodeURIComponent(data.target)}/missions?suggest=1`} variant="ghost">
+      چه باید آزمود
+    </Button>
     <!--
       «حساب و چک» از منو برداشته شد و اینجا نشست: حساب و فایلِ آپلودی چیزی
       نیستند که آدم سراغشان برود، چیزی‌اند که **وسطِ نوشتنِ سناریو** لازم

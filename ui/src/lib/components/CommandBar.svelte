@@ -87,7 +87,14 @@
     // «گشت» و «یافته‌ها» اجرا نیستند، مقصدند
     if (plan.goto) {
       dismiss();
-      return void goto(`${base}/${plan.goto}`);
+      /**
+       * مقصد یا زیرمسیر است یا پرسمانِ همین صفحه.
+       *
+       * «گشت» دیگر صفحه نیست؛ مودالی روی «اپِ من» است، پس مقصدش
+       * `?discover=tour` است. چسباندنِ بی‌قیدِ `/` وسطش آدرسِ
+       * `.../?discover=tour` می‌ساخت.
+       */
+      return void goto(plan.goto.startsWith('?') ? `${base}${plan.goto}` : `${base}/${plan.goto}`);
     }
     onRun?.(plan.job);
     dismiss();

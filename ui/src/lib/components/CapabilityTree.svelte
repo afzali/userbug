@@ -17,7 +17,41 @@
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { formatNumber } from '$lib/format.js';
 
-  let { roots = [], selected = '', picked = new Set(), open = new Set(), onPick, onOpen, onToggle, onReview } = $props();
+  let {
+    roots = [],
+    selected = '',
+    picked = new Set(),
+    open = new Set(),
+    onPick,
+    onOpen,
+    onToggle,
+    onReview,
+    onDiscover,
+  } = $props();
+
+  /**
+   * کارِ هر ردیف، تابعِ حالِ همان ردیف.
+   *
+   * ── چرا یک آیکونِ ثابت غلط بود ──
+   *
+   * هر ردیف آیکونِ `▶` داشت، یعنی «بررسی». ولی بررسی **اجرای سناریوهای
+   * موجود** است — و روی ردیفی که «بی‌سناریو» نوشته، دقیقاً هیچ سناریویی
+   * نیست. کاربر روی تنها دکمهٔ ردیف می‌زد و دیالوگی باز می‌شد که می‌گفت
+   * «اینجا سناریویی نیست، برو کشف کن».
+   *
+   * یعنی پرکارترین ردیف‌های این صفحه — همان‌هایی که زرد نوشته‌اند کار
+   * دارند — تنها دکمه‌شان کاری بود که روی آن‌ها معنا نداشت.
+   *
+   * حالا ردیفِ بی‌سناریو `＋` می‌گیرد و مستقیم به کشفِ همان‌جا می‌رود؛
+   * ردیفی که سناریو دارد همان `▶` را نگه می‌دارد.
+   */
+  function actionOf(node) {
+    if (node.shelf) return null;
+    const has = (node.counts?.scenarios?.length || 0) + (node.counts?.planned?.length || 0);
+    return has
+      ? { glyph: '▶', label: `بررسیِ «${node.title}»`, run: onReview }
+      : { glyph: '＋', label: `کشفِ «${node.title}» — تا سناریو داشته باشد`, run: onDiscover };
+  }
 
   /**
    * ── چرا نما و صفحه دو ستونِ متفاوت دارند ──
@@ -190,14 +224,29 @@
         {whenOf(node)}
       </span>
 
-      <!-- «چند سناریو» — و «بی‌سناریو» زرد است، چون کار می‌سازد -->
-      <span
-        class={`w-24 shrink-0 text-start text-[11px] ${
-          scenariosOf(node) === 'بی‌سناریو' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'
-        }`}
-      >
-        {scenariosOf(node)}
-      </span>
+      <!--
+        «چند سناریو» — و «بی‌سناریو» حالا خودش دکمه است.
+
+        ── چرا ──
+
+        کاربر گفت: «نوشتیم بی‌سناریو، ولی وقتی رویش کلیک می‌کنم توقع دارم
+        برود سناریو بسازد یا حداقل کشف را باز کند». حق داشت — زردِ هشدار
+        روی متنی که هیچ کاری نمی‌کند، وعدهٔ نگه‌داشته‌نشده است.
+
+        همان کارِ `＋`ِ کنارِ ردیف را می‌کند، چون یک معنی دارند.
+      -->
+      {#if scenariosOf(node) === 'بی‌سناریو'}
+        <button
+          type="button"
+          class="w-24 shrink-0 text-start text-[11px] text-amber-600 underline decoration-dotted underline-offset-4 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+          title={`هیچ سناریویی ندارد — برای کشفِ «${node.title}» کلیک کنید`}
+          onclick={(event) => { event.stopPropagation(); onDiscover?.(node); }}
+        >
+          بی‌سناریو
+        </button>
+      {:else}
+        <span class="w-24 shrink-0 text-start text-[11px] text-muted-foreground">{scenariosOf(node)}</span>
+      {/if}
 
       <!--
         آیکونِ بررسی روی هر ردیف.
@@ -207,15 +256,20 @@
 
         دامنه از خودِ ردیف می‌آید، پس هیچ فرمی لازم نیست تا بپرسد «کجا».
       -->
-      <button
-        type="button"
-        class="grid size-6 shrink-0 place-items-center rounded-md text-[11px] text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-        title={`بررسیِ «${node.title}»`}
-        aria-label={`بررسیِ ${node.title}`}
-        onclick={(event) => { event.stopPropagation(); onReview?.(node); }}
-      >
-        ▶
-      </button>
+      {#if actionOf(node)}
+        {@const action = actionOf(node)}
+        <button
+          type="button"
+          class="grid size-6 shrink-0 place-items-center rounded-md text-[11px] text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+          title={action.label}
+          aria-label={action.label}
+          onclick={(event) => { event.stopPropagation(); action.run?.(node); }}
+        >
+          {action.glyph}
+        </button>
+      {:else}
+        <span class="size-6 shrink-0" aria-hidden="true"></span>
+      {/if}
     </div>
 
     {#if node.children.length && isOpen}

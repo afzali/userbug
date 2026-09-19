@@ -277,7 +277,14 @@
     <Button variant="outline" disabled={busy === 'source' || !data.found.hasSource} onclick={rescan}>
       {busy === 'source' ? 'در حال خواندن…' : 'خواندنِ دوبارهٔ سورس'}
     </Button>
-    <Button href={`/projects/${encodeURIComponent(target)}/missions`} variant="outline">چه باید آزمود</Button>
+    <!--
+      «چه باید آزمود» دیگر صفحه نیست — بخشی از «سناریوها»ست، و بسته.
+      پیوندی که نامِ صفحهٔ حذف‌شده را داشته باشد، هم دروغ است هم کاربر را
+      بالای فهرستی رها می‌کند که بخشِ موردِ نظرش جمع‌شده پایینِ آن است.
+    -->
+    <Button href={`/projects/${encodeURIComponent(target)}/missions?suggest=1`} variant="outline">
+      چه باید آزمود — در سناریوها
+    </Button>
   </div>
 
 {#if error}
@@ -780,7 +787,7 @@
               </li>
             {/each}
           </ul>
-          <Button href={`${base}/missions`} variant="outline" size="sm" class="w-full">
+          <Button href={`${base}/missions?suggest=1`} variant="outline" size="sm" class="w-full">
             پیشنهادهایی که از این‌ها درآمده
           </Button>
         {:else}

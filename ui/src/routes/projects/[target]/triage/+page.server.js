@@ -1,6 +1,7 @@
 import { aggregateTriage } from '$lib/server/artifacts.js';
 import { readChecksConfig } from '../../../../../../src/checks/config.js';
 import { UNIVERSAL } from '../../../../../../src/checks/universal.js';
+import { normalizeCapabilityRoute, readCapabilities } from '../../../../../../src/knowledge/capabilities.js';
 
 /**
  * یافته‌ها — و «چه چیزی ایراد حساب می‌شود».
@@ -23,6 +24,38 @@ export async function load({ params, url }) {
 
   return {
     findings: await aggregateTriage(params.target),
+    /**
+     * نامِ خوانای هر مسیر — برای سرتیترِ دسته‌ها.
+     *
+     * ── چرا این صفحه دسته لازم داشت ──
+     *
+     * شش محورِ فیلتر داشت و خروجی‌اش یک فهرستِ تخت بود. فیلتر برای وقتی
+     * است که می‌دانی دنبالِ چه می‌گردی؛ کسی که تازه یک بررسی گرفته
+     * نمی‌داند، و پرسشش این است: «کدام بخشِ اپم بیشترین ایراد را دارد؟»
+     * فهرستِ تخت این را جواب نمی‌دهد، هرچند همهٔ داده‌اش را دارد.
+     *
+     * ── چرا نام از شناخت می‌آید و نه از خودِ مسیر ──
+     *
+     * سرتیترِ `/content/:id` چیزی نمی‌گوید؛ «کتاب» می‌گوید. و همان نامی
+     * است که کاربر در «اپِ من» دیده — دو نامِ متفاوت برای یک بخش یعنی
+     * کاربر باید خودش بچسباندشان.
+     *
+     * نامی که خودِ کاربر گذاشته بر نامِ مشتق مقدم است، همان‌طور که در
+     * درخت هست.
+     */
+    places: safely(() => {
+      const caps = readCapabilities(params.target);
+      const names = caps.names || {};
+      const out = {};
+      for (const node of caps.nodes || []) {
+        /** فقط صفحه‌ها: نما مسیرِ خودش را ندارد و نامش روی کلِ صفحه می‌نشیند. */
+        if (node.view) continue;
+        const route = normalizeCapabilityRoute(node.route);
+        if (!route) continue;
+        out[route] = names[node.id]?.title || node.title || route;
+      }
+      return out;
+    }, {}),
     /**
      * فیلترِ مکان از آدرس.
      *

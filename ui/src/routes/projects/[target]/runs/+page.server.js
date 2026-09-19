@@ -7,6 +7,7 @@ import { discoverySessions } from '../../../../../../src/knowledge/sessions.js';
 import { readCapabilities } from '../../../../../../src/knowledge/capabilities.js';
 import { allScenarios, yieldOf } from '../../../../../../src/knowledge/yield.js';
 import { countsByRoute, refreshTouch } from '../../../../../../src/runs/touch.js';
+import { listScenarios } from '$lib/server/projects.js';
 
 /**
  * «بررسی» — یک بار بررسی کن، و ببین بارهای قبل چه دادند.
@@ -101,22 +102,67 @@ export async function load({ params }) {
   const prints = printsByRound(findings);
   const named = rounds.filter((one) => one.name);
 
+  /**
+   * سناریوهایی که **امروز** روی دیسک‌اند و اجرا می‌شوند.
+   *
+   * ── چرا تقاطع لازم شد ──
+   *
+   * نخستین نسخه فهرستِ «دوباره» را فقط از تاریخچه می‌ساخت. نتیجه‌اش روی
+   * یک پروژهٔ واقعی این شد: «همان ۴۲۸ سناریو دوباره اجرا می‌شود» — چون
+   * سطلِ بی‌نام همهٔ اجراهای تاریخ را در خود دارد و نامِ هر سناریویی که
+   * روزی وجود داشته در آن جمع شده، از جمله سناریوهایی که بعداً حذف
+   * شدند.
+   *
+   * دکمه‌ای که عددِ بی‌ربط نشان بدهد و نیمی از فهرستش وجود نداشته باشد،
+   * همان وعده‌ای است که نگه داشته نمی‌شود.
+   */
+  const onDisk = new Set(
+    (await listScenarios(target).catch(() => []))
+      .filter((one) => one.executable)
+      .map((one) => one.name)
+  );
+
   const withDetail = rounds.map((round) => {
     /** اجراهای خودِ این دور، برای بازشدنِ ردیف. */
     const own = runs.filter((one) => round.runs.includes(one.runId));
 
-    if (!round.name) return { ...round, diff: null, items: own };
+    /**
+     * سناریوهایی که این دور **واقعاً** اجرا کرد — ورودیِ «اجرای دوباره».
+     *
+     * ── چرا از خودِ اجراها و نه از دامنه ──
+     *
+     * `scope` می‌گوید کجا را قرار بود ببیند، نه چه چیزی اجرا شد. ترجمهٔ
+     * دوبارهٔ دامنه به سناریو یعنی دورِ تازه ممکن است سناریویی را بگیرد که
+     * آن روز نبوده — و همان چیزی است که مقایسهٔ دو دور را بی‌صدا بی‌معنا
+     * می‌کند.
+     *
+     * ── چرا فقط `run` ──
+     *
+     * خزش و کاوش هدف و سقف‌هایشان را در `run.json` نمی‌نویسند. «دوباره»ی
+     * حدسی برایشان بدتر از نبودنش است.
+     */
+    const scenarios = [
+      ...new Set(
+        own
+          .filter((one) => (one.kind || 'run') === 'run')
+          .flatMap((one) => (one.scenarios || []).map((two) => two.name))
+          .filter((name) => name && onDisk.has(name))
+      ),
+    ];
+
+    if (!round.name) return { ...round, diff: null, items: own, scenarios };
 
     /** دورِ قبلی یعنی دورِ **نام‌دارِ** بعدی در ترتیبِ زمانی، نه اجرای قبلی. */
     const index = named.findIndex((one) => one.name === round.name);
     const previous = named[index + 1];
-    if (!previous) return { ...round, diff: null, items: own };
+    if (!previous) return { ...round, diff: null, items: own, scenarios };
 
     const a = prints.get(previous.name) || new Set();
     const b = prints.get(round.name) || new Set();
     return {
       ...round,
       items: own,
+      scenarios,
       diff: {
         against: previous.name,
         added: [...b].filter((one) => !a.has(one)).length,

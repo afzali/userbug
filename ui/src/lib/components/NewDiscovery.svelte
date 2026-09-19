@@ -30,7 +30,19 @@
   import Advanced from '$lib/components/Advanced.svelte';
   import { run, startJob } from '$lib/run-store.svelte.js';
 
-  let { target, project = null, scope = null, scenarios = [], onClose, onStarted } = $props();
+  let {
+    target,
+    project = null,
+    scope = null,
+    scenarios = [],
+    /** حساب‌های ذخیره‌شده و نشستِ مرورگر — ورودیِ «از کجا شروع کند؟». */
+    accounts = [],
+    hasProfile = false,
+    /** سناریوی ورودِ نقشه — پیش‌فرضِ خاموشِ کاوش، نه خزش. */
+    mapEntry = '',
+    onClose,
+    onStarted,
+  } = $props();
 
   /**
    * دامنه، وقتی از درخت آمده‌ایم.
@@ -43,7 +55,16 @@
    */
   let scoped = $derived(scope && scope.kind !== 'all' ? scope.nodes || [] : []);
 
-  let how = $state('tour');
+  /**
+   * راهِ پیش‌فرض، و چرا از بیرون هم می‌آید.
+   *
+   * `scope.how` را کسی می‌فرستد که از قبل می‌داند کدام راه را می‌خواهد —
+   * مثلاً پیوندی که واژهٔ «گشت» را به اینجا آورده. بی این، آن پیوند فقط
+   * مودال را باز می‌کرد و کاربر باید دوباره همان چیزی را انتخاب می‌کرد که
+   * روی خودِ پیوند نوشته بود.
+   */
+  // svelte-ignore state_referenced_locally
+  let how = $state(scope?.how || 'tour');
   let where = $state('');
 
   /**
@@ -121,6 +142,8 @@
   let settings = $state({
     from: '',
     profile: false,
+    /** با کدام حسابِ ذخیره‌شده وارد شود — تا دیروز اصلاً اینجا نبود. */
+    remember: '',
     fresh: false,
     states: '',
     minutes: '',
@@ -129,14 +152,50 @@
     headed: false,
   });
 
+  /**
+   * ── چرا `remember` فقط به خزش اضافه شد ──
+   *
+   * قاعدهٔ این جعبه این است که هر ردیف **دقیقاً** یک پرچمِ خط فرمانِ همان
+   * کار باشد. `userbug quest` فقط `--from`، `--depth`، `--model` و
+   * `--headed` دارد؛ `--profile` و `--remember` مالِ `map` اند.
+   *
+   * گذاشتنِ آن‌ها زیرِ «فقط فلان‌جا را بگرد» یعنی دو کنترل که هیچ کاری
+   * نمی‌کنند و کاربر فکر می‌کند کردند — بدترین نوعِ ایراد، چون خطا
+   * نمی‌دهد.
+   */
+  /**
+   * ── چرا گشت هم `profile` دارد و کاوش ندارد ──
+   *
+   * `startTour` از اول `profile` می‌پذیرفت و همان پوشه‌ای را می‌گیرد که
+   * خزش با `--profile` می‌گیرد. ولی این مودال هیچ‌وقت نمی‌فرستادش، پس
+   * **هر گشتی که از اینجا شروع می‌شد پروفایلِ موقت می‌گرفت و در پایان پاک
+   * می‌شد** — یعنی دقیقاً آن چیزی که کلِ «اول یک بار گشت برو و وارد شو»
+   * رویش بنا شده، کار نمی‌کرد.
+   *
+   * کاوش ندارد چون **نمی‌تواند**: `quest` یک فایلِ سناریو می‌سازد و از
+   * اجراگرِ معمولی می‌گذراندش، و آن اجراگر `launchPersistentContext`
+   * ندارد — فقط گشت و خزش دارند. راهِ ورودش `--from` است، همان ردیفی که
+   * از قبل هست.
+   *
+   * کنترلی که پرچم نسازد، بدتر از نبودنش است.
+   */
   const ROWS = {
-    crawl: ['from', 'profile', 'fresh', 'states', 'minutes', 'headed'],
+    crawl: ['from', 'profile', 'remember', 'fresh', 'states', 'minutes', 'headed'],
     scoped: ['from', 'depth', 'model', 'headed'],
-    tour: [],
+    tour: ['profile'],
     source: [],
   };
 
   let rows = $derived(ROWS[how] || []);
+
+  /**
+   * پیش‌فرضِ خاموشِ «مسیرِ ورود» — فقط برای کاوش.
+   *
+   * `userbug map` وقتی `--from` نگیرد واقعاً از آدرسِ اول شروع می‌کند؛
+   * فقط `quest` است که به `map.entry.scenario` برمی‌گردد. نوشتنِ یک
+   * متن برای هر دو یعنی یکی‌شان دروغ بگوید.
+   */
+  let entryFallback = $derived(how === 'scoped' ? mapEntry : '');
 
   /** فقط ردیف‌هایی که این راه دارد — تا تنظیمی که دیده نمی‌شود، فرستاده هم نشود. */
   let payload = $derived(
@@ -151,7 +210,14 @@
         const response = await fetch('/api/tour', {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
-          body: JSON.stringify({ target, action: 'start' }),
+          /**
+           * `profile` تا امروز فرستاده نمی‌شد.
+           *
+           * سرور پیش‌فرضش را `false` می‌گیرد، یعنی پوشهٔ موقت — و
+           * `TourSession` در پایان پاکش می‌کند. پس کاربر وارد می‌شد،
+           * حساب می‌ساخت، و هیچ‌کدام برای خزشِ بعدی نمی‌ماند.
+           */
+          body: JSON.stringify({ target, action: 'start', profile: Boolean(settings.profile) }),
         });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || 'گشت شروع نشد');
@@ -250,7 +316,41 @@
       و چون جعبه سرِ خودش می‌گوید چند تنظیم دست‌کاری شده، کاربری که
       «پیشرفته» را باز نمی‌کند هم می‌فهمد چیزی داخلش هست.
     -->
-    <Advanced bind:value={settings} {rows} {scenarios} disabled={busy} />
+    <!--
+      گشت می‌تواند نشست را **بسازد**؛ خزش فقط می‌تواند مصرفش کند.
+
+      پس روی گشت، گزینهٔ «نشست» حتی وقتی هیچ پروفایلی نیست هم باید باز
+      باشد — همان بارِ اول است که می‌سازدش.
+    -->
+    <Advanced
+      bind:value={settings}
+      {rows}
+      {scenarios}
+      {accounts}
+      {hasProfile}
+      canCreateSession={how === 'tour'}
+      {entryFallback}
+      disabled={busy}
+    />
+
+    <!--
+      راهِ فرمِ کاملِ خزش — فقط وقتی خزش انتخاب است.
+
+      ── چرا این لینک لازم شد ──
+
+      آن فرم تا امروز روی `discover/live` می‌نشست، یعنی روی صفحه‌ای که
+      **بعد** از شروع به آن می‌رسیدی. جایش غلط بود و از آنجا رفت؛ ولی
+      چیزهایی دارد که اینجا نیست — دانه، دامنه، واژه‌های اولویت، انتخابِ
+      حساب، و نقشهٔ کار. لینکِ نداشته یعنی همان قابلیت‌ها گم شوند.
+    -->
+    {#if how === 'crawl'}
+      <p class="mt-2 text-[11px] leading-6 text-muted-foreground">
+        دانه، دامنه، واژه‌های اولویت یا نقشهٔ کار می‌خواهید؟
+        <a class="underline underline-offset-4" href={`/projects/${encodeURIComponent(target)}/discover/new`}>
+          خزشِ دقیق
+        </a>
+      </p>
+    {/if}
 
     {#if noSource}
       <!--

@@ -39,7 +39,16 @@
       <ul class="mt-2 space-y-1">
         {#each harvest.made as one (one.id)}
           <li class="flex items-baseline gap-2 text-xs">
-            <a class="truncate font-medium underline underline-offset-2" href={`${base}/files?open=${encodeURIComponent(one.id)}`}>
+            <!--
+              `relative`، نه `open`.
+
+              `?open=` پارامتری بود که ویرایشگر نمی‌شناخت، پس کلیک روی نامِ
+              سناریو `<target>.config.js` را باز می‌کرد — بی هیچ خطایی.
+            -->
+            <a
+              class="truncate font-medium underline underline-offset-2"
+              href={`${base}/files?kind=scenario&relative=${encodeURIComponent(one.path || one.id)}`}
+            >
               {one.name}
             </a>
             {#if one.status === 'draft'}

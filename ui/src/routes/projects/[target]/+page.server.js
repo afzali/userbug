@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { RUNS_DIR, SCENARIOS_DIR } from '$lib/server/paths.js';
 import { aggregateTriage } from '$lib/server/artifacts.js';
@@ -7,6 +8,9 @@ import { countsByRoute, refreshTouch } from '../../../../../src/runs/touch.js';
 import { loadScenario, loadScenarios } from '../../../../../src/scenario/load.js';
 import { routesTouchedBy } from '../../../../../src/knowledge/propose.js';
 import { normalizeCapabilityRoute } from '../../../../../src/knowledge/capabilities.js';
+import { listAccounts } from '../../../../../src/knowledge/credentials.js';
+import { readMap } from '../../../../../src/map/store.js';
+import { knowledgeDir } from '../../../../../src/knowledge/store.js';
 
 /**
  * «اپِ من» — خانهٔ تازهٔ هر پروژه.
@@ -90,6 +94,40 @@ export async function load({ params }) {
         })),
       []
     ),
+    /**
+     * «از کجا شروع کند» — همان دو چیزی که مودالِ کشف لازم دارد.
+     *
+     * ── چرا اینجا و نه در خودِ مودال ──
+     *
+     * مودال کامپوننت است و نباید `knowledge/` را بشناسد؛ همان مرزی که
+     * درخت رعایت می‌کند. و هر دو ارزان‌اند: یک `existsSync` و یک فایلِ
+     * JSON.
+     *
+     * ── چرا تا امروز نبود ──
+     *
+     * جعبهٔ «پیشرفته»ی مودال `profile` را به‌شکلِ یک تیکِ تنها داشت و
+     * `remember` را **اصلاً نداشت** — یعنی از درِ پیش‌فرضِ کشف نمی‌شد
+     * گفت «با این حساب وارد شو». آن انتخاب فقط در صفحهٔ «خزشِ دقیق» بود.
+     */
+    accounts: safely(() => listAccounts(target).map((one) => ({ id: one.id, email: one.email })), []),
+    /**
+     * سناریویی که نقشه با آن وارد شده — پیش‌فرضِ خاموشِ کاوش.
+     *
+     * ── چرا رابط باید بداند ──
+     *
+     * `userbug quest` وقتی `--from` ندهی، خودش `map.entry.scenario` را
+     * برمی‌دارد و اولش بازپخش می‌کند. یعنی کاوش **از قبل وارد می‌شود** —
+     * ولی کشویی رابط گزینهٔ خالی‌اش را «هیچ — از خودِ آدرسِ اول شروع کن»
+     * صدا می‌زد، که در این حالت دروغ است.
+     *
+     * کاربر درست پرسید «چرا اینجا گزینهٔ نشستِ قبلی نیست؟» — و بخشی از
+     * جوابش این بود که کارِ معادلش هست و رابط پنهانش کرده.
+     */
+    mapEntry: safely(() => {
+      const scenario = readMap(target)?.entry?.scenario || '';
+      return scenario ? scenario.split('/').pop().replace(/.ya?ml$/i, '') : '';
+    }, ''),
+    hasProfile: safely(() => fs.existsSync(path.join(knowledgeDir(target), 'profile')), false),
     ...summary(tree, findings),
   };
 }

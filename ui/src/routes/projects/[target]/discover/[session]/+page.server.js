@@ -1,23 +1,12 @@
 import { error } from '@sveltejs/kit';
-import fs from 'node:fs';
 import path from 'node:path';
 import { RUNS_DIR } from '$lib/server/paths.js';
 import { listRuns, readRunDetails } from '$lib/server/artifacts.js';
-import { listProjects, listScenarios } from '$lib/server/projects.js';
+import { listProjects } from '$lib/server/projects.js';
 import { tourState } from '$lib/server/tours.js';
 import { getActiveJob } from '$lib/server/jobs.js';
 import { WAYS } from '../../../../../../../src/knowledge/sessions.js';
 import { coverageSnapshot } from '../../../../../../../src/knowledge/endpoints.js';
-import { knowledgeDir, readDossier } from '../../../../../../../src/knowledge/store.js';
-import { listAccounts } from '../../../../../../../src/knowledge/credentials.js';
-import { readMap } from '../../../../../../../src/map/store.js';
-import { unifiedStates } from '../../../../../../../src/map/merge.js';
-import { proposalsFor } from '../../../../../../../src/knowledge/propose.js';
-import { extraRoutes, stuckAtLogin, unreachedRoutes } from '../../../../../../../src/map/render.js';
-import { mispredictions } from '../../../../../../../src/map/classify.js';
-import { loadScenario, scenarioDir } from '../../../../../../../src/scenario/load.js';
-import { unsupportedVerbs } from '../../../../../../../src/map/replay.js';
-import { looksRecorded } from '../../../../../../../src/scenario/entry.js';
 import { countsByRoute, refreshTouch } from '../../../../../../../src/runs/touch.js';
 import { allScenarios, yieldOf } from '../../../../../../../src/knowledge/yield.js';
 
@@ -53,35 +42,55 @@ export async function load({ params }) {
 
   const projects = await listProjects();
   const project = projects.find((one) => one.key === target) || null;
-  const dossier = safely(() => readDossier(target), null);
 
   /* ── جلسهٔ در جریان ── */
+  /**
+   * ── چرا این شاخه بازنویسی شد ──
+   *
+   * دو دروغ داشت و هر دو را روی یک پروژهٔ واقعی دیدیم:
+   *
+   *   ۱. `kind` را «یا گشت یا خزش» حساب می‌کرد، پس **کاوشِ هدف‌دار** به
+   *      شاخهٔ خزش می‌افتاد — و صفحه فرمِ شروعِ خزش را نشان می‌داد وسطِ
+   *      کاوشی که همان لحظه در جریان بود. کاربر درست پرسید: «اگر شروع
+   *      شده، پس این چیه؟»
+   *
+   *   ۲. `live: true` ثابت بود، پس سرصفحه **همیشه** می‌گفت «در جریان» —
+   *      حتی وقتی هیچ کاری نبود. `running` حساب می‌شد و هیچ‌جا خوانده
+   *      نمی‌شد.
+   *
+   * حالا `kind` از خودِ کارِ در جریان می‌آید و اگر کاری نباشد، `null`
+   * است — و صفحه همین را می‌گوید، نه چیزی شبیهِ آن.
+   */
   if (id === 'live') {
     const live = safely(() => tourState(target), { running: false });
     const job = getActiveJob(true, target);
+    const kind = live.running ? 'tour' : job?.options?.kind === 'quest' ? 'quest' : job ? 'map' : '';
+
     return {
       session: {
         id: 'live',
-        kind: live.running ? 'tour' : job?.options?.kind === 'quest' ? 'quest' : 'map',
-        way: live.running ? WAYS.tour : WAYS[job?.options?.kind === 'quest' ? 'quest' : 'map'],
+        kind,
+        /**
+         * وقتی کاری در جریان نیست، زیرنویسی نمی‌ماند.
+         *
+         * سرصفحه خودش «چیزی در جریان نیست» را می‌گوید؛ همان جمله در
+         * `hint` یعنی دو بار پشتِ هم، که خواننده را وادار می‌کند دنبالِ
+         * تفاوتی بگردد که وجود ندارد.
+         */
+        way: kind ? WAYS[kind] : { label: 'کشف', hint: '' },
         live: true,
         running: Boolean(live.running || job),
+        /**
+         * جملهٔ هدف و دامنه — تنها چیزی که کاوش دربارهٔ خودش دارد.
+         *
+         * بی این، پنلِ زنده فقط می‌گوید «کاوشی در جریان است» و کاربر باید
+         * یادش بماند خودش چه نوشته بود.
+         */
+        goal: job?.options?.goal || '',
+        scope: job?.options?.scope || '',
+        focus: job?.options?.focus || '',
       },
       tour: { live, history: [] },
-      crawl: await crawlContext(target, dossier, safely),
-      /**
-       * `CrawlPanel` یک عدد از `found` می‌خواند: «چند سناریوی پیشنهادی از
-       * این نقشه درآمد».
-       *
-       * کلِ `found` را نمی‌دهیم — همان ۱۳ بخشی است که به «دانسته‌ها» رفت و
-       * آوردنش اینجا یعنی برگرداندنِ همان شلوغی. فقط همان یک عدد، که
-       * واقعاً دربارهٔ نتیجهٔ همین خزش است.
-       */
-      found: {
-        proposals: safely(() => proposalsFor(target).proposals.length, 0),
-        /** `MapReport` فهرستِ جاها را برای «فقط گشت دیده» می‌خواند. */
-        places: safely(() => unifiedStates(target), []),
-      },
     };
   }
 
@@ -185,42 +194,6 @@ export async function load({ params }) {
           counts: countsByRoute(refreshTouch(target, RUNS_DIR), []),
         }),
       null
-    ),
-  };
-}
-
-/**
- * بافتارِ خزشِ در جریان — همان چیزی که `CrawlPanel` لازم دارد.
- *
- * فقط برای جلسهٔ زنده خوانده می‌شود: جلسهٔ تمام‌شده نقشه‌اش را از قبل در
- * شناخت گذاشته و این عددها دربارهٔ **حالا** اند، نه دربارهٔ آن بار.
- */
-async function crawlContext(target, dossier, safely) {
-  const map = safely(() => readMap(target), null);
-  const loginPath = dossier?.auth?.loginPath || '';
-  const knownRoutes = (dossier?.routes || []).map((one) => one.path).filter(Boolean);
-
-  return {
-    hasMap: Boolean(map?.states?.length),
-    map,
-    knownRoutes,
-    unreached: map ? safely(() => unreachedRoutes(map, knownRoutes), []) : [],
-    extra: map ? safely(() => extraRoutes(map, knownRoutes), []) : [],
-    mispredicted: map ? safely(() => mispredictions(map), []) : [],
-    stuck: map ? safely(() => stuckAtLogin(map, { loginPath }), false) : false,
-    hasProfile: safely(() => fs.existsSync(path.join(knowledgeDir(target), 'profile')), false),
-    accounts: safely(() => listAccounts(target).map((one) => ({ id: one.id, email: one.email })), []),
-    scenarios: await Promise.all(
-      (await listScenarios(target).catch(() => []))
-        .filter((one) => !one.path.startsWith('_quests/'))
-        .map(async (one) => {
-          const steps = safely(() => loadScenario(path.join(scenarioDir(target), one.path)).steps, null);
-          return {
-            ...one,
-            blockers: steps ? unsupportedVerbs(steps) : ['ناخوانا'],
-            recorded: steps ? looksRecorded(steps) : false,
-          };
-        })
     ),
   };
 }

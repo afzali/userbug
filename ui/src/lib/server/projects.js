@@ -365,6 +365,37 @@ function eolOf(source) {
   return source.includes("\r\n") ? "\r\n" : "\n";
 }
 
+/**
+ * حذف یک سناریو.
+ *
+ * ── چرا تا امروز نبود و چرا لازم است ──
+ *
+ * کشف سناریو **می‌سازد** — گاهی چند تا در یک جلسه، و گاهی چیزی که کاربر
+ * نمی‌خواهد. تا امروز تنها راهِ خلاص شدن از آن، رفتن سراغِ پوشهٔ
+ * `scenarios/` روی دیسک بود. رابطی که بسازد و نتواند پس بگیرد، کاربر را
+ * مجبور می‌کند بیرون از خودش کار کند.
+ *
+ * ── چرا فقط خودِ فایل می‌رود ──
+ *
+ * اجراها و یافته‌هایی که نامِ این سناریو را دارند سرِ جایشان می‌مانند، و
+ * باید بمانند: آن‌ها **رخ داده‌اند**. پاک کردنشان یعنی بازنویسیِ تاریخ برای
+ * اینکه فهرستِ امروز تمیز به نظر برسد. شاخصِ لمس هم از اجراها مشتق است، پس
+ * خودش با اجرای بعدی درست می‌شود.
+ *
+ * ── چرا فایلِ ناموجود خطاست ──
+ *
+ * `fs.rm` با `force` روی مسیرِ ناموجود هم موفق برمی‌گردد. همان تلهٔ
+ * `deleteProject`: «حذف شد» گفتنِ چیزی که نبود. اگر کاربر دو بار کلیک کرد
+ * یا مسیر غلط بود، باید بداند.
+ */
+export async function deleteScenario({ target, relative }) {
+  const key = assertSafeSegment(target, 'هدف');
+  const safeRelative = assertScenarioPath(relative);
+  const { file } = await existingFileInside(SCENARIOS_DIR, key, safeRelative);
+  await fsp.rm(file);
+  return { target: key, relative: safeRelative, deletedAt: new Date().toISOString() };
+}
+
 export async function writeProjectFile({ kind, target, relative, content, createOnly = false }) {
   const key = assertSafeSegment(target, 'هدف');
   const source = String(content ?? '');

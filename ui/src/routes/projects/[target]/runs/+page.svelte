@@ -24,6 +24,7 @@
   import PageHeader from '$lib/components/PageHeader.svelte';
   import RunCard from '$lib/components/RunCard.svelte';
   import { formatDate, formatNumber } from '$lib/format.js';
+  import { run as live, startJob } from '$lib/run-store.svelte.js';
 
   let { data } = $props();
 
@@ -59,6 +60,30 @@
    * فهرستِ کاملِ یافته‌های یک دور معمولاً همان فهرستِ همیشگی است و چیزی
    * نمی‌گوید. آنچه دربارهٔ یک دور خبر است، تفاوتش است.
    */
+  /**
+   * «همین دور را دوباره بگیر».
+   *
+   * ── چرا روی دور و نه روی یک اجرا ──
+   *
+   * دور واحدی است که تفاوت از آن درمی‌آید: ردیفِ بالا همین حالا می‌گوید
+   * «۳ تازه نسبت به دورِ قبل». تکرارِ همان دور با همان نام یعنی خطِ بعدیِ
+   * همان مقایسه — و این دقیقاً کاری است که آدم بعد از یک اصلاح می‌خواهد.
+   *
+   * نام حفظ می‌شود، وگرنه اجرای تازه در دورِ بی‌نام می‌افتد و همان تفاوتی
+   * که دنبالش بودیم ساخته نمی‌شود.
+   */
+  let againError = $state('');
+
+  async function runRoundAgain(round) {
+    againError = '';
+    const job = await startJob(target, {
+      kind: 'run',
+      only: round.scenarios,
+      bench: round.name || '',
+    });
+    if (!job) againError = live.error || 'اجرا شروع نشد';
+  }
+
   function freshOf(round) {
     if (!round.diff) return [];
     const before = new Set(findingsOf(round.diff.against).map((one) => one.fingerprint));
@@ -85,6 +110,16 @@
   description="هر بار که چیزی اجرا شد — کشف یا بررسی. کشف می‌فهمد اپ چه دارد، بررسی می‌آزمایدش."
   {actions}
 />
+
+<!--
+  خطای «دوباره» بالای فهرست، نه کنارِ دکمه‌اش.
+
+  دکمه‌اش می‌تواند هر ردیفی باشد و ردیف‌ها باریک‌اند؛ پیامی که آنجا بنشیند
+  یا بریده می‌شود یا ردیف را می‌شکند.
+-->
+{#if againError}
+  <p class="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{againError}</p>
+{/if}
 
 <!--
   دو دسته، یک صفحه.
@@ -271,14 +306,46 @@
                   <span class="text-[10px] text-muted-foreground">نسبت به «{round.diff.against}»</span>
                 {/if}
 
-                <Button
-                  size="sm"
-                  variant="outline"
-                  class="mt-1"
-                  onclick={() => { open = isOpen ? '' : keyOf(round); }}
-                >
-                  {isOpen ? 'بستن' : 'باز کن'}
-                </Button>
+                <div class="mt-1 flex flex-wrap items-center justify-end gap-1.5">
+                  <!--
+                    «دوباره» کنارِ «باز کن» می‌نشیند و نه داخلِ ردیفِ بازشده.
+
+                    چیزی که بعد از خواندنِ سه عددِ بالا لازم می‌شود، نباید یک
+                    کلیکِ اضافه بخواهد — و اعدادِ همان ردیف تنها دلیلی‌اند که
+                    آدم دوباره می‌گیردش.
+                  -->
+                  <!--
+                    «دوباره» فقط روی دورِ **نام‌دار**.
+
+                    ── چرا سطلِ بی‌نام بیرون است ──
+
+                    آن سطل یک دور نیست؛ هرچه اسمی نداشته در آن ریخته —
+                    گاهی صدها اجرا از ماه‌های مختلف. «دوباره»یش یعنی
+                    «همه‌چیز را بگیر»، که همان دکمهٔ «بررسی» در اپِ من است
+                    و اینجا فقط یک درِ دوم با نامی گمراه‌کننده می‌شود.
+
+                    و تفاوتِ دور‌به‌دور — تنها دلیلِ وجودِ این دکمه — هم
+                    فقط برای دورِ نام‌دار حساب می‌شود.
+                  -->
+                  {#if round.name && round.scenarios?.length}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={live.submitting}
+                      onclick={() => runRoundAgain(round)}
+                      title={`همان ${formatNumber(round.scenarios.length)} سناریو دوباره اجرا می‌شود، زیرِ نامِ «${round.name}»`}
+                    >
+                      ↻ دوباره
+                    </Button>
+                  {/if}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onclick={() => { open = isOpen ? '' : keyOf(round); }}
+                  >
+                    {isOpen ? 'بستن' : 'باز کن'}
+                  </Button>
+                </div>
               </div>
             </div>
 

@@ -6,6 +6,7 @@
   import PageHeader from '$lib/components/PageHeader.svelte';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import { formatDate, formatDuration, formatNumber, sourceLabel } from '$lib/format.js';
+  import { run as live, startJob } from '$lib/run-store.svelte.js';
 
   let { data } = $props();
   /**
@@ -21,6 +22,49 @@
   // svelte-ignore state_referenced_locally
   let selectedIndex = $state(data.traces.length ? 0 : -1);
   const selectedTrace = $derived(selectedIndex >= 0 ? data.traces[selectedIndex] : null);
+
+  /**
+   * «دوباره بگیرش» — همان سناریوها، همین حالا.
+   *
+   * ── چرا این دکمه تا امروز نبود و چرا باید باشد ──
+   *
+   * این صفحه جایی است که آدم می‌فهمد چه شکست. و کارِ بعدی‌اش تقریباً همیشه
+   * یکی است: چیزی را درست می‌کند و می‌خواهد ببیند حالا سبز می‌شود یا نه.
+   * تا امروز برای همان یک کار باید به «اپِ من» برمی‌گشت، دامنه را دوباره
+   * پیدا می‌کرد، و امید داشت همان سناریوها را انتخاب کرده باشد.
+   *
+   * ── چرا از `scenarios` و نه از گزینه‌های اصلیِ اجرا ──
+   *
+   * `run.json` گزینه‌های CLI را نگه نمی‌دارد؛ چیزی که نگه می‌دارد فهرستِ
+   * سناریوهایی است که **واقعاً** اجرا شدند. و آن دقیقاً چیزی است که باید
+   * تکرار شود: الگوی `--grep`ی که آن روز نوشته شده بود، امروز ممکن است
+   * سناریوی تازه‌ای را هم بگیرد و مقایسه را بی‌صدا خراب کند.
+   *
+   * ── چرا فقط برای اجرا و نه برای کشف ──
+   *
+   * `quest` و `map` هدف و سقف‌هایشان را در `run.json` نمی‌نویسند، پس
+   * «دوباره» برایشان معنای دقیقی ندارد. دکمه‌ای که حدس بزند بدتر از نبودنش
+   * است — کشفِ تازه راهِ خودش را در «اپِ من» دارد.
+   */
+  /**
+   * فهرست از لودر می‌آید، چون **تقاطع** با دیسک لازم دارد: سناریویی که از
+   * آن اجرا تا امروز حذف شده، دیگر اجرا نمی‌شود و نباید در عددِ دکمه
+   * بیاید.
+   */
+  let names = $derived(data.run.kind === 'run' || !data.run.kind ? data.runnable || [] : []);
+
+  let again = $state('');
+
+  async function runAgain() {
+    again = '';
+    /** نامِ دور حفظ می‌شود تا این اجرا در همان دور بنشیند و تفاوتش دیده شود. */
+    const job = await startJob(data.run.target, {
+      kind: 'run',
+      only: names,
+      bench: data.run.bench || '',
+    });
+    if (!job) again = live.error || 'اجرا شروع نشد';
+  }
 
   function asset(relative) {
     return `/api/runs/${encodeURIComponent(data.run.runId)}/assets/${String(relative).split('/').map(encodeURIComponent).join('/')}`;
@@ -41,6 +85,11 @@
 <PageHeader eyebrow={`${data.run.target || 'هدف نامشخص'} · ${formatDate(data.run.startedAt)}`} title="روایت کامل اجرا" description={data.run.runId}>
   {#snippet actions()}
     <StatusBadge status={data.run.status} />
+    {#if names.length && data.run.target}
+      <Button disabled={live.submitting} onclick={runAgain} title={`همان ${formatNumber(names.length)} سناریو دوباره اجرا می‌شود`}>
+        {live.submitting ? 'در حال شروع…' : '↻ اجرای دوباره'}
+      </Button>
+    {/if}
     <Button href={asset('report.html')} target="_blank" variant="outline">گزارش HTML</Button>
     <!--
       اجرا زیر مسیر پروژه نرفت چون شناسه‌اش یکتاست، ولی راهِ برگشت به فضای کاری
@@ -48,10 +97,12 @@
     -->
     {#if data.run.target}
       <Button href={`/projects/${encodeURIComponent(data.run.target)}/compare?a=${encodeURIComponent(data.run.runId)}`} variant="outline">مقایسه</Button>
-      <Button href={`/projects/${encodeURIComponent(data.run.target)}`} variant="outline">فضای کاری پروژه</Button>
+      <Button href={`/projects/${encodeURIComponent(data.run.target)}`} variant="outline">اپِ من</Button>
     {/if}
   {/snippet}
 </PageHeader>
+
+{#if again}<p class="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{again}</p>{/if}
 
 <div class="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
   <Card.Root class="gap-1 p-4 py-4"><span class="text-xs text-muted-foreground">قدم</span><strong class="text-2xl">{formatNumber(data.run.steps)}</strong></Card.Root>

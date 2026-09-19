@@ -372,9 +372,9 @@
     </p>
     {#if !data.crawl.scenarios.length}
       <p class="mt-1 text-muted-foreground">
-        هنوز سناریویی ندارید: یک <a class="underline underline-offset-2" href={base}>گشت</a>
+        هنوز سناریویی ندارید: یک <a class="underline underline-offset-2" href={`${base}?discover=tour`}>گشت</a>
         بروید تا قدم‌های ورود ضبط شود، یا در
-        <a class="underline underline-offset-2" href={`${base}/files`}>سناریوها</a> یکی بنویسید.
+        <a class="underline underline-offset-2" href={`${base}/files?new=1`}>سناریوها</a> یکی بنویسید.
       </p>
     {/if}
   </section>
@@ -495,7 +495,7 @@
                 </span>
               {:else}
                 <span class="block text-[11px] leading-5 text-muted-foreground">
-                  نشستی ذخیره نشده. یک <a class="underline underline-offset-2" href={base}>گشت</a>
+                  نشستی ذخیره نشده. یک <a class="underline underline-offset-2" href={`${base}?discover=tour`}>گشت</a>
                   با تیکِ «نشست بماند» بروید تا این گزینه فعال شود.
                 </span>
               {/if}
@@ -658,7 +658,7 @@
               {:else}
                 <p class="text-[11px] leading-6 text-muted-foreground">
                   هیچ سناریویی با فرمِ ورود پیدا نشد. یک بار
-                  <a class="underline underline-offset-2" href={base}>گشتِ زنده</a>
+                  <a class="underline underline-offset-2" href={`${base}?discover=tour`}>گشتِ زنده</a>
                   بروید و خودتان وارد شوید؛ قدم‌هایش ضبط می‌شود و بعد از همان
                   ساخته می‌شود.
                 </p>

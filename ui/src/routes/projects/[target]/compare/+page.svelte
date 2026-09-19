@@ -10,7 +10,13 @@
 </script>
 
 <PageHeader eyebrow="اثر انگشت، نه متن خام" title="مقایسهٔ اجراهای {data.project.name}" description="یافته‌های تازه، رفته و مانده با همان تابع dedupe موتور محاسبه می‌شوند. فهرست فقط اجراهای همین پروژه است.">
-  {#snippet actions()}<Button href={`/projects/${encodeURIComponent(data.target)}/runs`} variant="outline">بررسی کن</Button>{/snippet}
+  <!--
+    مقصد تاریخچه است، پس نامش هم باید همان باشد.
+
+    «بررسی کن» وعدهٔ شروعِ کار می‌داد و به فهرستِ اجراهای گذشته می‌رسید.
+    بررسی از «اپِ من» شروع می‌شود، چون دامنه‌اش از همان درخت می‌آید.
+  -->
+  {#snippet actions()}<Button href={`/projects/${encodeURIComponent(data.target)}/runs`} variant="outline">اجراها</Button>{/snippet}
 </PageHeader>
 
 <Card.Root class="mb-6 gap-4">

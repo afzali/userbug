@@ -16,6 +16,8 @@
    * فقط می‌گوید «چیزی نشکست». سبزِ آن با سبزِ سناریویی که واقعاً چیزی را
    * تضمین می‌کند یکی نیست، و تا وقتی این عدد دیده نشود، کسی نمی‌فهمد.
    */
+  import { page } from '$app/state';
+  import { invalidateAll } from '$app/navigation';
   import { startJob } from '$lib/run-store.svelte.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
@@ -40,6 +42,27 @@
   /** عددِ روی عنوانِ بسته — بی آن، «باز کن تا ببینی خالی است» می‌شود. */
   let proposalCount = $derived((data.proposals?.proposals || []).filter((one) => !one.dismissed).length);
 
+  /**
+   * `?suggest=1` بخشِ «چه باید آزمود» را باز می‌کند.
+   *
+   * ── چرا لازم شد ──
+   *
+   * سه جای رابط دکمه‌ای با نامِ «چه باید آزمود» داشتند و هر سه به همین
+   * صفحه می‌رسیدند — بالای فهرستِ سناریوها، در حالی که آن بخش یک
+   * `details`ِ **بسته** ته صفحه است. یعنی پیوند اسمِ چیزی را داشت که
+   * مقصدش نشان نمی‌داد؛ همان ایرادی که `?filter=blind` یک بار گرفت.
+   *
+   * یک بار خوانده می‌شود و بعد دستِ کاربر است: `$effect`ی که هر بار از
+   * آدرس بازنویسی کند، بستنِ دستی را پس می‌گیرد.
+   */
+  let suggesting = $state(false);
+  let readUrl = $state(false);
+  $effect(() => {
+    if (readUrl) return;
+    readUrl = true;
+    if (page.url.searchParams.get('suggest') === '1') suggesting = true;
+  });
+
   let busy = $state('');
   let error = $state('');
 
@@ -58,6 +81,19 @@
 
   function fileHref(row, extra = '') {
     return `${base}/files?kind=scenario&relative=${encodeURIComponent(row.path)}${extra}`;
+  }
+
+  /**
+   * جملهٔ پیش‌فرضِ کادرِ بازنویسی.
+   *
+   * ردیفِ قرمز خودش می‌گوید چه شد؛ ریختنِ همان جمله در کادر یعنی کاربر
+   * لازم نیست خطای Playwright را از این صفحه به آن صفحه کپی کند. برای
+   * ردیفِ سالم کادر خالی می‌ماند — آنجا ما نمی‌دانیم چه باید عوض شود.
+   */
+  function reviseWish(row) {
+    return row.error
+      ? `این سناریو در آخرین اجرا شکست: «${describeFailure(row.error)}». اگر خودِ سناریو اشتباه است، اصلاحش کن.`
+      : '';
   }
 
   /**
@@ -89,6 +125,51 @@
     }
   }
 
+  /**
+   * حذف — و چرا تأییدش سبک‌تر از حذفِ پروژه است.
+   *
+   * ── چرا این دکمه اینجاست و نه در ویرایشگرِ فایل ──
+   *
+   * سناریو خروجیِ کشف است، و کشف گاهی چیزی می‌سازد که نمی‌خواهی. تا امروز
+   * تنها راهِ پس گرفتنش رفتن سراغِ پوشهٔ روی دیسک بود — یعنی رابط می‌ساخت و
+   * پس نمی‌گرفت. و جایش همین فهرست است، چون اینجاست که آدم نگاه می‌کند و
+   * می‌فهمد کدام اضافه است.
+   *
+   * ── چرا دو کلیک و نه تایپِ نام ──
+   *
+   * حذفِ پروژه تایپِ کلید می‌خواهد چون ساعت‌ها اجرا و شناخت را می‌برد و
+   * برگشتی ندارد. سناریو یک فایل است و همان کشف دوباره می‌سازدش. تأییدی
+   * سنگین‌تر از خطر، فقط یاد می‌دهد که تأییدها را بی‌خواندن رد کنی.
+   *
+   * اجراها و یافته‌هایی که نامش را دارند می‌مانند — سرور همین را می‌کند و
+   * متنِ تأیید هم همین را می‌گوید، وگرنه کاربر فکر می‌کند تاریخچه هم می‌رود.
+   */
+  let removing = $state('');
+  let removed = $state('');
+
+  async function remove(row) {
+    busy = `rm:${row.name}`;
+    error = '';
+    removed = '';
+    try {
+      const response = await fetch('/api/files', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json', 'x-userbug-request': '1' },
+        body: JSON.stringify({ kind: 'scenario', target, relative: row.path }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'حذف نشد');
+      removing = '';
+      removed = row.name;
+      /** فهرست از لودر می‌آید، پس بی این، ردیفِ حذف‌شده سرِ جایش می‌ماند. */
+      await invalidateAll();
+    } catch (cause) {
+      error = cause.message;
+    } finally {
+      busy = '';
+    }
+  }
+
   let runnable = $derived(missions.filter((one) => one.executable).map((one) => one.name));
 </script>
 
@@ -107,6 +188,7 @@
 />
 
 {#if error}<p class="mb-4 text-sm text-destructive">{error}</p>{/if}
+{#if removed}<p class="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3 text-sm">«{removed}» حذف شد — اجراها و یافته‌هایی که نامش را دارند سرِ جایشان هستند.</p>{/if}
 
 <!--
   «کد عوض شد — چه باید دوباره آزمود؟» بالای فهرست می‌نشیند، چون همان فهرستی
@@ -277,7 +359,48 @@
                 {#if !row.expects}
                   <Button size="sm" href={fileHref(row, '&expect=1')}>انتظار</Button>
                 {/if}
-                <Button size="sm" variant="outline" href={fileHref(row)}>باز کن</Button>
+                <!--
+                  «ویرایش»، نه «باز کن».
+
+                  ── چرا نامش عوض شد ──
+
+                  «باز کن» می‌گوید چه اتفاقی می‌افتد، نه چه کاری می‌شود کرد —
+                  و همان ابهام، ویرایشِ سناریو را عملاً پنهان کرده بود: کاربر
+                  می‌پرسید «کجا می‌توانم سناریو را عوض کنم؟» در حالی که دکمه‌اش
+                  جلوی چشمش بود.
+
+                  و «بازنویسی» کنارش می‌نشیند، چون همان جایی است که آدم
+                  می‌فهمد یک سناریو اشتباه است: وقتی قرمزش را در همین فهرست
+                  می‌بیند.
+                -->
+                <Button size="sm" variant="outline" href={fileHref(row)}>ویرایش</Button>
+                <Button size="sm" variant="ghost" href={fileHref(row, `&revise=${encodeURIComponent(reviseWish(row))}`)} title="کادرِ بازنویسی با هوش مصنوعی باز می‌شود — بگویید چه چیزش را عوض کند.">
+                  بازنویسی
+                </Button>
+                <!--
+                  تأیید در همان جای دکمه می‌نشیند، نه در مودال.
+
+                  مودال برای کاری است که باید جلویش گرفته شود؛ این فقط باید
+                  اتفاقی نیفتد. و ماندنِ تأیید کنارِ همان ردیف یعنی معلوم است
+                  کدام سناریو دارد حذف می‌شود — چیزی که مودال باید دوباره
+                  بگوید.
+                -->
+                {#if removing === row.name}
+                  <Button size="sm" variant="destructive" disabled={!!busy} onclick={() => remove(row)}>
+                    {busy === `rm:${row.name}` ? '…' : 'حذف کن'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onclick={() => { removing = ''; }}>انصراف</Button>
+                {:else}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    class="text-muted-foreground hover:text-destructive"
+                    title="فایلِ این سناریو حذف می‌شود؛ اجراها و یافته‌هایش می‌مانند."
+                    onclick={() => { removing = row.name; removed = ''; }}
+                  >
+                    حذف
+                  </Button>
+                {/if}
               {:else if row.runId}
                 <Button size="sm" variant="outline" href={`/runs/${encodeURIComponent(row.runId)}`}>آخرین اجرا</Button>
               {/if}
@@ -307,7 +430,7 @@
 <section class="mt-8 space-y-3">
   <h2 class="text-sm font-semibold">سفرِ تازه از کجا بیاورم؟</h2>
 
-  <details class="rounded-xl border bg-muted/30 p-4" open={!missions.length}>
+  <details class="rounded-xl border bg-muted/30 p-4" open={suggesting || !missions.length}>
     <summary class="cursor-pointer text-sm font-medium">
       چه باید آزمود؟{proposalCount ? ` — ${formatNumber(proposalCount)} پیشنهاد از کشف` : ' — فعلاً پیشنهادی نیست'}
     </summary>

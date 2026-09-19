@@ -292,8 +292,54 @@ export async function aggregateTriage(target) {
     return list;
   };
 
+  /**
+   * نامِ **سناریو**، جدا از نامِ قدم.
+   *
+   * ── چرا این دو یکی نبودند و کسی نفهمید ──
+   *
+   * یافته `steps` دارد، ولی محتوایش برچسبِ قدم است («go /»، «امضای دکمهٔ
+   * ورود»)، نه نامِ سناریو. تا امروز فرقی نمی‌کرد چون هیچ‌جا از آن سناریو
+   * ساخته نمی‌شد — فقط در یک کشویی چاپ می‌شد که عنوانش هم محتاطانه
+   * «قدم‌ها و سناریوها» بود.
+   *
+   * با آمدنِ دکمه‌های «دوباره بگیر» و «بروزرسانی سناریو» فرق کرد: آن‌ها
+   * فایلِ واقعی می‌خواهند، و «go /» هیچ فایلی نیست. پس پیوند از همان جایی
+   * برداشته می‌شود که وجود دارد — رخدادِ قدم، که `scenario` را دارد.
+   *
+   * ── چرا از رخداد و نه از `run.scenarios` ──
+   *
+   * `run.scenarios` می‌گوید کدام سناریوها در این اجرا بودند، نه اینکه
+   * این یافته از کدامشان درآمد. نسبت دادنِ همهٔ سناریوهای یک اجرا به هر
+   * یافته‌اش یعنی دکمهٔ «دوباره بگیر» چیزی را بگیرد که ربطی نداشت.
+   */
+  const scenarioOfStep = (detail) => {
+    const byStep = new Map();
+    for (const event of detail.events) {
+      if (event.kind !== 'step' || !event.scenario || !event.step) continue;
+      byStep.set(String(event.step), String(event.scenario));
+    }
+    return byStep;
+  };
+
+  const addScenarios = (list, finding, byStep) => {
+    /**
+     * اگر خودِ یافته سناریو را می‌داند، همان مقدم است.
+     *
+     * `buildTimeline` از قبل به `finding.scenario` تکیه می‌کند، پس بعضی
+     * ثبت‌کننده‌ها آن را می‌نویسند و بعضی نه. نقشهٔ قدم پوششِ بقیه است، نه
+     * جایگزینِ آن‌ها — و خواندنِ هر دو یعنی روزی که یکی خالی بماند، دیگری
+     * هنوز جواب می‌دهد.
+     */
+    const names = [finding.scenario, ...(finding.steps?.length ? finding.steps : [finding.step]).map((step) => byStep.get(String(step || '')))];
+    for (const name of names) {
+      if (name && !list.includes(name)) list.push(name);
+    }
+    return list;
+  };
+
   for (const run of [...runs].reverse()) {
     const detail = await readRunDetails(run.runId);
+    const byStep = scenarioOfStep(detail);
     for (const finding of detail.findings) {
       const seen = grouped.get(finding.fingerprint);
       if (seen) {
@@ -303,6 +349,7 @@ export async function aggregateTriage(target) {
         seen.latest = finding;
         addBench(seen.benches, run);
         addRoute(seen.routes, finding);
+        addScenarios(seen.scenarios, finding, byStep);
         for (const device of devicesOf(finding, run)) {
           if (!seen.devices.includes(device)) seen.devices.push(device);
         }
@@ -314,6 +361,8 @@ export async function aggregateTriage(target) {
           normalized: finding.normalized,
           detail: finding.detail,
           steps: finding.steps || [],
+          /** نامِ فایلِ سناریو — چیزی که `steps` نیست و دکمه‌ها لازمش دارند. */
+          scenarios: addScenarios([], finding, byStep),
           devices: devicesOf(finding, run),
           count: finding.count || 1,
           runs: [run.runId],
