@@ -2666,6 +2666,86 @@ function cmdDiff({ positional }) {
 }
 
 /**
+ * متنِ فارسی → فایلِ `.spec.js`.
+ *
+ * ── قابلیتی که از رابط جا مانده بود ──
+ *
+ * `scenarioFromText` از روزِ اول بود ولی هیچ فرمانی صدایش نمی‌زد؛ تنها
+ * مصرف‌کننده‌اش رابط گرافیکی بود. با رفتنِ رابط، «سناریو را به زبانِ خودت
+ * بنویس» بی‌صدا از دسترس خارج شد.
+ *
+ * ── چرا خروجی مستقیم کد است ──
+ *
+ * مدل همان ساختار را می‌سازد که همیشه می‌ساخت؛ فقط به‌جای `toYaml` از
+ * `scenarioToSpec` رد می‌شود. یعنی هزینهٔ مدل همان است و آنچه عوض شده،
+ * چیزی است که روی دیسک می‌نشیند: فایلی که `npx playwright test` می‌فهمدش
+ * و هیچ مفسری لازم ندارد.
+ */
+async function cmdAuthor({ flags, positional }) {
+  const target = positional[0];
+  const text = positional.slice(1).join(' ').trim();
+
+  if (!target) throw new Error('نام هدف لازم است: userbug author <هدف> "<کاربر چه می‌کند>"');
+  if (text.length < 10) {
+    throw new Error(
+      'متن را بنویسید: userbug author <هدف> "وارد می‌شوم و اولین کتاب را باز می‌کنم"\n' +
+        '  بگویید کاربر چه کاری انجام می‌دهد، نه اینکه چه دکمه‌ای را بزند.'
+    );
+  }
+
+  const { scenarioFromText } = await import('../src/scenario/from-text.js');
+  const { scenarioToSpec } = await import('../src/emit/author.js');
+  const { knowledgeFor } = await import('../src/knowledge/select.js');
+  const { loadTarget } = await import('../src/target.js');
+  const { workspaceRoot, ensureWorkspace, writeInside, contained } = await import('../src/emit/workspace.js');
+
+  const models = resolveModel({
+    global: await loadGlobalConfig(),
+    role: 'author',
+    model: flags.model && flags.model !== true ? assertModelSlug(flags.model) : undefined,
+  });
+
+  const loaded = await loadTarget(target);
+  const root = workspaceRoot(loaded);
+  ensureWorkspace(root);
+
+  console.log(`\n  ساختِ تست برای «${target}» با ${models.model}…`);
+
+  const result = await scenarioFromText({
+    text,
+    models,
+    target,
+    knowledge: knowledgeFor({ target, text, budget: 1800 }),
+  });
+
+  const source = scenarioToSpec(result.scenario);
+  const name = `${result.slug}.spec.js`;
+
+  /**
+   * بازنویسیِ بی‌صدا بدترین حالت است.
+   *
+   * فایل ممکن است دستی ویرایش شده باشد یا ادعاهایی گرفته باشد که با یک
+   * `author`ِ دوباره می‌روند — و کسی نمی‌فهمد.
+   */
+  if (fs.existsSync(contained(root, name)) && !flags.force) {
+    throw new Error(
+      `«${name}» از قبل هست.\n` +
+        '  اگر می‌خواهید بازنویسی شود: همین فرمان با --force\n' +
+        '  (ولی ادعاهایی که با userbug expect اضافه کرده‌اید از بین می‌روند)'
+    );
+  }
+
+  const file = writeInside(root, name, source);
+
+  console.log(`\n  ${result.steps} قدم نوشته شد: ${file}`);
+  if (result.notes) console.log(`  یادداشتِ مدل: ${result.notes}`);
+  console.log('\n  قدمِ بعد:');
+  console.log(`    userbug expect ${target} --from ${name}     ادعا اضافه کن`);
+  console.log(`    npx playwright test                        اجرا\n`);
+  console.log('  این فایل هنوز ادعایی ندارد، پس فقط می‌گوید «چیزی نشکست».\n');
+}
+
+/**
  * ساختِ کانفیگ یک هدفِ تازه.
  *
  * همان کاری که فرمِ «پروژهٔ تازه» در رابط می‌کند، با همان قالب. قاعدهٔ پروژه
@@ -2673,7 +2753,42 @@ function cmdDiff({ positional }) {
  *
  * `--log` تکرارشدنی است: `--log php=D:/x/err.log --log vite=D:/y/out.log`
  */
-function cmdInit({ flags, positional }) {
+async function cmdInit({ flags, positional }) {
+  /**
+   * ── `--workspace`: آماده کردنِ پوشهٔ userbug در خودِ پروژهٔ هدف ──
+   *
+   * این شاخه هدفِ **موجود** را می‌گیرد، نه تازه. چون تست‌ها از این مخزن
+   * رفته‌اند و در ریپوی اپ می‌نشینند، یک بار باید آن پوشه ساخته شود و
+   * `.gitignore`اش سرِ جایش بنشیند — وگرنه نخستین `git add` رازِ حساب و
+   * نشستِ لاگین‌شدهٔ مرورگر را کامیت می‌کند.
+   */
+  if (flags.workspace) {
+    const key = positional[0];
+    if (!key) throw new Error('نام هدف لازم است: userbug init <هدف> --workspace');
+
+    const { loadTarget } = await import('../src/target.js');
+    const { workspaceRoot, ensureWorkspace, LOCAL } = await import('../src/emit/workspace.js');
+
+    const root = workspaceRoot(await loadTarget(key));
+    const result = ensureWorkspace(root);
+
+    console.log(`\n  پوشهٔ userbug برای «${key}»:`);
+    console.log(`  ${root}\n`);
+    console.log(`  پوشه: ${result.created ? 'ساخته شد' : 'از قبل بود'}`);
+    console.log(`  .gitignore: ${result.gitignore === 'written' ? 'نوشته شد' : 'از قبل بود و دست نخورد'}\n`);
+
+    console.log('  در گیتِ پروژهٔ شما می‌ماند:');
+    console.log('    *.spec.js      تست‌ها — با کد بازبینی می‌شوند');
+    console.log('    knowledge/     شناختِ اپ');
+    console.log('    triage/        قضاوتِ شما');
+    console.log('    findings.md    فهرستِ باگ\n');
+    console.log(`  و نمی‌ماند (${LOCAL.root}/):`);
+    console.log('    رازِ حساب · نشستِ مرورگر · نقشه · خروجیِ اجراها\n');
+    console.log('  حالا یک فایلِ تست آنجا بگذارید، بعد:');
+    console.log(`    userbug expect ${key} --from <نامِ فایل>\n`);
+    return;
+  }
+
   // ساختِ تازه سخت‌گیر است؛ بقیهٔ فرمان‌ها با کلیدِ موجود کار می‌کنند.
   const key = assertNewProjectKey(positional[0]);
   const file = path.join(ROOT, 'targets', `${key}.config.js`);
@@ -2794,8 +2909,11 @@ try {
     case 'models':
       await cmdModels(parsed);
       break;
+    case 'author':
+      await cmdAuthor(parsed);
+      break;
     case 'init':
-      cmdInit(parsed);
+      await cmdInit(parsed);
       break;
     case 'schedule':
       await cmdSchedule(parsed);

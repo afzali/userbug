@@ -263,6 +263,14 @@ export async function scenarioFromText({ text, models, target, source, knowledge
   const steps = [...preamble, ...scenario.steps];
 
   return {
+    /**
+     * ساختار، نه فقط متن.
+     *
+     * `yaml` برای وقتی است که خروجیِ YAML می‌خواهیم؛ `scenario` برای
+     * `emit/author.js` که از همین ساختار کدِ پلی‌رایت می‌سازد. یک ساختِ
+     * مدل، دو مصرف‌کننده — نه دو فراخوانی.
+     */
+    scenario: { ...scenario, steps },
     yaml: toYaml(
       { ...scenario, steps },
       { text: trimmed, sourceFiles: source?.files || [], knowledge, preamble: preamble.length }
