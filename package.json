@@ -23,5 +23,10 @@
   },
   "dependencies": {
     "yaml": "^2.9.0"
+  },
+  "exports": {
+    ".": "./bin/userbug.js",
+    "./test": "./src/fixtures.js",
+    "./package.json": "./package.json"
   }
 }
