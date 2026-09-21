@@ -72,6 +72,11 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --remove <نام>              حذف
       --note <نام> --as <متن>     یادداشت
 
+  userbug test <هدف>              اجرای تست‌های پروژه — رایگان، بی‌مدل
+      --ui                        تماشا و قدم‌به‌قدم
+      --headed                    مرورگر دیده شود
+      --last-failed               فقط آن‌هایی که شکستند
+
   userbug impact <هدف>            «کد عوض شد — کدام تست‌ها باید دوباره فکر
                                   شوند؟» گیت + پرونده + تست‌ها
       --base <مرجع>               مرجعِ مقایسه؛ پیش‌فرض HEAD
@@ -2759,6 +2764,49 @@ function cmdDiff({ positional }) {
 }
 
 /**
+ * اجرای تست‌های پروژهٔ هدف.
+ *
+ * ── چرا رانر از اینجا می‌آید و نه از پروژه ──
+ *
+ * نخستین اجرای واقعیِ سرتاسری با «No tests found» شکست، در حالی که فایل
+ * سرِ جایش بود و ایمپورتش هم حل می‌شد. علت: **دو نسخهٔ پلی‌رایت**.
+ *
+ * فایلِ تست `userbug/test` را وارد می‌کند و Node آن را از مسیرِ واقعیِ
+ * userbug حل می‌کند، پس `src/fixtures.js` پلی‌رایتِ **اینجا** را بار
+ * می‌کند. ولی رانر در پروژه اجرا می‌شد و پلی‌رایتِ **آنجا** را. تستی که با
+ * یک نسخه ساخته شود، رانرِ نسخهٔ دیگر اصلاً نمی‌بیندش — و پیامش هم نمی‌گوید
+ * چرا.
+ *
+ * پس یک نسخه: رانر از همین‌جا، کانفیگ از آنجا. نتیجه‌اش این هم هست که
+ * پروژهٔ شما لازم نیست `@playwright/test` نصب کند — فقط خودِ userbug.
+ */
+async function cmdTest({ flags, positional }) {
+  const target = positional[0];
+  if (!target) throw new Error('نام هدف لازم است: userbug test <هدف> [--ui] [--headed]');
+
+  const { workspaceRoot, contained } = await import('../src/emit/workspace.js');
+
+  const root = workspaceRoot(await loadTarget(target));
+  const config = contained(root, 'playwright.config.js');
+
+  if (!fs.existsSync(config)) {
+    throw new Error(
+      `کانفیگی در ${root} نیست.\n` + `  یک بار بسازیدش: userbug init ${target} --workspace`
+    );
+  }
+
+  const args = [PLAYWRIGHT_CLI, 'test', '--config', config];
+  if (flags.ui) args.push('--ui');
+  if (flags.headed) args.push('--headed');
+  if (flags.grep && flags.grep !== true) args.push('--grep', String(flags.grep));
+  if (flags['last-failed']) args.push('--last-failed');
+  for (const rest of positional.slice(1)) args.push(rest);
+
+  const result = spawnSync(process.execPath, args, { cwd: ROOT, stdio: 'inherit' });
+  process.exit(result.status ?? 1);
+}
+
+/**
  * فایل‌های نمونه — آنچه تستِ آپلود بی آن کار نمی‌کند.
  *
  * ── چرا از CLI نمی‌شد ──
@@ -3003,25 +3051,56 @@ async function cmdInit({ flags, positional }) {
     if (!key) throw new Error('نام هدف لازم است: userbug init <هدف> --workspace');
 
     const { loadTarget } = await import('../src/target.js');
-    const { workspaceRoot, ensureWorkspace, LOCAL } = await import('../src/emit/workspace.js');
+    const { workspaceRoot, ensureWorkspace, writeInside, contained, LOCAL } = await import(
+      '../src/emit/workspace.js'
+    );
+    const { renderProjectConfig } = await import('../src/project-config.js');
 
-    const root = workspaceRoot(await loadTarget(key));
+    const loaded = await loadTarget(key);
+    const root = workspaceRoot(loaded);
     const result = ensureWorkspace(root);
+
+    /**
+     * کانفیگِ پلی‌رایت — بی آن، فایلِ تست روی دیسک می‌نشیند و هیچ اجرا
+     * نمی‌شود.
+     *
+     * بازنویسی نمی‌شود اگر هست: ممکن است کاربر پروژه‌ها یا reporter خودش
+     * را افزوده باشد.
+     */
+    const configPath = contained(root, 'playwright.config.js');
+    const hadConfig = fs.existsSync(configPath);
+    if (!hadConfig) writeInside(root, 'playwright.config.js', renderProjectConfig(key));
 
     console.log(`\n  پوشهٔ userbug برای «${key}»:`);
     console.log(`  ${root}\n`);
     console.log(`  پوشه: ${result.created ? 'ساخته شد' : 'از قبل بود'}`);
-    console.log(`  .gitignore: ${result.gitignore === 'written' ? 'نوشته شد' : 'از قبل بود و دست نخورد'}\n`);
+    console.log(`  .gitignore: ${result.gitignore === 'written' ? 'نوشته شد' : 'از قبل بود و دست نخورد'}`);
+    console.log(`  playwright.config.js: ${hadConfig ? 'از قبل بود و دست نخورد' : 'نوشته شد'}\n`);
 
     console.log('  در گیتِ پروژهٔ شما می‌ماند:');
-    console.log('    *.spec.js      تست‌ها — با کد بازبینی می‌شوند');
-    console.log('    knowledge/     شناختِ اپ');
-    console.log('    triage/        قضاوتِ شما');
-    console.log('    findings.md    فهرستِ باگ\n');
+    console.log('    *.spec.js              تست‌ها — با کد بازبینی می‌شوند');
+    console.log('    playwright.config.js   تنظیمات از userbug می‌آید');
+    console.log('    knowledge/             شناختِ اپ');
+    console.log('    triage/                قضاوتِ شما');
+    console.log('    findings.md            فهرستِ باگ\n');
     console.log(`  و نمی‌ماند (${LOCAL.root}/):`);
     console.log('    رازِ حساب · نشستِ مرورگر · نقشه · خروجیِ اجراها\n');
-    console.log('  حالا یک فایلِ تست آنجا بگذارید، بعد:');
-    console.log(`    userbug expect ${key} --from <نامِ فایل>\n`);
+
+    /**
+     * یک بار در پروژه نصب می‌شود، مثل هر ابزارِ تستِ دیگری.
+     *
+     * فایلِ تولیدشده `userbug/test` را وارد می‌کند و Node بستهٔ bare را از
+     * کنارِ **خودِ فایل** پیدا می‌کند، نه از جایی که فرمان اجرا شده. پس
+     * بی این پیوند، ایمپورت حل نمی‌شود.
+     */
+    console.log('  یک بار در پروژه نصب کنید:\n');
+    console.log(`    cd ${loaded.source?.root || '<پروژه>'}`);
+    console.log('    npm i -D @playwright/test');
+    console.log(`    npm i -D "file:${ROOT.split(path.sep).join('/')}"\n`);
+    console.log('  بعد از آن:\n');
+    console.log(`    userbug tour ${key}                 گشت بزنید → تست ساخته می‌شود`);
+    console.log(`    userbug expect ${key} --from <فایل>  ادعا اضافه کنید`);
+    console.log('    npx playwright test                 اجرا (از پوشهٔ پروژه)\n');
     return;
   }
 
@@ -3144,6 +3223,9 @@ try {
       break;
     case 'models':
       await cmdModels(parsed);
+      break;
+    case 'test':
+      await cmdTest(parsed);
       break;
     case 'fixtures':
       await cmdFixtures(parsed);

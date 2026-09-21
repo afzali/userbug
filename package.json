@@ -26,6 +26,7 @@
   "exports": {
     ".": "./bin/userbug.js",
     "./test": "./src/fixtures.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./config": "./src/project-config.js"
   }
 }
