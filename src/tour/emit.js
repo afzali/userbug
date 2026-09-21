@@ -2,7 +2,7 @@
  * گشت → چهار خروجی.
  *
  *   ۱. صفحه‌ها      `knowledge/<کلید>/pages/*.json` با جملهٔ خودِ کاربر
- *   ۲. سناریو       `scenarios/<کلید>/_drafts/tour-*.yml`، قابل اجرا
+ *   ۲. تست          `<پروژه>/tests/userbug/گشت-*.spec.js`، قابل اجرا
  *   ۳. کشِ آموخته   `scenarios/<کلید>/_learned/*.json` با `resolvedBy: human`
  *   ۴. پرونده       روت‌های تازه، فایل‌ها، و آخرین گشت
  *
@@ -16,84 +16,19 @@
  * بعد `do: دکمهٔ ورود را بزن` بدون هیچ فراخوانی حل می‌شود، با
  * `resolvedBy: "human"` — پراعتمادترین منبعی که این کش می‌تواند داشته باشد.
  *
- * ── چرا پیش‌نویس، نه سناریوی رسمی ──
+ * ── چرا تستِ تازه ادعایی ندارد ──
  *
- * ضبطِ کلیک، سناریوی خوب نمی‌سازد. کاربر مسیرِ اشتباه هم رفته، دوبار کلیک
- * کرده، و جایی که مهم بوده `expect` ننوشته. پس `status: draft` می‌ماند تا
- * آدم ببیندش — همان دروازه‌ای که `from-text` و `--author` هم دارند.
+ * ضبطِ کلیک، تستِ خوبی نمی‌سازد. کاربر مسیرِ اشتباه هم رفته، دوبار کلیک
+ * کرده، و جایی که مهم بوده ادعا ننوشته. پس فایل فقط قدم‌ها را دارد و
+ * سرصفحه‌اش می‌گوید قدمِ بعد `userbug expect` است — همان دروازهٔ بازبینیِ
+ * آدم که `author` هم دارد.
  */
-import fs from 'node:fs';
 import path from 'node:path';
-import YAML from 'yaml';
 
-import { scenarioDir } from '../scenario/load.js';
 import { getEntry, loadCache, putEntry, saveCache } from '../steps/cache.js';
 import { mergeIntoDossier } from '../knowledge/merge.js';
 import { readDossier, writeDossier, writePage } from '../knowledge/store.js';
 
-/**
- * قدم‌های ضبط‌شده → YAML.
- *
- * ── چرا `go` اول می‌آید ──
- *
- * کاربر از جایی شروع کرده که ما به آنجا رفته بودیم. پیش‌نویسی که با یک کلیک
- * شروع شود، روی صفحهٔ خالی اجرا می‌شود و همان قدمِ اول می‌شکند.
- *
- * ── چرا مسیرهای میانی هم `go` نمی‌گیرند ──
- *
- * ناوبریِ وسطِ گشت **نتیجهٔ** کلیک کاربر است، نه یک کنشِ جدا. افزودنش یعنی
- * سناریو به‌جای آزمودنِ پیوند، از رویش می‌پرد — و آن پیوند دقیقاً همان چیزی
- * است که ممکن است شکسته باشد.
- */
-export function stepsToYaml({ steps, pages, name, purpose = '', startPath = '/' }) {
-  const out = [{ clearState: true }, { go: startPath }];
-
-  let lastUrl = null;
-  for (const entry of steps) {
-    // عنوانِ گروه وقتی کاربر وارد صفحهٔ تازه‌ای شده: گزارش خواناتر می‌شود
-    if (entry.url && entry.url !== lastUrl) {
-      const page = pages.find((item) => item.path === entry.url);
-      const title = page?.purpose ? `${entry.url} — ${page.purpose}`.slice(0, 70) : entry.url;
-      out.push({ as: title, ...entry.step });
-      lastUrl = entry.url;
-      continue;
-    }
-    out.push({ ...entry.step });
-  }
-
-  const uploads = steps.filter((item) => item.needsFixture).map((item) => item.needsFixture);
-
-  const header = [
-    '# ضبط‌شده از گشتِ زندهٔ کاربر.',
-    '#',
-    '# قدم‌ها با توصیفِ معنایی نوشته شده‌اند (نقش و نام)، نه سلکتور — همان',
-    '# چیزی که `do:` می‌سازد. پس تغییرِ ساختارِ HTML نمی‌شکندشان.',
-  ];
-  if (uploads.length) {
-    header.push(
-      '#',
-      '# این فایل‌ها باید در `knowledge/<پروژه>/fixtures/` گذاشته شوند، وگرنه',
-      '# سناریو روی ماشین دیگری اجرا نمی‌شود:',
-      ...uploads.map((file) => `#   ${file}`)
-    );
-  }
-  header.push(
-    '#',
-    '# `status: draft` است چون ضبطِ کلیک سناریوی خوب نمی‌سازد: مسیرِ اشتباه و',
-    '# کلیکِ تکراری هم ضبط شده، و `expect` جایی که مهم بوده نوشته نشده.',
-    ''
-  );
-
-  /**
-   * «دربارهٔ چه بود» در سرصفحه می‌نشیند، نه در `name`.
-   *
-   * نام باید کوتاه بماند چون در فهرست‌ها و در `--grep` استفاده می‌شود؛
-   * توضیح جای دیگری لازم است — همان‌جا که آدم فایل را باز می‌کند.
-   */
-  if (purpose) header.splice(1, 0, '#', `# دربارهٔ چه بود: ${purpose}`);
-
-  return header.join('\n') + YAML.stringify({ name, status: 'draft', persona: 'novice', steps: out });
-}
 
 /**
  * قدم‌های ضبط‌شده → کشِ آموخته.
@@ -201,27 +136,45 @@ export async function emitTour({ target, state, name, purpose = '', landing = fa
     written.pages++;
   }
 
-  // ۲. سناریو
+  /**
+   * ۲. تست — در ریپوی خودِ پروژه، نه اینجا.
+   *
+   * ── چرا `.spec.js` و نه YAML ──
+   *
+   * پیش‌نویسِ YAML مفسر می‌خواست و آن مفسر برداشته شد؛ یعنی خروجیِ گشت
+   * دیگر نمی‌دوید. حالا همان قدم‌ها کدِ پلی‌رایت می‌شوند و `npx playwright
+   * test` بی هیچ واسطه‌ای اجرایشان می‌کند.
+   *
+   * و عنوانِ هر بلوک از مسیر و از **توضیحی که کاربر حین گشت تایپ کرده**
+   * ساخته می‌شود — یعنی حرفِ شما در گزارشِ تست دیده می‌شود.
+   */
   const steps = state.steps || [];
   if (steps.length) {
-    const dir = path.join(scenarioDir(target), '_drafts');
-    fs.mkdirSync(dir, { recursive: true });
-    const file = path.join(dir, `${landing ? 'آشنایی' : 'tour'}-${slugify(title)}.yml`);
-    fs.writeFileSync(
-      file,
-      stepsToYaml({
+    const { tourToSpec } = await import('../emit/author.js');
+    const { workspaceRoot, ensureWorkspace, writeInside } = await import('../emit/workspace.js');
+    const { loadTarget } = await import('../target.js');
+
+    const root = workspaceRoot(await loadTarget(target));
+    ensureWorkspace(root);
+
+    const name = `${landing ? 'آشنایی' : 'گشت'}-${slugify(title)}.spec.js`;
+    const file = writeInside(
+      root,
+      name,
+      tourToSpec({
         steps,
         pages: state.pages || [],
         name: title,
         purpose: why,
         startPath: (state.pages || [])[0]?.path || '/',
-      }),
-      'utf8'
+      })
     );
-    written.scenario = path.relative(scenarioDir(target), file).split(path.sep).join('/');
 
-    // ۳. کش
-    written.cached = seedCache({ target, scenarioId: path.basename(file, '.yml'), steps });
+    written.scenario = name;
+    written.file = file;
+
+    // ۳. کش — همان شناسه، بی پسوند
+    written.cached = seedCache({ target, scenarioId: path.basename(name, '.spec.js'), steps });
   }
 
   // ۴. پرونده

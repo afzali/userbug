@@ -32,7 +32,7 @@ import {
   startAll,
   stopAll,
 } from '../observe/server.js';
-import { judge } from '../observe/oracle.js';
+import { fingerprint, judge, normalizeMessage } from '../observe/oracle.js';
 import { dismissBlockers } from '../observe/blockers.js';
 import { routeOf } from '../observe/route.js';
 import { GUI_RUN_MARKER, RunStore, newRunId, runDir, setCurrentRun } from '../store/run-store.js';
@@ -1080,9 +1080,72 @@ export class MapSession extends EventEmitter {
   /* ─────────────────────────── حلقه ─────────────────────────── */
 
   capExceeded() {
+    // خواستهٔ آدم پیش از سقف‌ها: کسی که «بس است» گفته، منتظرِ سقفِ زمان نماند.
+    if (this.stopRequested) return this.stopRequested;
     if (this.map.states.length >= this.map.caps.states) return 'سقفِ حالت';
     if (Date.now() > this.deadline) return 'سقفِ زمان';
     return '';
+  }
+
+  /**
+   * «بس است» — ولی نه وسطِ کار.
+   *
+   * ── چرا پرچم و نه قطعِ فوری ──
+   *
+   * خزش وسطِ یک کنش است: صفحه در حالِ رندر، قراردادی در حالِ نوشتن. قطعِ
+   * همان‌جا یعنی نقشه‌ای نیمه‌نوشته و حالتی که نه ثبت شده نه رها.
+   *
+   * پس پرچم می‌نشیند و حلقه در نخستین مرزِ امن — همان‌جا که سقف‌ها را
+   * می‌سنجد — تمیز بیرون می‌آید. هرچه تا آن لحظه پیدا شده، می‌ماند.
+   */
+  requestStop(reason = 'خواستهٔ کاربر') {
+    this.stopRequested = reason;
+    this.emitEvent('warning', { message: `${reason} — در نخستین مرزِ امن می‌ایستد.` });
+  }
+
+  /**
+   * حرفِ آدم، وسطِ خزشِ خودکار.
+   *
+   * ── چرا این کانال لازم بود ──
+   *
+   * گشت از روزِ اول `note` داشت: آدم می‌دید، می‌گفت، و حرفش یافته می‌شد.
+   * خزش این را نداشت — فقط رویداد بیرون می‌داد و هیچ راهی برای حرف زدن
+   * تو نبود. یعنی وقتی چیزی می‌دیدید که ماشین نمی‌فهمید، تنها کارتان
+   * تماشا بود.
+   *
+   * یادداشت همان‌جا به یافتهٔ واقعی تبدیل می‌شود، با مسیرِ همان لحظه، و
+   * خزش ادامه می‌دهد.
+   */
+  async note(message) {
+    const text = String(message || '').trim();
+    if (!text) return null;
+
+    const route = (routeOf(this.page?.url() || '') || '');
+    const finding = {
+      fingerprint: fingerprint({ source: 'crawl-note', message: text, route, step: 'خزش' }),
+      source: 'crawl-note',
+      severity: 'error',
+      message: text,
+      normalized: normalizeMessage(text),
+      step: 'خزش',
+      route,
+      device: this.deviceName || this.target.device,
+      at: new Date().toISOString(),
+      detail: { note: 'یادداشتِ کاربر حین خزش' },
+    };
+
+    await this.record(finding);
+    return finding;
+  }
+
+  /** کجاییم؟ — برای وقتی که آدم می‌پرسد «الان کجا را می‌گردی؟» */
+  where() {
+    return {
+      route: (routeOf(this.page?.url() || '') || ''),
+      states: this.map?.states?.length ?? 0,
+      queued: this.queue?.length ?? 0,
+      findings: this.findings.length,
+    };
   }
 
   async crawl() {

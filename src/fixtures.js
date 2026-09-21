@@ -382,6 +382,24 @@ export const test = base.extend({
       },
 
       /**
+       * مسیرِ یک فایلِ نمونه — از دروازهٔ امن.
+       *
+       * ── چرا نه مسیرِ مستقیم در خودِ تست ──
+       *
+       * `setInputFiles('D:/…')` کار می‌کند، ولی دو چیز را از دست می‌دهد:
+       * تست به یک ماشین گره می‌خورد، و هیچ مرزی نمی‌ماند که بگوید کدام
+       * فایل‌ها را می‌شود فرستاد. `resolveFixture` از روزِ اول همین دروازه
+       * بود — فقط از `knowledge/<هدف>/fixtures/` می‌خوانَد.
+       *
+       * افزودنِ فایل: `userbug fixtures <هدف> --add <مسیر>`
+       */
+      async fixture(name) {
+        const { resolveFixture } = await import('./knowledge/fixtures.js');
+        const { file } = await resolveFixture(target.key, name);
+        return file;
+      },
+
+      /**
        * «هست یا نیست؟» — بی آنکه نبودنش تست را بشکند.
        *
        * ── چرا لازم است ──

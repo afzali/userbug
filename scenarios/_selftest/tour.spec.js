@@ -26,7 +26,8 @@ import path from 'node:path';
 import { test, expect } from '@playwright/test';
 
 import { TourSession } from '../../src/tour/session.js';
-import { emitTour, seedCache, stepsToYaml } from '../../src/tour/emit.js';
+import { emitTour, seedCache } from '../../src/tour/emit.js';
+import { tourToSpec } from '../../src/emit/author.js';
 import { toStep, describe as describeItem } from '../../src/tour/recorder.js';
 
 /** اپِ ساختگی: فرمِ ورود، و صفحه‌ای که بعدش می‌آید. */
@@ -433,29 +434,39 @@ test('نامِ خوانا از نقش می‌آید', () => {
   expect(describeItem({})).toBe('«عنصر»');
 });
 
-test('YAML با clearState و go شروع می‌شود', () => {
-  const yaml = stepsToYaml({
+test('تست با پاکسازی و ناوبری شروع می‌شود', () => {
+  const spec = tourToSpec({
     steps: [{ step: { click: { role: 'button', name: 'x' } }, url: '/a', action: 'click' }],
     pages: [{ path: '/a', purpose: 'صفحهٔ الف' }],
     name: 'نمونه',
     startPath: '/a',
   });
 
-  // پیش‌نویسی که با کلیک شروع شود، روی صفحهٔ خالی اجرا می‌شود و می‌شکند
-  expect(yaml).toMatch(/clearState/);
-  expect(yaml).toMatch(/go: \/a/);
-  expect(yaml).toContain('صفحهٔ الف');
+  // تستی که با کلیک شروع شود، روی صفحهٔ خالی اجرا می‌شود و می‌شکند
+  expect(spec).toContain('clearCookies');
+  expect(spec).toContain("page.goto('/a')");
+
+  /**
+   * عنوانِ بلوک از مسیر **و از توضیحی که کاربر حین گشت تایپ کرده** ساخته
+   * می‌شود. یعنی حرفِ آدم در گزارشِ تست دیده می‌شود — و همان عنوان بعداً
+   * لنگرِ درجِ ادعاست.
+   */
+  expect(spec).toContain("ub.step('/a — صفحهٔ الف'");
 });
 
 test('آپلودِ ضبط‌شده، فایلِ لازم را در سرصفحه اعلام می‌کند', () => {
-  const yaml = stepsToYaml({
-    steps: [{ step: { upload: { to: {}, file: 'fixtures/x.pdf' } }, url: '/a', needsFixture: 'x.pdf' }],
+  const spec = tourToSpec({
+    steps: [{ step: { upload: { to: { label: 'فایل' }, file: 'x.pdf' } }, url: '/a', needsFixture: 'x.pdf' }],
     pages: [],
     name: 'ن',
   });
-  // بدون این، سناریو روی ماشین دیگری با «فایل پیدا نشد» می‌شکند
-  expect(yaml).toContain('x.pdf');
-  expect(yaml).toContain('fixtures');
+
+  // بدون این، تست روی ماشین دیگری با «فایل پیدا نشد» می‌شکند
+  expect(spec).toContain('x.pdf');
+  expect(spec).toContain('userbug fixtures');
+
+  // و مسیر از دروازهٔ امن می‌آید، نه رشتهٔ خام
+  expect(spec).toContain("setInputFiles(await ub.fixture('x.pdf'))");
 });
 
 test('کش مدخلِ موجود را بازنویسی نمی‌کند', async () => {

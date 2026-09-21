@@ -172,6 +172,38 @@ export function emitAction(step) {
     case 'check':
       return [`await ${emitLocator(body)}.${verb}();`];
 
+    /**
+     * دادنِ فایل به اپ — دو شکل، همان دو شکلِ بازپخش.
+     *
+     * `to` یعنی خودِ `<input type=file>` را داریم؛ `trigger` یعنی دکمه‌ای
+     * که پنجرهٔ انتخابِ فایل را باز می‌کند و ورودی‌اش پنهان است.
+     *
+     * مسیر از `ub.fixture()` می‌آید نه از رشتهٔ خام: تست به ماشین گره
+     * نمی‌خورد، و مرزی می‌ماند که می‌گوید کدام فایل‌ها فرستادنی‌اند.
+     */
+    case 'upload': {
+      const names = [].concat(body?.file ?? body?.files ?? []).filter(Boolean);
+      if (!names.length) throw new Error('`upload` بدون `file` معنا ندارد');
+
+      const files =
+        names.length === 1
+          ? `await ub.fixture(${quote(names[0])})`
+          : `await Promise.all([${names.map((n) => `ub.fixture(${quote(n)})`).join(', ')}])`;
+
+      if (body.to) return [`await ${emitLocator(body.to)}.setInputFiles(${files});`];
+
+      if (body.trigger) {
+        const timeout = Number(body.timeout) || 15_000;
+        return [
+          `const chooser = page.waitForEvent('filechooser', { timeout: ${timeout} });`,
+          `await ${emitLocator(body.trigger)}.click();`,
+          `await (await chooser).setFiles(${files});`,
+        ];
+      }
+
+      throw new Error('`upload` باید `to` (خودِ input) یا `trigger` (دکمه) داشته باشد');
+    }
+
     default:
       throw new Error(
         `فعلِ «${verb}» تولیدکنندهٔ کد ندارد.\n` +

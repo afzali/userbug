@@ -64,6 +64,9 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --model <اسلاگ>             مدلِ تألیف؛ بر کانفیگ می‌چربد
       --force                     بازنویسیِ فایلِ موجود (ادعاها می‌روند)
 
+  userbug map <هدف> [--headed]    خزشِ خودکار. حینش در همین ترمینال:
+                                  n <متن> یادداشت · w کجاست · q بس است
+
   userbug fixtures <هدف>          فایل‌های نمونه — تستِ آپلود از این‌جا
       --add <مسیر> [--note <چرا>] افزودن
       --remove <نام>              حذف
@@ -1180,9 +1183,17 @@ async function cmdTour({ flags, positional }) {
 
   console.log(`\n  گشت تمام شد: ${state.steps.length} قدم · ${state.pages.length} صفحه · ${state.findings.length} یافته`);
   console.log(`  صفحه‌های ثبت‌شده: ${written.pages}  ·  کشِ آموخته: ${written.cached} مدخل`);
-  if (written.scenario) console.log(`  پیش‌نویس: scenarios/${name}/${written.scenario}`);
+  if (written.file) console.log(`  تست: ${written.file}`);
   console.log(`  پرونده: ${written.dossier.replaced} تازه · ${written.dossier.conflicts} تعارض`);
-  console.log('\n  پیش‌نویس را بازبینی و اجرا کنید؛ تا اجرا نشده، سناریو نیست.\n');
+
+  if (written.scenario) {
+    console.log('\n  قدمِ بعد:');
+    console.log(`    npx playwright test                             ببینید می‌دود`);
+    console.log(`    userbug expect ${name} --from ${written.scenario}   ادعا اضافه کنید`);
+    console.log('\n  تا ادعا نگرفته، فقط می‌گوید «چیزی نشکست».\n');
+  } else {
+    console.log('\n  قدمی ضبط نشد، پس تستی نوشته نشد.\n');
+  }
 }
 
 /**
@@ -2418,16 +2429,65 @@ async function cmdMap({ flags, positional }) {
   });
 
   await session.start();
-  console.log(`\n  خزش آغاز شد: ${session.runId}\n`);
+  console.log(`\n  خزش آغاز شد: ${session.runId}`);
+
+  /**
+   * کانالِ حرف زدن، وسطِ خزشِ خودکار.
+   *
+   * ── چرا لازم بود ──
+   *
+   * گشت از روزِ اول REPL داشت و خزش فقط رویداد بیرون می‌داد. یعنی وقتی
+   * چیزی می‌دیدید که ماشین نمی‌فهمد — «این مودال باگ دارد»، «اینجا را
+   * نگرد» — تنها کارتان تماشا بود.
+   *
+   * ── چرا با `--headed` معنا پیدا می‌کند ──
+   *
+   * خزش پیش‌فرض بی‌مرورگرِ دیده‌شدنی است. با `--headed` صفحه را می‌بینید و
+   * همین‌جا دربارهٔ همان صفحه حرف می‌زنید.
+   */
+  const interactive = Boolean(process.stdin.isTTY) && !flags.quiet;
+  let rl = null;
+
+  if (interactive) {
+    const readline = await import('node:readline');
+    rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+    console.log('  در همین ترمینال:');
+    console.log('    n <متن>  یادداشت/ایراد دربارهٔ همین لحظه');
+    console.log('    w        الان کجاست؟');
+    console.log('    q        بس است — تمیز بایست و آنچه پیدا شده را نگه دار\n');
+
+    rl.on('line', async (line) => {
+      const text = line.trim();
+      try {
+        if (text === 'q') session.requestStop('خواستهٔ کاربر');
+        else if (text === 'w') {
+          const at = session.where();
+          console.log(`  ▸ ${at.route || '؟'} · ${at.states} حالت · ${at.queued} در صف · ${at.findings} یافته`);
+        } else if (text.startsWith('n ')) {
+          await session.note(text.slice(2));
+          console.log('  ✓ ثبت شد');
+        } else if (text) {
+          console.log('  ? فرمان‌ها: n <متن> · w · q');
+        }
+      } catch (cause) {
+        console.error(`  ! ${cause.message}`);
+      }
+    });
+  } else {
+    console.log('');
+  }
 
   let map;
   try {
     map = await session.crawl();
   } catch (cause) {
     // خطا در `run.json` می‌نشیند، وگرنه فهرستِ اجراها «پایان‌یافته» نشان می‌دهد
+    rl?.close();
     await session.stop(cause);
     throw cause;
   }
+  rl?.close();
   await session.stop();
 
   console.log('\n' + renderMap(map, { knownRoutes, loginPath }));

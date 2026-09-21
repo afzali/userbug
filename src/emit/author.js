@@ -126,6 +126,85 @@ function emitConditional(step) {
 }
 
 /**
+ * گشتِ ضبط‌شده → متنِ فایل.
+ *
+ * ── چرا گروه‌بندی بر اساسِ صفحه، و نه هر کلیک یک قدم ──
+ *
+ * ضبطِ گشت ریز است: ده کلیک و پنج تایپ در یک صفحه. اگر هر کدام یک
+ * `ub.step()` شود، فایل خوانده نمی‌شود و لنگرها بی‌معنا می‌شوند.
+ *
+ * خودِ `stepsToYaml` از روزِ اول این را می‌دانست و کلیدِ `as:` را وقتی
+ * می‌گذاشت که کاربر وارد صفحهٔ تازه‌ای شده بود — «گزارش خواناتر می‌شود».
+ * همان مرز اینجا مرزِ `ub.step()` است، و عنوانش از مسیر و از **توضیحی که
+ * خودِ کاربر حین گشت نوشته** ساخته می‌شود.
+ *
+ * یعنی چیزی که در ترمینال تایپ کردید، در گزارشِ تست دیده می‌شود.
+ *
+ * @param {object} input
+ * @param {{url?: string, step: object, needsFixture?: string}[]} input.steps
+ * @param {{path: string, purpose?: string}[]} [input.pages]
+ * @param {string} input.name
+ * @param {string} [input.purpose] توضیحِ کلیِ کاربر دربارهٔ این گشت
+ * @param {string} [input.startPath]
+ * @returns {string}
+ */
+export function tourToSpec({ steps = [], pages = [], name, purpose = '', startPath = '/' }) {
+  if (!steps.length) throw new Error('گشت قدمی ضبط نکرده');
+
+  const groups = [{ title: `شروع از ${startPath}`, steps: [{ clearState: true }, { go: startPath }] }];
+  let lastUrl = null;
+
+  for (const entry of steps) {
+    if (entry.url && entry.url !== lastUrl) {
+      const page = pages.find((item) => item.path === entry.url);
+      groups.push({ title: page?.purpose ? `${entry.url} — ${page.purpose}` : entry.url, steps: [] });
+      lastUrl = entry.url;
+    }
+    groups.at(-1).steps.push(entry.step);
+  }
+
+  const taken = new Set();
+  const emitted = groups
+    .filter((group) => group.steps.length)
+    .map((group) => ({
+      name: uniqueName(String(group.title).slice(0, 70), taken),
+      lines: group.steps.flatMap((step) => (verbOf(step) === 'when' ? emitConditional(step) : emitAction(step))),
+    }));
+
+  /**
+   * فایل‌های نمونه در سرصفحه اعلام می‌شوند.
+   *
+   * بی آن‌ها این تست روی ماشینِ دیگری نمی‌دود، و خطایش («فایل پیدا نشد»)
+   * دربارهٔ اپ هیچ نمی‌گوید.
+   */
+  const uploads = steps.map((item) => item.needsFixture).filter(Boolean);
+
+  const doc = [
+    'ضبط‌شده از گشتِ زندهٔ کاربر.',
+    '',
+    'قدم‌ها با توصیفِ معنایی نوشته شده‌اند (نقش و برچسب، نه سلکتور)، پس',
+    'تغییرِ ساختارِ HTML نمی‌شکندشان.',
+  ];
+  if (purpose) doc.splice(1, 0, '', `دربارهٔ چه بود: ${purpose}`);
+  if (uploads.length) {
+    doc.push(
+      '',
+      'این فایل‌ها باید با `userbug fixtures <هدف> --add` اضافه شوند،',
+      'وگرنه تست روی ماشینِ دیگری اجرا نمی‌شود:',
+      ...[...new Set(uploads)].map((file) => `  ${file}`),
+    );
+  }
+  doc.push(
+    '',
+    'ضبطِ کلیک تستِ خوبی نمی‌سازد: مسیرِ اشتباه و کلیکِ تکراری هم ضبط شده،',
+    'و ادعا جایی که مهم بوده نوشته نشده. بازبینی‌اش کنید، بعد:',
+    '  userbug expect <هدف> --from <همین فایل>',
+  );
+
+  return emitSpec({ title: name || 'گشت', doc: doc.join('\n'), steps: emitted });
+}
+
+/**
  * سناریو → متنِ فایل.
  *
  * @param {object} scenario `{name, steps}`
