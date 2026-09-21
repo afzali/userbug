@@ -239,8 +239,9 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
   userbug expect <هدف> --from <فایل .spec.js>
                                   «انتظار داشتیم چه ببینیم؟» — ادعاها را
                                   پیشنهاد می‌دهد، از عنصرهای واقعیِ گشت و نقشه
+      --from <فایل>               بی آن، فهرست می‌دهد تا انتخاب کنید
       --list                      فقط فهرستِ عنصرهای واقعی (رایگان)
-      --apply                     واقعاً در فایل بنویس
+      --apply                     همه را بنویس، بی پرسش
       --hard                      expect به‌جای expect.soft (همان‌جا بشکند)
       --model <اسلاگ>
 
@@ -1905,12 +1906,42 @@ async function cmdExpect({ flags, positional }) {
     return;
   }
 
-  const from = flags.from && flags.from !== true ? String(flags.from) : '';
-  if (!from) throw new Error('فایلِ تست لازم است: userbug expect <هدف> --from <فایل>   (یا --list)');
+  const root = workspaceRoot(await loadTarget(target));
+  let from = flags.from && flags.from !== true ? String(flags.from) : '';
+
+  /**
+   * بی `--from`، فهرست می‌دهد به‌جای خطا.
+   *
+   * نامِ فایل‌ها فارسی است و تایپِ دقیقشان آزاردهنده — همان اصطکاکی که
+   * کاربر را از ابزار دور می‌کند بی آنکه بتواند بگوید چرا.
+   */
+  if (!from) {
+    const { listSpecs } = await import('../src/emit/specs.js');
+    const { choose } = await import('../src/ask.js');
+    const specs = listSpecs(root);
+
+    if (!specs.length) {
+      throw new Error(
+        `تستی در ${root} نیست.\n` +
+          `  یکی بسازید: userbug tour ${target}   یا   userbug author ${target} "<متن>"`
+      );
+    }
+
+    const [index] = await choose(specs, {
+      message: 'کدام فایل؟',
+      render: (item) => `${item.name}`,
+      hint: (item) => `${item.id} · ${item.steps.length} قدم`,
+    });
+    if (index === undefined) {
+      console.log('\n  چیزی انتخاب نشد.\n');
+      return;
+    }
+    from = specs[index].id;
+  }
 
   // مسیرِ نسبی از پوشهٔ userbug در خودِ پروژهٔ هدف خوانده می‌شود، چون تست‌ها
   // از این مخزن رفته‌اند و در ریپوی همان اپ می‌نشینند.
-  const file = path.isAbsolute(from) ? from : path.join(workspaceRoot(await loadTarget(target)), from);
+  const file = path.isAbsolute(from) ? from : path.join(root, from);
   if (!fs.existsSync(file)) throw new Error(`فایلِ تست پیدا نشد: ${file}`);
 
   const before = fs.readFileSync(file, 'utf8');
@@ -1946,33 +1977,53 @@ async function cmdExpect({ flags, positional }) {
     return;
   }
 
-  console.log('');
-  for (const item of result.expectations) {
-    const mark = item.confidence === 'low' ? '?' : '·';
-    console.log(`  ${mark} ${describeExpectation(item)}`);
-    if (item.why) console.log(`      ${item.why}`);
-  }
   /**
-   * آنچه افتاد، چاپ می‌شود.
+   * آنچه افتاد، پیش از فهرست چاپ می‌شود.
    *
    * مدل گاهی عنصری می‌گوید که وجود ندارد؛ حذفِ بی‌صدایش یعنی کاربر فکر کند
    * آن هم سنجیده می‌شود.
    */
-  for (const note of result.dropped) console.log(`  ! ${note}`);
+  if (result.dropped.length) {
+    console.log('');
+    for (const note of result.dropped) console.log(`  ! ${note}`);
+  }
 
-  if (!flags.apply) {
-    console.log(`\n  چیزی نوشته نشد. برای افزودن: همین فرمان با --apply`);
-    console.log(`  (و --hard اگر می‌خواهید به‌جای expect.soft، expect باشند — یعنی همان‌جا بشکنند)\n`);
+  /**
+   * ── انتخابِ جزئی ──
+   *
+   * `describeExpectation` از روزِ اول نوشته بود «جمله‌ای که در فهرست دیده
+   * می‌شود… آدم باید در یک نگاه بفهمد دارد چه چیزی را تأیید می‌کند» —
+   * یعنی برای فهرستی نوشته شده بود که آدم از آن انتخاب کند. ولی CLI فقط
+   * همه-یا-هیچ داشت؛ آن فهرست تنها در رابط گرافیکی بود.
+   *
+   * و این مهم است: مدل چهار ادعا می‌دهد و معمولاً دوتایش درست است. «همه یا
+   * هیچ» یعنی یا ادعای مشکوک را می‌پذیرید یا حرفِ درست را هم دور می‌ریزید.
+   */
+  const { choose } = await import('../src/ask.js');
+
+  const picked = flags.apply
+    ? [...result.expectations.keys()]
+    : await choose(result.expectations, {
+        message: 'کدام‌ها نوشته شوند؟',
+        render: (item) => `${item.confidence === 'low' ? '?' : '·'} ${describeExpectation(item)}`,
+        hint: (item) => item.why,
+      });
+
+  if (!picked.length) {
+    console.log('\n  چیزی نوشته نشد.');
+    console.log('  برای نوشتنِ همه بی پرسش: همین فرمان با --apply');
+    console.log('  و --hard اگر به‌جای expect.soft، expect بخواهید — یعنی همان‌جا بشکنند.\n');
     return;
   }
 
   /**
-   * `assert` پیش‌فرض است، `expect` با پرچم.
+   * نرم پیش‌فرض است، سخت با پرچم.
    *
-   * حرفِ نیازموده‌ی مدل نباید بتواند بقیهٔ سناریو را از اجرا بیندازد: یافته
+   * حرفِ نیازموده‌ی مدل نباید بتواند بقیهٔ تست را از اجرا بیندازد: یافته
    * ثبت می‌کند و می‌گذرد. سخت‌شدنش تصمیمِ آدم است.
    */
   const hard = Boolean(flags.hard);
+  const chosen = picked.map((index) => result.expectations[index]);
 
   /**
    * حفظِ کامنت‌ها دیگر کاری نمی‌خواهد.
@@ -1981,9 +2032,9 @@ async function cmdExpect({ flags, positional }) {
    * `YAML.stringify` از ساختار می‌ساخت و هرچه نوشته بودی می‌رفت. درج در
    * **متن** چنین مسئله‌ای ندارد: فایل همان است، فقط چند خط بیشتر دارد.
    */
-  const next = applyExpectations(before, result.expectations.map((one) => ({ ...one, hard })));
+  const next = applyExpectations(before, chosen.map((one) => ({ ...one, hard })));
   fs.writeFileSync(file, next, 'utf8');
-  console.log(`\n  ${result.expectations.length} انتظار اضافه شد: ${path.relative(ROOT, file).split(path.sep).join('/')}`);
+  console.log(`\n  ${chosen.length} ادعا اضافه شد (${hard ? 'سخت' : 'نرم'}): ${file}`);
   console.log('  یک بار اجرا کنید و ببینید کدامشان واقعاً می‌خورند.\n');
 }
 
