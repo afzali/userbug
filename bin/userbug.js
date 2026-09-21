@@ -3102,7 +3102,7 @@ async function cmdInit({ flags, positional }) {
     if (!key) throw new Error('نام هدف لازم است: userbug init <هدف> --workspace');
 
     const { loadTarget } = await import('../src/target.js');
-    const { workspaceRoot, ensureWorkspace, writeInside, contained, LOCAL } = await import(
+    const { workspaceRoot, ensureWorkspace, ensureNpmrc, writeInside, contained, LOCAL } = await import(
       '../src/emit/workspace.js'
     );
     const { renderProjectConfig } = await import('../src/project-config.js');
@@ -3144,14 +3144,48 @@ async function cmdInit({ flags, positional }) {
      * کنارِ **خودِ فایل** پیدا می‌کند، نه از جایی که فرمان اجرا شده. پس
      * بی این پیوند، ایمپورت حل نمی‌شود.
      */
+    /**
+     * `.npmrc`ِ پروژه — بی آن، نصبِ `file:` symlink می‌شود و دو نسخهٔ
+     * پلی‌رایت می‌سازد. نتیجه‌اش `No tests found` است، در حالی که فایل سرِ
+     * جایش است و ایمپورتش هم حل می‌شود.
+     */
+    const projectRoot = loaded.source?.root;
+    const npmrc = projectRoot ? ensureNpmrc(projectRoot) : null;
+    if (npmrc) {
+      console.log(
+        `  .npmrc پروژه: ${
+          { written: 'ساخته شد', appended: 'خطِ install-links افزوده شد', kept: 'از قبل داشت' }[npmrc]
+        }\n`
+      );
+    }
+
+    /**
+     * نسخهٔ **دقیق**، نه بازه.
+     *
+     * `^1.62.1` به npm اجازه می‌دهد ۱.۶۳ بدهد، و باینریِ مرورگر
+     * نسخه‌به‌نسخه است — یعنی یک دانلودِ اضافه و شکستی که هیچ ربطی به کدِ
+     * شما ندارد. userbug می‌داند با چه نسخه‌ای ساخته شده؛ نباید از آدم
+     * خواسته شود حدس بزند.
+     */
+    let pinned = '';
+    try {
+      const own = JSON.parse(
+        fs.readFileSync(path.join(ROOT, 'node_modules', '@playwright', 'test', 'package.json'), 'utf8')
+      );
+      pinned = `@${own.version}`;
+    } catch {
+      // نصب نشده؛ بدونِ پین می‌گوییم، که از نگفتن بهتر است
+    }
+
     console.log('  یک بار در پروژه نصب کنید:\n');
-    console.log(`    cd ${loaded.source?.root || '<پروژه>'}`);
-    console.log('    npm i -D @playwright/test');
-    console.log(`    npm i -D "file:${ROOT.split(path.sep).join('/')}"\n`);
+    console.log(`    cd ${projectRoot || '<پروژه>'}`);
+    console.log(`    npm i -D @playwright/test${pinned} "file:${ROOT.split(path.sep).join('/')}"`);
+    console.log('    npx playwright install chromium\n');
     console.log('  بعد از آن:\n');
     console.log(`    userbug tour ${key}                 گشت بزنید → تست ساخته می‌شود`);
-    console.log(`    userbug expect ${key} --from <فایل>  ادعا اضافه کنید`);
-    console.log('    npx playwright test                 اجرا (از پوشهٔ پروژه)\n');
+    console.log(`    userbug expect ${key}               ادعا اضافه کنید`);
+    console.log('    npx playwright test                 اجرا، از پوشهٔ پروژه');
+    console.log(`    userbug test ${key}                 یا از هر جا — همان اجرا\n`);
     return;
   }
 

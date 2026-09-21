@@ -82,6 +82,54 @@ playwright-report/
 `;
 
 /**
+ * `install-links=true` در `.npmrc`ِ پروژه — و چرا حیاتی است.
+ *
+ * ── مسئله ──
+ *
+ * userbug به‌صورت `file:` نصب می‌شود و npm پیش‌فرض **symlink** می‌سازد.
+ * آن‌وقت Node ماژول‌ها را از مسیرِ **واقعیِ** userbug حل می‌کند، پس
+ * `src/fixtures.js` پلی‌رایتِ خودِ userbug را بار می‌کند در حالی که رانر
+ * پلی‌رایتِ پروژه را. دو نسخه، و نتیجه‌اش:
+ *
+ *     Error: Playwright Test did not expect test() to be called here.
+ *     Error: No tests found
+ *
+ * فایل سرِ جایش است، ایمپورتش حل می‌شود، و پیام هیچ نمی‌گوید که چرا.
+ *
+ * ── چرا در `.npmrc` و نه به‌صورت پرچم ──
+ *
+ * `npm i --install-links` فقط همان یک دستور را عوض می‌کند. نخستین
+ * `npm install`ِ بعدی — حتی برای بسته‌ای بی‌ربط — دوباره symlink می‌سازد و
+ * همه‌چیز بی‌صدا می‌شکند. در `.npmrc` می‌ماند، و چون `.npmrc` در گیتِ
+ * پروژه است، هم‌تیمی و CI هم همان رفتار را می‌گیرند.
+ */
+export const NPMRC_LINE = 'install-links=true';
+
+/**
+ * خطِ `install-links` را به `.npmrc`ِ پروژه اضافه کن، اگر نیست.
+ *
+ * فایلِ موجود بازنویسی نمی‌شود: ممکن است registry یا proxy یا توکنِ
+ * کاربر در آن باشد.
+ *
+ * @param {string} projectRoot ریشهٔ پروژهٔ هدف، نه پوشهٔ userbug
+ * @returns {'written'|'appended'|'kept'}
+ */
+export function ensureNpmrc(projectRoot) {
+  const file = path.join(projectRoot, '.npmrc');
+
+  if (!fs.existsSync(file)) {
+    fs.writeFileSync(file, `${NPMRC_LINE}\n`, 'utf8');
+    return 'written';
+  }
+
+  const current = fs.readFileSync(file, 'utf8');
+  if (/^\s*install-links\s*=/m.test(current)) return 'kept';
+
+  fs.appendFileSync(file, `${current.endsWith('\n') ? '' : '\n'}${NPMRC_LINE}\n`);
+  return 'appended';
+}
+
+/**
  * ریشهٔ پوشهٔ userbug در پروژهٔ هدف.
  *
  * `workspace` در کانفیگ بر همه‌چیز می‌چربد؛ وگرنه از `source.root` مشتق
