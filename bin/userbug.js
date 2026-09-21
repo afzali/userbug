@@ -790,10 +790,15 @@ async function cmdMissions({ flags, positional }) {
 function cmdList({ flags }) {
   const limit = Number(flags.limit || 20);
   const ids = listRunIds().slice(-limit).reverse();
-  if (!ids.length) return console.log('هیچ اجرایی ثبت نشده.');
+  if (!ids.length) return console.log(pick('هیچ اجرایی ثبت نشده.', 'No runs recorded.'));
 
   console.log('');
-  console.log('  اجرا                                هدف     دستگاه      قدم  یافته  وضعیت');
+  console.log(
+    pick(
+      '  اجرا                                هدف     دستگاه      قدم  یافته  وضعیت',
+      '  run                                target  device      step  find   status'
+    )
+  );
   console.log('  ' + '─'.repeat(78));
   for (const id of ids) {
     let r;
@@ -2605,7 +2610,8 @@ async function cmdMap({ flags, positional }) {
   });
 
   await session.start();
-  console.log(`\n  خزش آغاز شد: ${session.runId}`);
+  noteLanguageFallback();
+  console.log(pick(`\n  خزش آغاز شد: ${session.runId}`, `\n  Crawl started: ${session.runId}`));
 
   /**
    * کانالِ حرف زدن، وسطِ خزشِ خودکار.
@@ -2628,23 +2634,37 @@ async function cmdMap({ flags, positional }) {
     const readline = await import('node:readline');
     rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
-    console.log('  در همین ترمینال:');
-    console.log('    n <متن>  یادداشت/ایراد دربارهٔ همین لحظه');
-    console.log('    w        الان کجاست؟');
-    console.log('    q        بس است — تمیز بایست و آنچه پیدا شده را نگه دار\n');
+    if (lang() === 'fa') {
+      console.log('  در همین ترمینال:');
+      console.log('    n <متن>  یادداشت/ایراد دربارهٔ همین لحظه');
+      console.log('    w        الان کجاست؟');
+      console.log('    q        بس است — تمیز بایست و آنچه پیدا شده را نگه دار\n');
+    } else {
+      console.log('  Here in this terminal:');
+      console.log('    n <text>  note or defect about this moment');
+      console.log('    w         where is it now?');
+      console.log('    q         stop cleanly, keeping what was found\n');
+    }
 
     rl.on('line', async (line) => {
       const text = line.trim();
       try {
-        if (text === 'q') session.requestStop('خواستهٔ کاربر');
+        if (text === 'q') session.requestStop(pick('خواستهٔ کاربر', 'user asked to stop'));
         else if (text === 'w') {
           const at = session.where();
-          console.log(`  ▸ ${at.route || '؟'} · ${at.states} حالت · ${at.queued} در صف · ${at.findings} یافته`);
+          console.log(
+            pick(
+              `  ▸ ${at.route || '؟'} · ${at.states} حالت · ${at.queued} در صف · ${at.findings} یافته`,
+              `  ▸ ${at.route || '?'} · ${at.states} states · ${at.queued} queued · ${at.findings} findings`
+            )
+          );
         } else if (text.startsWith('n ')) {
-          await session.note(text.slice(2));
-          console.log('  ✓ ثبت شد');
+          const note = text.slice(2);
+          await session.note(note);
+          // بازخوانی، چون در کنسولِ بدرندر کاربر ندیده چه تایپ کرده
+          console.log(pick(`  ✓ ثبت شد: ${note}`, `  ✓ recorded: ${note}`));
         } else if (text) {
-          console.log('  ? فرمان‌ها: n <متن> · w · q');
+          console.log(pick('  ? فرمان‌ها: n <متن> · w · q', '  ? commands: n <text> · w · q'));
         }
       } catch (cause) {
         console.error(`  ! ${cause.message}`);
@@ -3116,11 +3136,18 @@ async function cmdFixtures({ flags, positional }) {
   const target = positional[0];
   if (!target) {
     throw new Error(
-      'نام هدف لازم است:\n' +
-        '  userbug fixtures <هدف>                      فهرست\n' +
-        '  userbug fixtures <هدف> --add <مسیر> [--note <چرا>]\n' +
-        '  userbug fixtures <هدف> --remove <نام>\n' +
-        '  userbug fixtures <هدف> --note <نام> --as <متن>'
+      pick(
+        'نام هدف لازم است:\n' +
+          '  userbug fixtures <هدف>                      فهرست\n' +
+          '  userbug fixtures <هدف> --add <مسیر> [--note <چرا>]\n' +
+          '  userbug fixtures <هدف> --remove <نام>\n' +
+          '  userbug fixtures <هدف> --note <نام> --as <متن>',
+        'A target key is required:\n' +
+          '  userbug fixtures <key>                      list\n' +
+          '  userbug fixtures <key> --add <path> [--note <why>]\n' +
+          '  userbug fixtures <key> --remove <name>\n' +
+          '  userbug fixtures <key> --note <name> --as <text>'
+      )
     );
   }
 
@@ -3129,28 +3156,28 @@ async function cmdFixtures({ flags, positional }) {
 
   if (flags.add && flags.add !== true) {
     const from = path.resolve(String(flags.add));
-    if (!fs.existsSync(from)) throw new Error(`فایل پیدا نشد: ${from}`);
+    if (!fs.existsSync(from)) throw new Error(pick(`فایل پیدا نشد: ${from}`, `File not found: ${from}`));
 
     const saved = await saveFixture(target, {
       name: path.basename(from),
       bytes: await fs.promises.readFile(from),
       note: flags.note && flags.note !== true ? String(flags.note) : '',
     });
-    console.log(`\n  اضافه شد: ${saved.relative}\n`);
-    console.log('  در سناریو: { upload: { to: <ورودی>, file: ' + JSON.stringify(path.basename(from)) + ' } }\n');
+    console.log(pick(`\n  اضافه شد: ${saved.relative}\n`, `\n  Added: ${saved.relative}\n`));
+    console.log(pick('  در سناریو: ', '  In a test: ') + '{ upload: { to: <input>, file: ' + JSON.stringify(path.basename(from)) + ' } }\n');
     return;
   }
 
   if (flags.remove && flags.remove !== true) {
     const gone = await removeFixture(target, String(flags.remove));
-    console.log(`\n  حذف شد: ${gone.relative}\n`);
+    console.log(pick(`\n  حذف شد: ${gone.relative}\n`, `\n  Removed: ${gone.relative}\n`));
     return;
   }
 
   if (flags.note && flags.note !== true) {
     const as = flags.as && flags.as !== true ? String(flags.as) : '';
     await setFixtureNote(target, String(flags.note), as);
-    console.log(`\n  یادداشت ثبت شد.\n`);
+    console.log(pick('\n  یادداشت ثبت شد.\n', '\n  Note saved.\n'));
     return;
   }
 
@@ -3158,15 +3185,15 @@ async function cmdFixtures({ flags, positional }) {
   const notes = readFixtureNotes(target);
 
   if (!rows.length) {
-    console.log(`\n  فایلِ نمونه‌ای نیست: ${fixturesDir(target)}`);
-    console.log('  افزودن: userbug fixtures ' + target + ' --add <مسیر> --note "<چرا>"\n');
+    console.log(pick(`\n  فایلِ نمونه‌ای نیست: ${fixturesDir(target)}`, `\n  No sample files: ${fixturesDir(target)}`));
+    console.log(pick('  افزودن: ', '  Add one: ') + 'userbug fixtures ' + target + ' --add <path> --note "<why>"\n');
     return;
   }
 
-  console.log(`\n  ${rows.length} فایلِ نمونه در «${target}»:\n`);
+  console.log(pick(`\n  ${rows.length} فایلِ نمونه در «${target}»:\n`, `\n  ${rows.length} sample file(s) in "${target}":\n`));
   for (const row of rows) {
     const key = String(row.relative || row.name || '').replace(/^fixtures\//, '');
-    console.log(`  ${pad(clip(key, 34), 34)} ${pad(String(row.bytes ?? '—'), 9, 'start')} بایت`);
+    console.log(`  ${pad(clip(key, 34), 34)} ${pad(String(row.bytes ?? '—'), 9, 'start')} ${pick('بایت', 'bytes')}`);
     if (notes[key]) console.log(`      ${notes[key]}`);
   }
   console.log('');
@@ -3693,6 +3720,6 @@ try {
       process.exit(cmd ? 1 : 0);
   }
 } catch (e) {
-  console.error(`\n  خطا: ${e.message}\n`);
+  console.error(pick(`\n  خطا: ${e.message}\n`, `\n  Error: ${e.message}\n`));
   process.exit(2);
 }
