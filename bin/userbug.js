@@ -1123,16 +1123,42 @@ async function cmdTour({ flags, positional }) {
   });
 
   await session.start();
-  console.log(`\n  گشت آغاز شد: ${session.runId}`);
-  console.log('  مرورگر باز است. کار کنید؛ هرچه می‌کنید ضبط می‌شود.\n');
-  console.log('  فرمان‌ها (در همین ترمینال):');
-  console.log('    <متن>   توضیحِ صفحهٔ فعلی را ثبت کن');
-  console.log('    v <نام> نامِ لایهٔ فعلی (مودال/کشویی) — بر تشخیصِ خودکار می‌چربد');
-  console.log('            با توضیح هم می‌شود:  v نامِ لایه | این پنجره چه می‌کند');
-  console.log('    p       صفحهٔ فعلی را بی‌توضیح ثبت کن');
-  console.log('    n <متن> یادداشت/ایراد ثبت کن');
-  console.log('    r       ضبطِ قدم‌ها را روشن/خاموش کن');
-  console.log('    q       پایان و نوشتنِ خروجی\n');
+  noteLanguageFallback();
+
+  if (lang() === 'fa') {
+    console.log(`\n  گشت آغاز شد: ${session.runId}`);
+    console.log('  مرورگر باز است. کار کنید؛ هرچه می‌کنید ضبط می‌شود.\n');
+    console.log('  فرمان‌ها (در همین ترمینال):');
+    console.log('    <متن>   توضیحِ صفحهٔ فعلی را ثبت کن');
+    console.log('    v <نام> نامِ لایهٔ فعلی (مودال/کشویی) — بر تشخیصِ خودکار می‌چربد');
+    console.log('            با توضیح هم می‌شود:  v نامِ لایه | این پنجره چه می‌کند');
+    console.log('    p       صفحهٔ فعلی را بی‌توضیح ثبت کن');
+    console.log('    n <متن> یادداشت/ایراد ثبت کن');
+    console.log('    e       نوشتن در ویرایشگر — برای متنِ فارسیِ بلند');
+    console.log('    r       ضبطِ قدم‌ها را روشن/خاموش کن');
+    console.log('    q       پایان و نوشتنِ خروجی\n');
+  } else {
+    console.log(`\n  Tour started: ${session.runId}`);
+    console.log('  Browser is open. Use the app; everything you do is recorded.\n');
+    console.log('  Commands (here in this terminal):');
+    console.log('    <text>   describe the current page');
+    console.log('    v <name> name the current layer (modal/dropdown)');
+    console.log('             with a description too:  v Upload modal | takes a file');
+    console.log('    p        record the page without a description');
+    console.log('    n <text> note or defect');
+    console.log('    e        write in an editor — for Persian or long text');
+    console.log('    r        toggle step recording');
+    console.log('    q        finish and write the output\n');
+
+    /**
+     * ── چرا `e` اینجا برجسته می‌شود ──
+     *
+     * وقتی به انگلیسی افتاده‌ایم یعنی کنسول bidi ندارد — همان کنسولی که
+     * تایپِ فارسی در آن به‌هم می‌ریزد. کاربر باید بداند راهی هست.
+     */
+    console.log('  Typing Persian here will look scrambled — this console has no');
+    console.log('  bidi support. Press "e" to write in an editor instead.\n');
+  }
 
   /**
    * خواندنِ خط‌به‌خطِ ترمینال.
@@ -1141,7 +1167,11 @@ async function cmdTour({ flags, positional }) {
    * چندبایتی کارِ خودش است.
    */
   const readline = await import('node:readline');
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: 'گشت> ' });
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    prompt: pick('گشت> ', 'tour> '),
+  });
   rl.prompt();
 
   await new Promise((resolve) => {
@@ -1158,7 +1188,47 @@ async function cmdTour({ flags, positional }) {
         if (text === 'q') return void (await session.stop('پایان از ترمینال'));
         if (text === 'p') await session.notePage({});
         else if (text === 'r') session.setRecording(!session.recording);
-        else if (text.startsWith('n ')) await session.note(text.slice(2));
+        /**
+         * ── `e`: نوشتن در ویرایشگر ──
+         *
+         * در کنسولی که bidi ندارد، تایپِ فارسی به‌هم می‌ریزد: echo از همان
+         * رندررِ خراب رد می‌شود و `readline` مکان‌نما را چپ‌به‌راست حساب
+         * می‌کند، پس backspace هم جابه‌جا می‌شود. هیچ‌کدام از داخلِ Node
+         * رفع‌شدنی نیست.
+         *
+         * ویرایشگر bidi دارد. همان مسیری که `git commit` بی `-m` می‌رود.
+         */
+        else if (text === 'e') {
+          const { viaEditor } = await import('../src/ask.js');
+          const written = await viaEditor({
+            hint: pick(
+              'توضیحِ این صفحه را بنویسید.\nخطِ اولْ توضیحِ صفحه است؛ اگر با «!» شروع شود، یادداشت/ایراد ثبت می‌شود.\nخطوطی که با # شروع شوند نادیده گرفته می‌شوند.',
+              'Describe this page.\nFirst line is the page description; start it with "!" to record a note/defect instead.\nLines starting with # are ignored.'
+            ),
+          });
+
+          if (!written) {
+            console.log(pick('  · چیزی نوشته نشد', '  · nothing written'));
+          } else if (written.startsWith('!')) {
+            const note = written.slice(1).trim();
+            await session.note(note);
+            console.log(pick(`  ⚠ یادداشت: ${note}`, `  ⚠ note: ${note}`));
+          } else {
+            await session.notePage({ purpose: written });
+            console.log(pick(`  ✓ توضیح: ${written}`, `  ✓ description: ${written}`));
+          }
+        } else if (text.startsWith('n ')) {
+          const note = text.slice(2);
+          await session.note(note);
+          /**
+           * بازخوانی — چون کاربر نمی‌بیند چه تایپ کرده.
+           *
+           * در کنسولِ بدرندر، تنها راهِ اطمینان این است که آنچه **ثبت شد**
+           * دوباره چاپ شود. بدنمایش هم که باشد، دست‌کم همان چیزی است که
+           * ذخیره شده — نه آنچه موقعِ تایپ دیده می‌شد.
+           */
+          console.log(pick(`  ⚠ ثبت شد: ${note}`, `  ⚠ recorded: ${note}`));
+        }
         /**
          * نام‌گذاریِ دستیِ لایه.
          *
@@ -1172,10 +1242,15 @@ async function cmdTour({ flags, positional }) {
          */
         else if (text.startsWith('v ')) {
           const [view, ...rest] = text.slice(2).split('|');
-          await session.notePage({ view: view.trim(), purpose: rest.join('|').trim() });
-        } else if (text) await session.notePage({ purpose: text });
+          const name = view.trim();
+          await session.notePage({ view: name, purpose: rest.join('|').trim() });
+          console.log(pick(`  ✓ لایه: ${name}`, `  ✓ layer: ${name}`));
+        } else if (text) {
+          await session.notePage({ purpose: text });
+          console.log(pick(`  ✓ توضیح: ${text}`, `  ✓ description: ${text}`));
+        }
       } catch (cause) {
-        console.error(`  خطا: ${cause.message}`);
+        console.error(pick(`  خطا: ${cause.message}`, `  error: ${cause.message}`));
       }
       rl.prompt();
     });
