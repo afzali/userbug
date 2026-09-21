@@ -26,23 +26,65 @@ import { request } from '@playwright/test';
 /** یک بار پرسیده می‌شود، نه به‌ازای هر بند. */
 let cached;
 
+/** سقفِ خودمان روی کلِ پرسش. */
+const PROBE_MS = 3000;
+
 /**
- * @param {string} baseURL
- * @returns {Promise<boolean>}
+ * آیا اپ جواب می‌دهد؟
+ *
+ * ── چرا مهلتِ خودمان، روی کلِ پرسش ──
+ *
+ * نسخهٔ اولِ این تابع فقط `timeout` را به `context.get` می‌داد. آن گزینه
+ * مرحلهٔ **اتصال** را همیشه پوشش نمی‌دهد: روی ویندوز وقتی چیزی روی پورت
+ * گوش نمی‌دهد، تلاشِ اتصال می‌تواند بلند شود و `newContext()` هم خودش
+ * مهلتی ندارد.
+ *
+ * نتیجه‌اش بدتر از چیزی بود که قرار بود درست کند: یک بار `beforeEach` صد و
+ * بیست ثانیه ماند و سوییت با «Test timeout exceeded» شکست — یعنی محافظی که
+ * برای حذفِ قرمزِ بی‌معنا نوشته شده بود، خودش قرمزِ بی‌معنا ساخت. و آن اجرا
+ * ۲.۵ دقیقه طول کشید به‌جای ۳۲ ثانیه.
+ *
+ * پس مهلت روی **کلِ** پرسش است، نه فقط روی درخواست. هرچه دیرتر از آن جواب
+ * بدهد، «نیست» خوانده می‌شود — که برای این تصمیم جوابِ درستی است: اپی که
+ * سه ثانیه جواب نمی‌دهد، اپی نیست که بشود رفتارش را سنجید.
  */
 export async function appIsUp(baseURL) {
   if (cached !== undefined) return cached;
   if (!baseURL) return (cached = false);
 
-  try {
+  const probe = (async () => {
     const context = await request.newContext();
-    const response = await context.get(baseURL, { timeout: 3000 });
-    await context.dispose();
-    cached = response.ok();
+    try {
+      const response = await context.get(baseURL, { timeout: PROBE_MS });
+      return response.ok();
+    } finally {
+      // بی این، هر اجرا یک context باز می‌گذارد و پلی‌رایت آخرِ کار شکایت می‌کند
+      await context.dispose().catch(() => {});
+    }
+  })();
+
+  let timer;
+  const deadline = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(false), PROBE_MS);
+  });
+
+  try {
+    cached = await Promise.race([probe, deadline]);
   } catch {
     // وصل نشد، مهلت تمام شد، یا آدرس بی‌معنا بود — همه یعنی «نیست»
     cached = false;
+  } finally {
+    clearTimeout(timer);
   }
+
+  /**
+   * اگر مهلت برنده شد، `probe` هنوز در هوا است.
+   *
+   * رهایش می‌کنیم ولی خطایش را می‌بلعیم، وگرنه یک
+   * `unhandledRejection` چند ثانیه بعد — وسطِ بندی بی‌ربط — اجرا را
+   * می‌خواباند و کسی نمی‌فهمد از کجا آمد.
+   */
+  probe.catch(() => {});
   return cached;
 }
 
