@@ -120,9 +120,64 @@ function expandVars(value, targetName) {
   });
 }
 
-/** کانفیگ یک هدف را بخوان و پیش‌فرض‌های نبود را پر کن. */
-export async function loadTarget(name) {
-  const file = path.join(rootDir(), 'targets', `${name}.config.js`);
+/** نامِ فایلِ کانفیگ وقتی داخلِ خودِ پروژه زندگی می‌کند. */
+export const PROJECT_CONFIG = path.join('tests', 'userbug', 'userbug.config.mjs');
+
+/**
+ * کانفیگِ پروژه، با بالا رفتن از پوشهٔ جاری.
+ *
+ * ── چرا داخلِ پروژه، و نه فقط `targets/` ──
+ *
+ * `targets/*.config.js` از دورانی مانده که userbug یک میزکارِ مرکزی بود و
+ * چند پروژه را با هم می‌گرداند. با رفتنِ تست‌ها و شناخت به ریپوی اپ، آن
+ * مدل نیمه‌کاره ماند: همه‌چیزِ پروژه آنجا بود جز آدرس و لاگش.
+ *
+ * حالا کانفیگ هم می‌تواند در خودِ پروژه باشد. آن‌وقت داخلِ پوشهٔ اپ، هیچ
+ * نامی لازم نیست تایپ شود — `userbug test` می‌داند کجاست، مثل هر ابزارِ
+ * دیگری که از `package.json` بالا می‌رود.
+ *
+ * `targets/` هم کار می‌کند و نمی‌شکند: پروژه‌های موجود دست نمی‌خورند.
+ *
+ * @param {string} [from] پوشهٔ شروع؛ پیش‌فرض `process.cwd()`
+ * @returns {string} مسیرِ مطلق، یا رشتهٔ خالی
+ */
+export function findProjectConfig(from = process.cwd()) {
+  let current = path.resolve(from);
+
+  while (true) {
+    const candidate = path.join(current, PROJECT_CONFIG);
+    if (fs.existsSync(candidate)) return candidate;
+
+    // خودِ پوشهٔ `tests/userbug` هم نقطهٔ شروعِ معتبری است
+    if (path.basename(current) === 'userbug') {
+      const inside = path.join(current, path.basename(PROJECT_CONFIG));
+      if (fs.existsSync(inside)) return inside;
+    }
+
+    const parent = path.dirname(current);
+    if (parent === current) return '';
+    current = parent;
+  }
+}
+
+/**
+ * کانفیگ یک هدف را بخوان و پیش‌فرض‌های نبود را پر کن.
+ *
+ * بی نام، کانفیگِ پروژه‌ای که در آن ایستاده‌اید خوانده می‌شود.
+ */
+export async function loadTarget(name, { from } = {}) {
+  const file = name
+    ? path.join(rootDir(), 'targets', `${name}.config.js`)
+    : findProjectConfig(from) ||
+      (() => {
+        throw Object.assign(
+          new Error(
+            'نه نامِ هدف دادید و نه در پروژه‌ای با کانفیگِ userbug ایستاده‌اید.\n' +
+              `  در پوشهٔ اپتان یک بار: userbug setup`
+          ),
+          { code: 'ENOTARGET' }
+        );
+      })();
   const mod = await import(pathToFileURL(file).href);
   const t = mod.default;
 
@@ -148,7 +203,28 @@ export async function loadTarget(name) {
   // می‌نشیند و گزارش می‌شود، پس ادعای جداسازی‌ای که وجود ندارد، خواننده را
   // گمراه می‌کند. هدفِ جعبه‌سیاه دقیقاً همین حالت است.
   t.isolation ??= { mode: 'none' };
-  t.key = name;
+
+  /**
+   * کلید — شناسه‌ای که شناخت و اجراها زیرش ذخیره می‌شوند.
+   *
+   * با نام، همان نام. بی نام (کانفیگِ داخلِ پروژه)، از خودِ کانفیگ یا از
+   * نامِ پوشهٔ پروژه. ثابت بودنش مهم است: عوض شدنش یعنی شناختِ جمع‌شده
+   * یتیم می‌شود.
+   */
+  t.key = name || t.key || t.name || path.basename(path.resolve(path.dirname(file), '..', '..'));
+
+  /**
+   * کانفیگِ داخلِ پروژه، ریشهٔ سورس را خودش می‌داند.
+   *
+   * `tests/userbug/userbug.config.js` دو پوشه پایین‌ترِ ریشهٔ پروژه است.
+   * نوشتنِ دوبارهٔ آن در کانفیگ، جایی است که می‌تواند غلط شود.
+   */
+  if (!name) {
+    const projectRoot = path.resolve(path.dirname(file), '..', '..');
+    t.source = { root: projectRoot, ...(t.source || {}) };
+    t.workspace ??= path.dirname(file);
+  }
+
   return t;
 }
 

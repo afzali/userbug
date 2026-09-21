@@ -10,7 +10,7 @@
  *
  * ── چرا تکرارِ کانفیگ نه ──
  *
- * وسوسه‌اش هست: یک `playwright.config.js` ساده در پروژه بنویسیم و تمام.
+ * وسوسه‌اش هست: یک `playwright.config.mjs` ساده در پروژه بنویسیم و تمام.
  * ولی آن‌وقت `trace: 'on'`، مهلت‌ها، گزارشگر، و `globalTeardown` که گزارش
  * را می‌سازد، دو جا تعریف می‌شوند و دیر یا زود واگرا. همان درسی که
  * `emit/locator.js` و `replay-parity` نوشتند.
@@ -35,6 +35,23 @@ const own = (relative) => path.join(ROOT, relative);
  */
 export async function userbugConfig({ target: targetName, testDir, testIgnore = [] }) {
   /**
+   * بی نامِ هدف، کانفیگ را از کنارِ خودِ specها می‌خوانیم.
+   *
+   * `process.cwd()` اینجا به‌درد نمی‌خورد: پلی‌رایت ممکن است از هر جایی
+   * اجرا شده باشد. ولی `testDir` همیشه همان پوشه‌ای است که این کانفیگ در
+   * آن نشسته — پس نقطهٔ شروعِ قابلِ اعتمادی است.
+   */
+  let target;
+
+  if (targetName) {
+    target = await loadTargetOrPlaceholder(targetName);
+  } else {
+    const { loadTarget } = await import('./target.js');
+    target = await loadTarget(undefined, { from: testDir });
+    targetName = target.key;
+  }
+
+  /**
    * شناسهٔ اجرا پیش از workerها ساخته می‌شود.
    *
    * کانفیگ زودتر از `globalSetup` و گزارشگر بار می‌شود، پس همه یک شناسهٔ
@@ -43,8 +60,6 @@ export async function userbugConfig({ target: targetName, testDir, testIgnore = 
    */
   process.env.UB_TARGET ||= targetName;
   process.env.UB_RUN_ID ||= newRunId(targetName);
-
-  const target = await loadTargetOrPlaceholder(targetName);
 
   // 'desktop' یعنی بدون emulation. بقیه مستقیم از فهرستِ دستگاه‌های پلی‌رایت.
   const deviceName = process.env.UB_DEVICE || target.device;
@@ -81,24 +96,22 @@ export async function userbugConfig({ target: targetName, testDir, testIgnore = 
 }
 
 /**
- * متنِ `playwright.config.js`ی که در پوشهٔ userbugِ پروژه می‌نشیند.
+ * متنِ `playwright.config.mjs`ی که در پوشهٔ userbugِ پروژه می‌نشیند.
  *
  * عمداً کوتاه است: هرچه اینجا نوشته شود، نسخهٔ دومی از تصمیم‌هایی است که
  * جای دیگری گرفته شده‌اند.
  */
-export function renderProjectConfig(targetName) {
+export function renderProjectConfig() {
   return `/**
- * ساختهٔ \`userbug init ${targetName} --workspace\`.
+ * ساختهٔ \`userbug setup\`.
  *
- * تنظیمات — مهلت‌ها، گزارشگر، trace، دستگاه، و آدرسِ اپ — از خودِ userbug
- * می‌آید تا دو جا تعریف نشود و واگرا نشوند. آدرس و لاگ و سورس را در
- * \`targets/${targetName}.config.js\` عوض کنید.
+ * تنظیمات — مهلت‌ها، گزارشگر، trace و دستگاه — از خودِ userbug می‌آید تا
+ * دو جا تعریف نشوند و واگرا نشوند.
+ *
+ * آدرسِ اپ، لاگِ سرور و بقیه در \`userbug.config.mjs\`ِ کنارِ همین فایل.
  */
 import { userbugConfig } from 'userbug/config';
 
-export default await userbugConfig({
-  target: ${JSON.stringify(targetName)},
-  testDir: import.meta.dirname,
-});
+export default await userbugConfig({ testDir: import.meta.dirname });
 `;
 }

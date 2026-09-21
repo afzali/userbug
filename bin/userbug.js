@@ -72,7 +72,11 @@ userbug — شبیه‌ساز کاربر برای تست اپ‌های وب
       --remove <نام>              حذف
       --note <نام> --as <متن>     یادداشت
 
-  userbug test <هدف>              اجرای تست‌های پروژه — رایگان، بی‌مدل
+  userbug setup                   راه‌اندازی — از داخلِ پوشهٔ خودِ پروژه
+      --base-url <آدرس>           آدرسِ اپ
+      --no-install                فقط فایل‌ها، بی npm
+
+  userbug test [هدف]              اجرای تست‌های پروژه — رایگان، بی‌مدل
       --ui                        تماشا و قدم‌به‌قدم
       --headed                    مرورگر دیده شود
       --last-failed               فقط آن‌هایی که شکستند
@@ -2815,6 +2819,102 @@ function cmdDiff({ positional }) {
 }
 
 /**
+ * راه‌اندازی — یک دستور، از داخلِ پوشهٔ خودِ پروژه.
+ *
+ * ── چرا لازم شد ──
+ *
+ * راه‌اندازی شش قدم بود و کاربر باید مسیرِ مطلقِ userbug و نسخهٔ دقیقِ
+ * پلی‌رایت را تایپ می‌کرد. هیچ ابزارِ دیگری چنین چیزی نمی‌خواهد.
+ *
+ * و همهٔ آن شش قدم چیزهایی‌اند که ماشین می‌داند: مسیرِ خودش، نسخه‌اش، و
+ * اینکه `.npmrc` چه خطی لازم دارد. چیزی که ماشین می‌داند نباید از آدم
+ * خواسته شود.
+ */
+async function cmdSetup({ flags }) {
+  const cwd = process.cwd();
+  const pkgPath = path.join(cwd, 'package.json');
+
+  if (!fs.existsSync(pkgPath)) {
+    throw new Error(
+      'اینجا پروژه‌ای نیست (package.json ندارد).\n' + '  در پوشهٔ ریشهٔ اپتان اجرا کنید.'
+    );
+  }
+
+  const { ensureNpmrc, ensureWorkspace, writeInside } = await import('../src/emit/workspace.js');
+  const { renderProjectConfig } = await import('../src/project-config.js');
+  const { PROJECT_CONFIG } = await import('../src/target.js');
+
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  const key = String(pkg.name || path.basename(cwd)).replace(/[^\w-]/g, '-');
+  const workspace = path.join(cwd, path.dirname(PROJECT_CONFIG));
+  const baseURL = flags['base-url'] && flags['base-url'] !== true ? String(flags['base-url']) : '';
+
+  console.log(`\n  راه‌اندازی «${key}» در ${cwd}\n`);
+
+  /* ── ۱. پوشه و .npmrc ── */
+  ensureWorkspace(workspace);
+  console.log(`  ✓ ${path.dirname(PROJECT_CONFIG)}/`);
+  console.log(`  ✓ .npmrc — ${{ written: 'ساخته شد', appended: 'خط افزوده شد', kept: 'از قبل داشت' }[ensureNpmrc(cwd)]}`);
+
+  /* ── ۲. کانفیگ‌ها ── */
+  const configFile = path.join(cwd, PROJECT_CONFIG);
+  if (fs.existsSync(configFile)) {
+    console.log('  · userbug.config.mjs — از قبل بود، دست نخورد');
+  } else {
+    writeInside(workspace, 'userbug.config.mjs', renderTargetConfig({
+      key,
+      name: pkg.name || key,
+      baseURL: baseURL || 'http://localhost:5173',
+      environment: 'local',
+    }));
+    console.log('  ✓ userbug.config.mjs');
+  }
+
+  const playwrightFile = path.join(workspace, 'playwright.config.mjs');
+  if (!fs.existsSync(playwrightFile)) {
+    writeInside(workspace, 'playwright.config.mjs', renderProjectConfig());
+    console.log('  ✓ playwright.config.mjs');
+  }
+
+  /* ── ۳. وابستگی‌ها ── */
+  let pinned = '';
+  try {
+    const own = JSON.parse(
+      fs.readFileSync(path.join(ROOT, 'node_modules', '@playwright', 'test', 'package.json'), 'utf8')
+    );
+    pinned = `@${own.version}`;
+  } catch {
+    // نصب نشده؛ بی پین ادامه می‌دهیم
+  }
+
+  const spec = `@playwright/test${pinned}`;
+  const link = `file:${ROOT.split(path.sep).join('/')}`;
+
+  if (flags['no-install']) {
+    console.log(`\n  نصب نشد (--no-install). خودتان:\n    npm i -D ${spec} "${link}"\n`);
+    return;
+  }
+
+  console.log(`\n  نصبِ ${spec} و userbug…`);
+  const install = spawnSync('npm', ['i', '-D', spec, link, '--no-audit', '--no-fund'], {
+    cwd,
+    stdio: 'inherit',
+    shell: true,
+  });
+  if (install.status !== 0) throw new Error('نصب ناموفق بود — پیام npm را ببینید.');
+
+  console.log('\n  نصبِ مرورگر…');
+  spawnSync('npx', ['playwright', 'install', 'chromium'], { cwd, stdio: 'inherit', shell: true });
+
+  console.log('\n  آماده است. قدمِ بعد:\n');
+  console.log('    userbug tour                 گشت بزنید → تست ساخته می‌شود');
+  console.log('    userbug expect               ادعا اضافه کنید');
+  console.log('    npx playwright test          اجرا\n');
+  console.log(`  آدرسِ اپ را در ${PROJECT_CONFIG.split(path.sep).join('/')} تنظیم کنید`);
+  console.log('  و مسیرِ لاگِ سرور را — همان چیزی که پلی‌رایتِ خالی نمی‌دهد.\n');
+}
+
+/**
  * اجرای تست‌های پروژهٔ هدف.
  *
  * ── چرا رانر از اینجا می‌آید و نه از پروژه ──
@@ -2833,12 +2933,16 @@ function cmdDiff({ positional }) {
  */
 async function cmdTest({ flags, positional }) {
   const target = positional[0];
-  if (!target) throw new Error('نام هدف لازم است: userbug test <هدف> [--ui] [--headed]');
-
+  /**
+   * بی نام، کانفیگِ پروژه‌ای که در آن ایستاده‌اید.
+   *
+   * داخلِ پوشهٔ اپ، تایپ کردنِ نامِ هدف تکرارِ چیزی است که از مسیر پیداست
+   * — همان اصطکاکی که هیچ ابزارِ دیگری تحمیل نمی‌کند.
+   */
   const { workspaceRoot, contained } = await import('../src/emit/workspace.js');
 
   const root = workspaceRoot(await loadTarget(target));
-  const config = contained(root, 'playwright.config.js');
+  const config = contained(root, 'playwright.config.mjs');
 
   if (!fs.existsSync(config)) {
     throw new Error(
@@ -3118,9 +3222,9 @@ async function cmdInit({ flags, positional }) {
      * بازنویسی نمی‌شود اگر هست: ممکن است کاربر پروژه‌ها یا reporter خودش
      * را افزوده باشد.
      */
-    const configPath = contained(root, 'playwright.config.js');
+    const configPath = contained(root, 'playwright.config.mjs');
     const hadConfig = fs.existsSync(configPath);
-    if (!hadConfig) writeInside(root, 'playwright.config.js', renderProjectConfig(key));
+    if (!hadConfig) writeInside(root, 'playwright.config.mjs', renderProjectConfig());
 
     console.log(`\n  پوشهٔ userbug برای «${key}»:`);
     console.log(`  ${root}\n`);
@@ -3308,6 +3412,9 @@ try {
       break;
     case 'models':
       await cmdModels(parsed);
+      break;
+    case 'setup':
+      await cmdSetup(parsed);
       break;
     case 'test':
       await cmdTest(parsed);
