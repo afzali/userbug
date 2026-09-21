@@ -26,6 +26,8 @@ import {
 } from '../src/schedule.js';
 import { renderJUnit } from '../src/report/junit.js';
 import { clip, pad } from '../src/terminal.js';
+import { lang, noteLanguageFallback, pick } from '../src/i18n.js';
+import { HELP_EN } from '../src/help-en.js';
 import { knowledgeDir, readDossier, writeDossier } from '../src/knowledge/store.js';
 import { digestSource } from '../src/knowledge/digest.js';
 import { answerQuestion, mergeIntoDossier } from '../src/knowledge/merge.js';
@@ -2849,17 +2851,18 @@ async function cmdSetup({ flags }) {
   const workspace = path.join(cwd, path.dirname(PROJECT_CONFIG));
   const baseURL = flags['base-url'] && flags['base-url'] !== true ? String(flags['base-url']) : '';
 
-  console.log(`\n  راه‌اندازی «${key}» در ${cwd}\n`);
+  noteLanguageFallback();
+  console.log(pick(`\n  راه‌اندازی «${key}» در ${cwd}\n`, `\n  Setting up "${key}" in ${cwd}\n`));
 
   /* ── ۱. پوشه و .npmrc ── */
   ensureWorkspace(workspace);
   console.log(`  ✓ ${path.dirname(PROJECT_CONFIG)}/`);
-  console.log(`  ✓ .npmrc — ${{ written: 'ساخته شد', appended: 'خط افزوده شد', kept: 'از قبل داشت' }[ensureNpmrc(cwd)]}`);
+  console.log(`  ✓ .npmrc — ${pick({ written: 'ساخته شد', appended: 'خط افزوده شد', kept: 'از قبل داشت' }[ensureNpmrc(cwd)], { written: 'created', appended: 'line added', kept: 'already had it' }[ensureNpmrc(cwd)])}`);
 
   /* ── ۲. کانفیگ‌ها ── */
   const configFile = path.join(cwd, PROJECT_CONFIG);
   if (fs.existsSync(configFile)) {
-    console.log('  · userbug.config.mjs — از قبل بود، دست نخورد');
+    console.log(pick('  · userbug.config.mjs — از قبل بود، دست نخورد', '  · userbug.config.mjs — already there, left alone'));
   } else {
     writeInside(workspace, 'userbug.config.mjs', renderTargetConfig({
       key,
@@ -2891,27 +2894,45 @@ async function cmdSetup({ flags }) {
   const link = `file:${ROOT.split(path.sep).join('/')}`;
 
   if (flags['no-install']) {
-    console.log(`\n  نصب نشد (--no-install). خودتان:\n    npm i -D ${spec} "${link}"\n`);
+    console.log(
+      pick(
+        `\n  نصب نشد (--no-install). خودتان:\n    npm i -D ${spec} "${link}"\n`,
+        `\n  Skipped install (--no-install). Run it yourself:\n    npm i -D ${spec} "${link}"\n`
+      )
+    );
     return;
   }
 
-  console.log(`\n  نصبِ ${spec} و userbug…`);
+  console.log(pick(`\n  نصبِ ${spec} و userbug…`, `\n  Installing ${spec} and userbug…`));
   const install = spawnSync('npm', ['i', '-D', spec, link, '--no-audit', '--no-fund'], {
     cwd,
     stdio: 'inherit',
     shell: true,
   });
-  if (install.status !== 0) throw new Error('نصب ناموفق بود — پیام npm را ببینید.');
+  if (install.status !== 0) {
+    throw new Error(pick('نصب ناموفق بود — پیام npm را ببینید.', 'Install failed — see npm output above.'));
+  }
 
-  console.log('\n  نصبِ مرورگر…');
+  console.log(pick('\n  نصبِ مرورگر…', '\n  Installing browser…'));
   spawnSync('npx', ['playwright', 'install', 'chromium'], { cwd, stdio: 'inherit', shell: true });
 
-  console.log('\n  آماده است. قدمِ بعد:\n');
-  console.log('    userbug tour                 گشت بزنید → تست ساخته می‌شود');
-  console.log('    userbug expect               ادعا اضافه کنید');
-  console.log('    npx playwright test          اجرا\n');
-  console.log(`  آدرسِ اپ را در ${PROJECT_CONFIG.split(path.sep).join('/')} تنظیم کنید`);
-  console.log('  و مسیرِ لاگِ سرور را — همان چیزی که پلی‌رایتِ خالی نمی‌دهد.\n');
+  const configPath = PROJECT_CONFIG.split(path.sep).join('/');
+
+  if (lang() === 'fa') {
+    console.log('\n  آماده است. قدمِ بعد:\n');
+    console.log('    userbug tour                 گشت بزنید → تست ساخته می‌شود');
+    console.log('    userbug expect               ادعا اضافه کنید');
+    console.log('    npx playwright test          اجرا\n');
+    console.log(`  آدرسِ اپ را در ${configPath} تنظیم کنید`);
+    console.log('  و مسیرِ لاگِ سرور را — همان چیزی که پلی‌رایتِ خالی نمی‌دهد.\n');
+  } else {
+    console.log('\n  Ready. Next:\n');
+    console.log('    userbug tour                 walk around; it writes the test');
+    console.log('    userbug expect               add assertions');
+    console.log('    npx playwright test          run\n');
+    console.log(`  Set your app address in ${configPath},`);
+    console.log('  and the server log path — the thing plain Playwright cannot give you.\n');
+  }
 }
 
 /**
@@ -3513,11 +3534,11 @@ try {
     case 'help':
     case '--help':
     case '-h':
-      console.log(HELP);
+      console.log(lang() === 'fa' ? HELP : HELP_EN);
       break;
 
     default:
-      console.log(HELP);
+      console.log(lang() === 'fa' ? HELP : HELP_EN);
       // دستورِ ناشناس خطاست؛ نبودِ دستور نه.
       process.exit(cmd ? 1 : 0);
   }
