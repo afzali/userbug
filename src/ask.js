@@ -18,6 +18,7 @@
  */
 import readline from 'node:readline';
 import { clip, pad } from './terminal.js';
+import { pick } from './i18n.js';
 
 /**
  * رقمِ فارسی و عربی → لاتین.
@@ -99,11 +100,21 @@ export async function choose(items, { render, message = 'کدام‌ها؟', hin
 
   if (!process.stdin.isTTY) {
     const chosen = fallback ?? [];
-    console.log(`\n  (ترمینال تعاملی نیست — ${chosen.length ? 'همه' : 'هیچ‌کدام'} انتخاب شد)\n`);
+    console.log(
+      pick(
+        `\n  (ترمینال تعاملی نیست — ${chosen.length ? 'همه' : 'هیچ‌کدام'} انتخاب شد)\n`,
+        `\n  (not an interactive terminal — picked ${chosen.length ? 'all' : 'none'})\n`
+      )
+    );
     return chosen;
   }
 
-  console.log('\n  شماره‌ها را با ویرگول یا بازه بدهید — یا «همه» / «هیچ».');
+  console.log(
+    pick(
+      '\n  شماره‌ها را با ویرگول یا بازه بدهید — یا «همه» / «هیچ».',
+      '\n  Give numbers separated by commas, or a range — or "all" / "none".'
+    )
+  );
   const answer = await readLine(`  ${message} › `);
   const parsed = parseSelection(answer, items.length);
 
@@ -159,7 +170,14 @@ export async function viaEditor({ initial = '', hint = '' } = {}) {
       process.env.VISUAL || process.env.EDITOR || (process.platform === 'win32' ? 'notepad' : 'nano');
 
     const result = spawnSync(editor, [file], { stdio: 'inherit', shell: true });
-    if (result.error) throw new Error(`ویرایشگر باز نشد (${editor}): ${result.error.message}`);
+    if (result.error) {
+      throw new Error(
+        pick(
+          `ویرایشگر باز نشد (${editor}): ${result.error.message}`,
+          `Editor did not open (${editor}): ${result.error.message}`
+        )
+      );
+    }
 
     return fs
       .readFileSync(file, 'utf8')

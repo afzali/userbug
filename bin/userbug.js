@@ -2003,18 +2003,22 @@ async function cmdExpect({ flags, positional }) {
 
     if (!specs.length) {
       throw new Error(
-        `تستی در ${root} نیست.\n` +
-          `  یکی بسازید: userbug tour ${target}   یا   userbug author ${target} "<متن>"`
+        pick(
+          `تستی در ${root} نیست.\n` +
+            `  یکی بسازید: userbug tour ${target}   یا   userbug author ${target} "<متن>"`,
+          `No tests in ${root}\n` +
+            `  Make one: userbug tour ${target}   or   userbug author ${target} "<text>"`
+        )
       );
     }
 
     const [index] = await choose(specs, {
-      message: 'کدام فایل؟',
+      message: pick('کدام فایل؟', 'Which file?'),
       render: (item) => `${item.name}`,
-      hint: (item) => `${item.id} · ${item.steps.length} قدم`,
+      hint: (item) => `${item.id} · ${item.steps.length} ${pick('قدم', 'steps')}`,
     });
     if (index === undefined) {
-      console.log('\n  چیزی انتخاب نشد.\n');
+      console.log(pick('\n  چیزی انتخاب نشد.\n', '\n  Nothing selected.\n'));
       return;
     }
     from = specs[index].id;
@@ -2023,14 +2027,20 @@ async function cmdExpect({ flags, positional }) {
   // مسیرِ نسبی از پوشهٔ userbug در خودِ پروژهٔ هدف خوانده می‌شود، چون تست‌ها
   // از این مخزن رفته‌اند و در ریپوی همان اپ می‌نشینند.
   const file = path.isAbsolute(from) ? from : path.join(root, from);
-  if (!fs.existsSync(file)) throw new Error(`فایلِ تست پیدا نشد: ${file}`);
+  if (!fs.existsSync(file)) {
+    throw new Error(pick(`فایلِ تست پیدا نشد: ${file}`, `Test file not found: ${file}`));
+  }
 
   const before = fs.readFileSync(file, 'utf8');
   const steps = stepNames(before);
   if (!steps.length) {
     throw new Error(
-      'این فایل هیچ `ub.step()`ی ندارد.\n' +
-        '  لنگرِ درجِ ادعا نامِ قدم است، پس بی قدم جایی برای گذاشتنش نیست.'
+      pick(
+        'این فایل هیچ `ub.step()`ی ندارد.\n' +
+          '  لنگرِ درجِ ادعا نامِ قدم است، پس بی قدم جایی برای گذاشتنش نیست.',
+        'This file has no ub.step() blocks.\n' +
+          '  Assertions anchor to step names, so there is nowhere to put them.'
+      )
     );
   }
 
@@ -2041,7 +2051,13 @@ async function cmdExpect({ flags, positional }) {
   });
 
   const title = testTitle(before) || from;
-  console.log(`\n  انتظارها برای «${title}» با ${models.model}…`);
+  noteLanguageFallback();
+  console.log(
+    pick(
+      `\n  انتظارها برای «${title}» با ${models.model}…`,
+      `\n  Proposing assertions for "${title}" with ${models.model}…`
+    )
+  );
 
   const result = await proposeExpectations({
     source: before,
@@ -2052,9 +2068,16 @@ async function cmdExpect({ flags, positional }) {
   });
 
   if (!result.expectations.length) {
-    console.log('\n  مدل هیچ انتظارِ معتبری پیشنهاد نداد.');
+    console.log(
+      pick('\n  مدل هیچ انتظارِ معتبری پیشنهاد نداد.', '\n  The model proposed nothing valid.')
+    );
     for (const note of result.dropped) console.log(`  ! ${note}`);
-    console.log(`\n  فهرستِ عنصرهای واقعی: userbug expect ${target} --list\n`);
+    console.log(
+      pick(
+        `\n  فهرستِ عنصرهای واقعی: userbug expect ${target} --list\n`,
+        `\n  See the real elements: userbug expect ${target} --list\n`
+      )
+    );
     return;
   }
 
@@ -2085,15 +2108,21 @@ async function cmdExpect({ flags, positional }) {
   const picked = flags.apply
     ? [...result.expectations.keys()]
     : await choose(result.expectations, {
-        message: 'کدام‌ها نوشته شوند؟',
+        message: pick('کدام‌ها نوشته شوند؟', 'Which ones to write?'),
         render: (item) => `${item.confidence === 'low' ? '?' : '·'} ${describeExpectation(item)}`,
         hint: (item) => item.why,
       });
 
   if (!picked.length) {
-    console.log('\n  چیزی نوشته نشد.');
-    console.log('  برای نوشتنِ همه بی پرسش: همین فرمان با --apply');
-    console.log('  و --hard اگر به‌جای expect.soft، expect بخواهید — یعنی همان‌جا بشکنند.\n');
+    if (lang() === 'fa') {
+      console.log('\n  چیزی نوشته نشد.');
+      console.log('  برای نوشتنِ همه بی پرسش: همین فرمان با --apply');
+      console.log('  و --hard اگر به‌جای expect.soft، expect بخواهید — یعنی همان‌جا بشکنند.\n');
+    } else {
+      console.log('\n  Nothing written.');
+      console.log('  To write all without asking: same command with --apply');
+      console.log('  And --hard for expect instead of expect.soft — they break on the spot.\n');
+    }
     return;
   }
 
@@ -2115,8 +2144,18 @@ async function cmdExpect({ flags, positional }) {
    */
   const next = applyExpectations(before, chosen.map((one) => ({ ...one, hard })));
   fs.writeFileSync(file, next, 'utf8');
-  console.log(`\n  ${chosen.length} ادعا اضافه شد (${hard ? 'سخت' : 'نرم'}): ${file}`);
-  console.log('  یک بار اجرا کنید و ببینید کدامشان واقعاً می‌خورند.\n');
+  console.log(
+    pick(
+      `\n  ${chosen.length} ادعا اضافه شد (${hard ? 'سخت' : 'نرم'}): ${file}`,
+      `\n  Added ${chosen.length} assertion(s) (${hard ? 'hard' : 'soft'}): ${file}`
+    )
+  );
+  console.log(
+    pick(
+      '  یک بار اجرا کنید و ببینید کدامشان واقعاً می‌خورند.\n',
+      '  Run it once and see which ones actually hold.\n'
+    )
+  );
 }
 
 /**
@@ -3042,7 +3081,10 @@ async function cmdTest({ flags, positional }) {
 
   if (!fs.existsSync(config)) {
     throw new Error(
-      `کانفیگی در ${root} نیست.\n` + `  یک بار بسازیدش: userbug init ${target} --workspace`
+      pick(
+        `کانفیگی در ${root} نیست.\n  یک بار بسازیدش: userbug setup`,
+        `No config in ${root}\n  Create it once: userbug setup`
+      )
     );
   }
 
@@ -3158,25 +3200,40 @@ async function cmdImpact({ flags, positional }) {
 
   const report = await impactOf(target, { roots, base, specs });
 
-  console.log(`\n  ${report.changed} فایل از «${report.base}» تا حالا عوض شده.`);
-  console.log(`  ${specs.length} تست در پوشهٔ پروژه.\n`);
+  noteLanguageFallback();
+  console.log(
+    pick(
+      `\n  ${report.changed} فایل از «${report.base}» تا حالا عوض شده.`,
+      `\n  ${report.changed} file(s) changed since "${report.base}".`
+    )
+  );
+  console.log(
+    pick(`  ${specs.length} تست در پوشهٔ پروژه.\n`, `  ${specs.length} test(s) in the project.\n`)
+  );
 
   if (!report.changed) {
-    console.log('  چیزی عوض نشده.\n');
+    console.log(pick('  چیزی عوض نشده.\n', '  Nothing changed.\n'));
     return;
   }
 
   if (report.scenarios.length) {
-    console.log('  تست‌هایی که باید دوباره فکر شوند:\n');
+    console.log(pick('  تست‌هایی که باید دوباره فکر شوند:\n', '  Tests to rethink:\n'));
     for (const item of report.scenarios) {
       // شاهدِ ضعیف علامت می‌خورد، نه حذف: صفحهٔ گذرگاه واقعاً لمس شده،
       // ولی به‌عنوان شاهد چیزی نمی‌گوید چون همه‌جا هست.
       const mark = item.weak ? '?' : '·';
-      console.log(`  ${mark} ${pad(clip(item.name, 40), 40)} ${item.because.join('، ')}`);
+      console.log(
+        `  ${mark} ${pad(clip(item.name, 40), 40)} ${item.because.join(pick('، ', ', '))}`
+      );
     }
     console.log('');
   } else {
-    console.log('  هیچ تستی به صفحه‌های عوض‌شده نمی‌خورد.\n');
+    console.log(
+      pick(
+        '  هیچ تستی به صفحه‌های عوض‌شده نمی‌خورد.\n',
+        '  No test touches the changed pages.\n'
+      )
+    );
   }
 
   /**
@@ -3187,14 +3244,32 @@ async function cmdImpact({ flags, positional }) {
    * که دروغِ آرام است.
    */
   if (report.unmapped.length) {
-    console.log(`  ${report.unmapped.length} فایل به هیچ صفحه‌ای نگاشت نشد:\n`);
+    console.log(
+      pick(
+        `  ${report.unmapped.length} فایل به هیچ صفحه‌ای نگاشت نشد:\n`,
+        `  ${report.unmapped.length} file(s) mapped to no page:\n`
+      )
+    );
     for (const file of report.unmapped.slice(0, 12)) console.log(`  ! ${file}`);
-    if (report.unmapped.length > 12) console.log(`  … و ${report.unmapped.length - 12} تای دیگر`);
-    console.log('\n  این‌ها ممکن است به همه‌جا اثر داشته باشند؛ خودتان قضاوت کنید.\n');
+    if (report.unmapped.length > 12) {
+      const rest = report.unmapped.length - 12;
+      console.log(pick(`  … و ${rest} تای دیگر`, `  … and ${rest} more`));
+    }
+    console.log(
+      pick(
+        '\n  این‌ها ممکن است به همه‌جا اثر داشته باشند؛ خودتان قضاوت کنید.\n',
+        '\n  These may affect everything — your judgement.\n'
+      )
+    );
   }
 
   if (report.uncovered.length) {
-    console.log('  صفحه‌هایی که عوض شدند و هیچ تستی ندارند:\n');
+    console.log(
+      pick(
+        '  صفحه‌هایی که عوض شدند و هیچ تستی ندارند:\n',
+        '  Pages that changed and have no test:\n'
+      )
+    );
     for (const item of report.uncovered) console.log(`  ✗ ${item.path}`);
     console.log('');
   }

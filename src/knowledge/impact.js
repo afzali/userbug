@@ -60,10 +60,24 @@ function assertRef(value) {
  *
  * `--` هم گذاشته می‌شود تا مرجعی که اتفاقاً نامِ فایل هم هست، ابهام نسازد.
  */
+/**
+ * `core.quotepath=false` — وگرنه نامِ فارسی اوکتالِ فرارشده می‌شود.
+ *
+ * ── چه چیزی بی این می‌شکست ──
+ *
+ * گیت پیش‌فرض هر بایتِ غیرِ اسکی را `\331\210` می‌نویسد و کلِ نام را در
+ * گیومه می‌گذارد. نتیجه دو خرابی هم‌زمان بود: گزارش ناخوانا می‌شد، و آن
+ * رشته با `route.sourceFile` هرگز جور درنمی‌آمد — پس فایلی که واقعاً عوض
+ * شده بود، «به هیچ صفحه‌ای نگاشت نشد» خوانده می‌شد.
+ *
+ * دومی بدتر است: گزارش عددِ درست می‌داد با معنای غلط.
+ */
+const GIT = (root, args) => ['-c', 'core.quotepath=false', '-C', root, ...args];
+
 export async function changedFiles({ root, base = 'HEAD' } = {}) {
   const ref = assertRef(base);
   try {
-    const { stdout } = await run('git', ['-C', root, 'diff', '--name-only', ref, '--'], {
+    const { stdout } = await run('git', GIT(root, ['diff', '--name-only', ref, '--']), {
       maxBuffer: 8 * 1024 * 1024,
     });
     const tracked = stdout.split('\n').map((line) => line.trim()).filter(Boolean);
@@ -77,7 +91,7 @@ export async function changedFiles({ root, base = 'HEAD' } = {}) {
      */
     const { stdout: untracked } = await run(
       'git',
-      ['-C', root, 'ls-files', '--others', '--exclude-standard'],
+      GIT(root, ['ls-files', '--others', '--exclude-standard']),
       { maxBuffer: 8 * 1024 * 1024 }
     );
 
